@@ -1,10 +1,31 @@
+#include <math.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <locale.h>
+#include <errno.h>
 
+#include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xft/Xft.h>
-#include <X11/Xatom.h>
+
+#include "debug.h"
+#include "tty.h"
+
+/* Font structure */
+#define Font Font_
+typedef struct {
+	int height;
+	int width;
+	int ascent;
+	int descent;
+	int badslant;
+	int badweight;
+	short lbearing;
+	short rbearing;
+	XftFont *match;
+	FcFontSet *set;
+	FcPattern *pattern;
+} Font;
 
 typedef struct Xw {
 	Display* d;
@@ -17,7 +38,11 @@ typedef struct Xw {
 	int w,h;
 	int cw,ch;
 	int border;
+	float cwscale, chscale;// todo
 	XftDraw* draw;
+	
+	Font fonts[4]; // normal, bold, italic, bold+italic
+	
 	struct atoms {
 		Atom xembed;
 		Atom wm_delete_window;
@@ -25,6 +50,7 @@ typedef struct Xw {
 		Atom net_wm_icon_name;
 		Atom net_wm_pid;
 		Atom utf8_string;
+		Atom clipboard;
 	} atoms;
 } Xw;
 
@@ -35,7 +61,7 @@ typedef void (*HandlerFunc)(XEvent*);
 #define XEMBED_FOCUS_IN  4
 #define XEMBED_FOCUS_OUT 5
 
-void on_clientmessage(XEvent* e) {
+static void on_clientmessage(XEvent* e) {
 	if (e->xclient.message_type == W.atoms.xembed && e->xclient.format == 32) {
 		if (e->xclient.data.l[1] == XEMBED_FOCUS_IN) {
 			//win.mode |= MODE_FOCUSED;
@@ -53,7 +79,13 @@ static HandlerFunc handler[LASTEvent] = {
 	[ClientMessage] = on_clientmessage,
 };
 
-void run(void) {
+int max(int a, int b) {
+	if (a>b)
+		return a;
+	return b;
+}
+
+static void run(void) {
 	XEvent ev;
 	do {
 		XNextEvent(W.d, &ev);
@@ -65,15 +97,37 @@ void run(void) {
 		}
 	} while (ev.type != MapNotify);
 	
+	time_log("window mapped");
+	
+	int ttyfd = ttynew(NULL, "/bin/sh", NULL, NULL);
+	
+	time_log("tty");
+	
+	int timeout = -1;
+	struct timespec seltv, *tv, now, lastblink, trigger;
 	while (1) {
-	/*fd_set rfd;
-	FD_ZERO(&rfd);
-	int ttyfd;
-	FD_SET(ttyfd, &rfd);
-	int xfd = XConnectionNumber(W.d);
-	FD_SET(xfd, &rfd);*/
-		//if (XPending(W.d))
-		//	;
+		fd_set rfd;
+		FD_ZERO(&rfd);
+		FD_SET(ttyfd, &rfd);
+		int xfd = XConnectionNumber(W.d);
+		FD_SET(xfd, &rfd);
+		
+		if (XPending(W.d))
+			timeout = 0;  /* existing events might not set xfd */
+		
+		seltv.tv_sec = timeout / 1000;
+		seltv.tv_nsec = 1000000 * (timeout % 1000);
+		tv = timeout>=0 ? &seltv : NULL;
+		
+		if (pselect(max(xfd, ttyfd)+1, &rfd, NULL, NULL, tv, NULL) < 0) {
+			if (errno == EINTR)
+				continue;
+			die("select failed: %s\n", strerror(errno));
+		}
+		
+		if (FD_ISSET(ttyfd, &rfd))
+			ttyread();
+		
 		while (XPending(W.d)) {
 			XNextEvent(W.d, &ev);
 			if (XFilterEvent(&ev, None))
@@ -85,21 +139,24 @@ void run(void) {
 	}
 }
 
-void setHints(void) {
+static void init_hints(void) {
+	int base = W.border*2;
 	XSetWMProperties(W.d, W.win, NULL, NULL, NULL, 0, &(XSizeHints){
 			.flags = PSize | PResizeInc | PBaseSize | PMinSize,
 			.width = W.w,
 			.height = W.h,
 			.width_inc = W.cw,
 			.height_inc = W.ch,
-			.base_width = W.border * 2,
-			.base_height = W.border * 2,
+			.base_width = base,
+			.base_height = base,
+			.min_width = base + W.cw*2,
+			.min_height = base + W.ch*2,
 		}, &(XWMHints){
 			.flags = InputHint, .input = 1
 		}, NULL); //todo: class hint?
 }
 
-void init_atoms(void) {
+static void init_atoms(void) {
 	W.atoms.xembed = XInternAtom(W.d, "_XEMBED", False);
 	W.atoms.wm_delete_window = XInternAtom(W.d, "WM_DELETE_WINDOW", False);
 	W.atoms.net_wm_name = XInternAtom(W.d, "_NET_WM_NAME", False);
@@ -108,22 +165,154 @@ void init_atoms(void) {
 	W.atoms.utf8_string = XInternAtom(W.d, "UTF8_STRING", False);
 	if (W.atoms.utf8_string == None)
 		W.atoms.utf8_string = XA_STRING;
+	W.atoms.clipboard = XInternAtom(W.d, "CLIPBOARD", False);
+}
+
+static int ceildiv(int a, int b) {
+	return (a+b-1)/b;
+}
+
+static int load_font(Font* f, FcPattern* pattern) {
+	FcPattern* configured = FcPatternDuplicate(pattern);
+	if (!configured)
+		return 1;
+	
+	FcConfigSubstitute(NULL, configured, FcMatchPattern);
+	XftDefaultSubstitute(W.d, W.scr, configured);
+	
+	FcResult result;
+	FcPattern* match = FcFontMatch(NULL, configured, &result);
+	if (!match) {
+		FcPatternDestroy(configured);
+		return 1;
+	}
+	
+	f->match = XftFontOpenPattern(W.d, match);
+	if (!f->match) {
+		FcPatternDestroy(configured);
+		FcPatternDestroy(match);
+		return 1;
+	}
+	
+	int wantattr, haveattr;
+	
+	// check slant/weight to see if
+	if (XftPatternGetInteger(pattern, "slant", 0, &wantattr) == XftResultMatch) {
+		if (XftPatternGetInteger(f->match->pattern, "slant", 0, &haveattr)!=XftResultMatch || haveattr<wantattr) {
+			f->badslant = 1;
+		}
+	}
+	if (XftPatternGetInteger(pattern, "weight", 0, &wantattr) == XftResultMatch) {
+		if (XftPatternGetInteger(f->match->pattern, "weight", 0, &haveattr)!=XftResultMatch || haveattr != wantattr) {
+			f->badweight = 1;
+		}
+	}
+	
+	const char ascii_printable[] = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+	int len = strlen(ascii_printable);
+	XGlyphInfo extents;
+	XftTextExtentsUtf8(W.d, f->match, (const FcChar8*)ascii_printable, len, &extents);
+	f->set = NULL;
+	f->pattern = configured;
+	f->ascent = f->match->ascent;
+	f->descent = f->match->descent;
+	f->lbearing = 0;
+	f->rbearing = f->match->max_advance_width;
+	f->height = f->ascent + f->descent;
+	f->width = ceildiv(extents.xOff, len);
+	
+	return 0;
+}
+
+static void init_fonts(const char* fontstr, double fontsize) {
+	FcPattern* pattern;
+		
+	if (fontstr[0] == '-')
+		pattern = XftXlfdParse(fontstr, False, False);
+	else
+		pattern = FcNameParse((const FcChar8*)fontstr);
+	
+	//if (!pattern)
+	//	die("can't open font %s\n", fontstr);
+	
+	
+	if (fontsize) {
+		FcPatternDel(pattern, FC_PIXEL_SIZE);
+		FcPatternDel(pattern, FC_SIZE);
+		FcPatternAddDouble(pattern, FC_PIXEL_SIZE, fontsize);
+	} else {
+		if (FcPatternGetDouble(pattern, FC_PIXEL_SIZE, 0, &fontsize) == FcResultMatch) {
+			//
+		} else if (FcPatternGetDouble(pattern, FC_SIZE, 0, &fontsize) == FcResultMatch) {
+			//
+		} else {
+			FcPatternAddDouble(pattern, FC_PIXEL_SIZE, 12);
+			fontsize = 12;
+		}
+	}
+	
+	time_log("parsed font pattern");
+	
+	load_font(&W.fonts[0], pattern);
+	
+	time_log("loaded font 0");
+	
+	W.cw = (int)ceil(W.fonts[0].width);
+	W.ch = (int)ceil(W.fonts[0].height);
+	
+	// italic
+	FcPatternDel(pattern, FC_SLANT);
+	FcPatternAddInteger(pattern, FC_SLANT, FC_SLANT_ITALIC);
+	load_font(&W.fonts[1], pattern);
+	time_log("loaded font 1");
+	
+	// bold+italic
+	FcPatternDel(pattern, FC_WEIGHT);
+	FcPatternAddInteger(pattern, FC_WEIGHT, FC_WEIGHT_BOLD);
+	load_font(&W.fonts[2], pattern);
+	time_log("loaded font 2");
+	// bold
+	FcPatternDel(pattern, FC_SLANT);
+	FcPatternAddInteger(pattern, FC_SLANT, FC_SLANT_ROMAN);
+	load_font(&W.fonts[3], pattern);
+	time_log("loaded font 3");
+	
+	FcPatternDestroy(pattern);
+}
+
+static void init_pixmap(void) {
+	if (W.pix)
+		XFreePixmap(W.d, W.pix);
+	W.pix = XCreatePixmap(W.d, W.win, W.w, W.h, DefaultDepth(W.d, W.scr));
+	if (W.draw) {
+		XftDrawChange(W.draw, W.pix);
+	} else {
+		W.draw = XftDrawCreate(W.d, W.pix, W.vis, W.cmap);
+	}
 }
 
 int main(int argc, char* argv[argc+1]) {
+	time_log("");
+	
 	// hecking locale
 	setlocale(LC_CTYPE, "");
 	XSetLocaleModifiers("");
 	
+	// temp
 	W.w = 100;
 	W.h = 100;
+	W.cw = 10;
+	W.ch = 10;
+	W.border = 3;
 	
 	W.d = XOpenDisplay(NULL);
 	W.scr = XDefaultScreen(W.d);
 	W.vis = XDefaultVisual(W.d, W.scr);
 	
+	time_log("x stuff 1");
+	
 	FcInit();
-	// todo: load fonts
+	init_fonts("cascadia code:pixelsize=16:antialias=true:autohint=true", 0);
 	
 	W.cmap = XDefaultColormap(W.d, W.scr);
 	// todo: load colors
@@ -147,12 +336,8 @@ int main(int argc, char* argv[argc+1]) {
 	W.gc = XCreateGC(W.d, parent, GCGraphicsExposures, &(XGCValues){
 			.graphics_exposures = False,	
 		});
-	// init pixmap
-	W.pix = XCreatePixmap(W.d, W.win, W.w, W.h, DefaultDepth(W.d, W.scr));
-	//XSetForeground(W.d, W.gc, fg);
-	//XFillRectangle(W.d, W.pix, W.gc, 0, 0, W.w, W.h);
 	
-	W.draw = XftDrawCreate(W.d, W.pix, W.vis, W.cmap);
+	init_pixmap();
 	
 	// TODO: xim
 	
@@ -165,9 +350,10 @@ int main(int argc, char* argv[argc+1]) {
 	XMapWindow(W.d, W.win);
 	XSync(W.d, False);
 	
-	W.border = 3;
+	init_hints();
 	
-	setHints();
+	time_log("created window");
+	
 	run();
 	return 0;
 }

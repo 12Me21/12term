@@ -9,11 +9,7 @@ MAKEFLAGS+= --no-builtin-rules
 # (will be created automatically, as well as any subdirectories)
 # (ex: src `subdir/file` will create `.junk/subdir/` and compile `subdir/file.c` to `.junk/subdir/file.o`)
 junkbase:= .junk
-ifdef junkdir
- junkdir:= $(junkbase)/$(junkdir)
-else
- junkdir:= $(junkbase)
-endif
+junkdir:= $(junkbase)/$(output)
 srcdir?= .
 
 # print status nicely (assumes ansi-compatible terminal)
@@ -48,7 +44,7 @@ $(junkdir)/%.o $(junkdir)/%.mk : $(srcdir)/%.c
 
 .PHONY: clean
 clean:
-	$(RM) -r $(junkdir)
+	$(RM) -r $(junkbase)
 	$(RM) $(output)
 
 ifneq ($(findstring clean,$(MAKECMDGOALS)),)
