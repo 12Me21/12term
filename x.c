@@ -10,6 +10,8 @@
 
 #include "debug.h"
 #include "tty.h"
+#define Cursor Cursor_
+#include "buffer.h"
 
 /* Font structure */
 #define Font Font_
@@ -56,6 +58,19 @@ typedef struct Xw {
 
 Xw W;
 
+Term T;
+
+typedef struct {
+	XftFont *font;
+	int flags;
+	Char unicodep;
+} Fontcache;
+
+/* Fontcache is an array now. A new font will be appended to the array. */
+static Fontcache *frc = NULL;
+static int frclen = 0;
+static int frccap = 0;
+
 typedef void (*HandlerFunc)(XEvent*);
 
 #define XEMBED_FOCUS_IN  4
@@ -85,6 +100,18 @@ int max(int a, int b) {
 	return b;
 }
 
+static int timediff(struct timespec t1, struct timespec t2) {
+	return (t1.tv_sec-t2.tv_sec)*1000 + (t1.tv_nsec-t2.tv_nsec)/1E6;
+}
+
+static double minlatency = 8;
+static double maxlatency = 33;
+
+static void draw(void) {
+	print("drawing screen\n");
+	draw_screen(&T);
+}
+
 static void run(void) {
 	XEvent ev;
 	do {
@@ -101,19 +128,21 @@ static void run(void) {
 	
 	int ttyfd = ttynew(NULL, "/bin/sh", NULL, NULL);
 	
-	time_log("tty");
+	time_log("created tty");
 	
 	int timeout = -1;
-	struct timespec seltv, *tv, now, lastblink, trigger;
+	struct timespec seltv, *tv, now, trigger;
+	int drawing;
 	while (1) {
+		int xfd = XConnectionNumber(W.d);
+		
 		fd_set rfd;
 		FD_ZERO(&rfd);
 		FD_SET(ttyfd, &rfd);
-		int xfd = XConnectionNumber(W.d);
 		FD_SET(xfd, &rfd);
 		
 		if (XPending(W.d))
-			timeout = 0;  /* existing events might not set xfd */
+			timeout = 0;
 		
 		seltv.tv_sec = timeout / 1000;
 		seltv.tv_nsec = 1000000 * (timeout % 1000);
@@ -128,14 +157,35 @@ static void run(void) {
 		if (FD_ISSET(ttyfd, &rfd))
 			ttyread();
 		
+		int xev = 0;
 		while (XPending(W.d)) {
+			xev = 1;
 			XNextEvent(W.d, &ev);
 			if (XFilterEvent(&ev, None))
 				continue;
 			if (handler[ev.type])
 				(handler[ev.type])(&ev);
 		}
+		
+		
+		// idea: instead of using just a timeout
+		// we can be more intelligent about this.
+		// detect newlines etc.
+		if (FD_ISSET(ttyfd, &rfd) || xev) {
+			if (!drawing) {
+				trigger = now;
+				drawing = 1;
+			}
+			timeout = (maxlatency - timediff(now, trigger)) / maxlatency * minlatency;
+			if (timeout > 0)
+				continue; /* we have time, try to find idle */
+		}
+		
+		timeout = -1;
+		
+		draw();
 		XFlush(W.d);
+		drawing = 0;
 	}
 }
 
@@ -354,6 +404,273 @@ int main(int argc, char* argv[argc+1]) {
 	
 	time_log("created window");
 	
+	init_term(&T, 10, 10);
+	
 	run();
 	return 0;
 }
+
+XRenderColor get_color(Term* t, Color c) {
+	RGBColor rgb;
+	if (c.truecolor)
+		rgb = c.rgb;
+	else {
+		if (c.i>=0 && c.i<256)
+			rgb = t->palette[c.i];
+		else if (c.i == -1)
+			rgb = t->foreground;
+		else
+			rgb = t->background;
+	}
+	print("color: %d %d %d\n", rgb.r, rgb.g, rgb.b);
+	return (XRenderColor){
+		.red = rgb.r*65535/255,
+		.green = rgb.g*65535/255,
+		.blue = rgb.b*65535/255,
+		.alpha = 65535,
+	};
+}
+
+int same_color(XRenderColor a, XRenderColor b) {
+	return a.red==b.red && a.green==b.green && a.blue==b.blue && a.alpha==b.alpha;
+}
+
+// do we need this??
+void alloc_color(XRenderColor* col, XftColor* out) {
+	XftColorAllocValue(W.d, W.vis, W.cmap, col, out);
+}
+
+void fill_bg(int x, int y, int w, int h, XRenderColor col) {
+	XftColor xcol;
+	alloc_color(&col, &xcol);
+	XftDrawRect(W.draw, &xcol, W.border+W.cw*x, W.border+W.ch*y, W.cw*w, W.ch*h);
+}
+
+// todo: we should cache this for all the text onscreen mayb
+int xmakeglyphfontspecs(XftGlyphFontSpec* specs, int len, const Cell cells[len], int x, int y) {
+	float winx = W.border+x*W.cw;
+	float winy = W.border+y*W.ch;
+	
+	unsigned short prevmode = USHRT_MAX;
+	Font* font = &W.fonts[0];
+	int frcflags = 0;
+	float runewidth = W.cw;
+	FcResult fcres;
+	FcPattern *fcpattern, *fontpattern;
+	FcFontSet *fcsets[] = {NULL};
+	FcCharSet *fccharset;
+	int numspecs = 0;
+	
+	float xp = winx, yp = winy+font->ascent;
+	for (int i=0; i<len; i++) {
+		// Fetch rune and mode for current glyph.
+		Char rune = cells[i].chr;
+		Attrs attrs = cells[i].attrs;
+		
+		/* Skip dummy wide-character spacing. */
+		//if (mode == ATTR_WDUMMY)
+		//	continue;
+
+		/* Determine font for glyph if different from previous glyph. */
+		//if (prevmode != mode) {
+		//	prevmode = mode;
+		frcflags = 0;
+		runewidth = W.cw * (attrs.wide ? 2 : 1);
+		if (attrs.italic && attrs.bold) {
+			frcflags = 3;
+		} else if (attrs.italic) {
+			frcflags = 2;
+		} else if (attrs.bold) {
+			frcflags = 1;
+		}
+		font = &W.fonts[frcflags];
+		yp = winy + font->ascent;
+		//}
+
+		/* Lookup character index with default font. */
+		FT_UInt glyphidx = XftCharIndex(W.d, font->match, rune);
+		if (glyphidx) {
+			specs[numspecs].font = font->match;
+			specs[numspecs].glyph = glyphidx;
+			specs[numspecs].x = (short)xp;
+			specs[numspecs].y = (short)yp;
+			xp += runewidth;
+			numspecs++;
+			continue;
+		}
+
+		/* Fallback on font cache, search the font cache for match. */
+		int f;
+		for (f=0; f<frclen; f++) {
+			glyphidx = XftCharIndex(W.d, frc[f].font, rune);
+			/* Everything correct. */
+			if (glyphidx && frc[f].flags == frcflags)
+				goto found;
+			/* We got a default font for a not found glyph. */
+			if (!glyphidx && frc[f].flags == frcflags && frc[f].unicodep == rune) {
+				goto found;
+			}
+		}
+		/* Nothing was found. Use fontconfig to find matching font. */
+		if (!font->set)
+			font->set = FcFontSort(0, font->pattern, 1, 0, &fcres);
+		fcsets[0] = font->set;
+		
+		/*
+		 * Nothing was found in the cache. Now use
+		 * some dozen of Fontconfig calls to get the
+		 * font for one single character.
+		 *
+		 * Xft and fontconfig are design failures.
+		 */
+		fcpattern = FcPatternDuplicate(font->pattern);
+		fccharset = FcCharSetCreate();
+		
+		FcCharSetAddChar(fccharset, rune);
+		FcPatternAddCharSet(fcpattern, FC_CHARSET, fccharset);
+		FcPatternAddBool(fcpattern, FC_SCALABLE, 1);
+		
+		FcConfigSubstitute(0, fcpattern, FcMatchPattern);
+		FcDefaultSubstitute(fcpattern);
+		
+		fontpattern = FcFontSetMatch(0, fcsets, 1, fcpattern, &fcres);
+		
+		/* Allocate memory for the new cache entry. */
+		if (frclen >= frccap) {
+			frccap += 16;
+			frc = realloc(frc, frccap * sizeof(Fontcache));
+		}
+		
+		frc[frclen].font = XftFontOpenPattern(W.d, fontpattern);
+		if (!frc[frclen].font)
+			die("XftFontOpenPattern failed seeking fallback font: %s\n",
+				strerror(errno));
+		frc[frclen].flags = frcflags;
+		frc[frclen].unicodep = rune;
+		
+		glyphidx = XftCharIndex(W.d, frc[frclen].font, rune);
+		
+		f = frclen;
+		frclen++;
+		
+		FcPatternDestroy(fcpattern);
+		FcCharSetDestroy(fccharset);
+	found:;
+		specs[numspecs].font = frc[f].font;
+		specs[numspecs].glyph = glyphidx;
+		specs[numspecs].x = (short)xp;
+		specs[numspecs].y = (short)yp;
+		xp += runewidth;
+		numspecs++;
+	}
+
+	return numspecs;
+}
+
+void draw_char(Term* t, int x, int y, Cell* c) {
+	XRenderColor fg = get_color(t, c->attrs.color);
+	XRenderColor bg = get_color(t, c->attrs.background);
+	XftColor xcol;
+	alloc_color(&bg, &xcol);
+	XftDrawRect(W.draw, &xcol, W.border+W.cw*x, W.border+W.ch*y, W.cw, W.ch);
+	alloc_color(&fg, &xcol);
+	XftGlyphFontSpec specs;
+	xmakeglyphfontspecs(&specs, 1, c, x, y);
+	XftDrawGlyphFontSpec(W.draw, &xcol, &specs, 1);
+}
+
+void draw_screen(Term* t) {
+	for (int y=0; y<t->height; y++) {
+		for (int x=0; x<t->width; x++) {
+			draw_char(t, x, y, &t->current->rows[y][x]);
+		}
+	}
+	XCopyArea(W.d, W.pix, W.win, W.gc, 0, 0, W.w, W.h, 0, 0);
+}
+
+/*void draw_strikethrough(int x, int y, int w, XRenderColor col) {
+	XftColor xcol;
+	alloc_color(&col, &xcol);
+	XftDrawRect(W.draw, &xcol, W.border+W.cw*x, W.border+W.ch*y+W.fonts[0].ascent+1, W.cw*w, 1);
+}
+
+void draw_underline(int x, int y, int w, XRenderColor col) {
+	XftColor xcol;
+	alloc_color(&col, &xcol);
+	XftDrawRect(W.draw, &xcol, W.border+W.cw*x, W.border+W.ch*y+W.fonts[0].ascent*2/3, W.cw*w, 1);
+	}*/
+
+/*void render_line(Term* t, int width, Cell line[width], int y) {
+	// first, draw the background colors
+	XRenderColor prev;
+	int prevstart = -1;
+	int i;
+	for (i=0; i<width; i++) {
+		XRenderColor col = get_color(t, line[i].attrs.background);
+		if (prevstart==-1) {
+			prevstart = i;
+		} else {
+			if (!same_color(col, prev)) {
+				fill_bg(prevstart, y, i-prevstart, 1, prev);
+				prevstart = i;
+			}
+		}
+		prev = col;
+	}
+	if (i>prevstart) {
+		fill_bg(prevstart, y, i-prevstart, 1, prev);
+	}
+	
+	// now characters
+	// we also group them based on attributes to minimize the number of draws.
+	Attrs preva;
+	for (i=0; i<width; i++) {
+		XRenderColor col = get_color(t, line[i].attrs.color);
+		Attrs attrs = line[i].attrs;
+		if (prevstart==-1) {
+			prevstart = i;
+		} else {
+			if (!same_color(col, prev) || attrs.italic != preva.italic || attrs.bold != preva.bold ) {
+				
+				prevstart = i;
+			}
+		}
+		prev = col;
+		preva = attrs;
+	}
+	
+	// next, the strikethroughs
+	prevstart = -1;
+	for (i=0; i<width; i++) {
+		XRenderColor col = {0};
+		if (line[i].attrs.strikethrough)
+			col = get_color(t, line[i].attrs.color);
+		if (prevstart==-1) {
+			prevstart = i;
+		} else {
+			if (!same_color(col, prev)) {
+				if (prev.alpha)
+					draw_strikethrough(prevstart, y, i-prevstart, prev);
+				prevstart = i;
+			}
+		}
+		prev = col;
+	}
+	// and then underlines
+	prevstart = -1;
+	for (i=0; i<width; i++) {
+		XRenderColor col = {0};
+		if (!line[i].attrs.underline)
+			col = get_color(t, line[i].attrs.color);
+		if (prevstart==-1) {
+			prevstart = i;
+p		} else {
+			if (!same_color(col, prev)) {
+				if (prev.alpha)
+					draw_underline(prevstart, y, i-prevstart, prev);
+				prevstart = i;
+			}
+		}
+		prev = col;
+	}
+	}*/
