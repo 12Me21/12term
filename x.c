@@ -7,10 +7,10 @@
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xft/Xft.h>
+#define Cursor Cursor_
 
 #include "debug.h"
 #include "tty.h"
-#define Cursor Cursor_
 #include "buffer.h"
 
 /* Font structure */
@@ -85,7 +85,7 @@ static void on_clientmessage(XEvent* e) {
 			//win.mode &= ~MODE_FOCUSED;
 		}
 	} else if (e->xclient.data.l[0] == W.atoms.wm_delete_window) {
-		//ttyhangup();
+		tty_hangup();
 		exit(0);
 	}
 }
@@ -108,7 +108,6 @@ static double minlatency = 8;
 static double maxlatency = 33;
 
 static void draw(void) {
-	print("drawing screen\n");
 	draw_screen(&T);
 }
 
@@ -132,7 +131,7 @@ static void run(void) {
 	
 	int timeout = -1;
 	struct timespec seltv, *tv, now, trigger;
-	int drawing;
+	int drawing = 0;
 	while (1) {
 		int xfd = XConnectionNumber(W.d);
 		
@@ -155,7 +154,7 @@ static void run(void) {
 		}
 		
 		if (FD_ISSET(ttyfd, &rfd))
-			ttyread();
+			ttyread(&T);
 		
 		int xev = 0;
 		while (XPending(W.d)) {
@@ -348,12 +347,13 @@ int main(int argc, char* argv[argc+1]) {
 	setlocale(LC_CTYPE, "");
 	XSetLocaleModifiers("");
 	
+	int w = 20;
+	int h = 10;
+	
 	// temp
-	W.w = 100;
-	W.h = 100;
-	W.cw = 10;
-	W.ch = 10;
 	W.border = 3;
+	//W.cw = 10;
+	//W.ch = 10;
 	
 	W.d = XOpenDisplay(NULL);
 	W.scr = XDefaultScreen(W.d);
@@ -363,6 +363,9 @@ int main(int argc, char* argv[argc+1]) {
 	
 	FcInit();
 	init_fonts("cascadia code:pixelsize=16:antialias=true:autohint=true", 0);
+	
+	W.w = W.cw*w+W.border*2;
+	W.h = W.ch*h+W.border*2;
 	
 	W.cmap = XDefaultColormap(W.d, W.scr);
 	// todo: load colors
@@ -404,7 +407,7 @@ int main(int argc, char* argv[argc+1]) {
 	
 	time_log("created window");
 	
-	init_term(&T, 10, 10);
+	init_term(&T, w, h);
 	
 	run();
 	return 0;
@@ -422,7 +425,6 @@ XRenderColor get_color(Term* t, Color c) {
 		else
 			rgb = t->background;
 	}
-	print("color: %d %d %d\n", rgb.r, rgb.g, rgb.b);
 	return (XRenderColor){
 		.red = rgb.r*65535/255,
 		.green = rgb.g*65535/255,
@@ -568,15 +570,18 @@ int xmakeglyphfontspecs(XftGlyphFontSpec* specs, int len, const Cell cells[len],
 }
 
 void draw_char(Term* t, int x, int y, Cell* c) {
-	XRenderColor fg = get_color(t, c->attrs.color);
 	XRenderColor bg = get_color(t, c->attrs.background);
 	XftColor xcol;
 	alloc_color(&bg, &xcol);
 	XftDrawRect(W.draw, &xcol, W.border+W.cw*x, W.border+W.ch*y, W.cw, W.ch);
-	alloc_color(&fg, &xcol);
-	XftGlyphFontSpec specs;
-	xmakeglyphfontspecs(&specs, 1, c, x, y);
-	XftDrawGlyphFontSpec(W.draw, &xcol, &specs, 1);
+	
+	if (c->chr) {
+		XRenderColor fg = get_color(t, c->attrs.color);
+		alloc_color(&fg, &xcol);
+		XftGlyphFontSpec specs;
+		xmakeglyphfontspecs(&specs, 1, c, x, y);
+		XftDrawGlyphFontSpec(W.draw, &xcol, &specs, 1);
+	}
 }
 
 void draw_screen(Term* t) {

@@ -1,5 +1,8 @@
 #pragma once
 #include <stdint.h>
+#include <stdbool.h>
+
+//#include "coroutine.h"
 
 typedef int32_t Char;
 
@@ -15,21 +18,21 @@ typedef struct Color {
 		RGBColor rgb;
 		short i;
 	};
-	char truecolor;
+	bool truecolor;
 } Color;
 
 // display attributes for characters
 typedef struct Attrs {
 	Color color, background;
-	char bold: 1;
-	char faint: 1;
-	char italic: 1;
-	char underline: 1;
-	char blink: 1;
-	char reverse: 1;
-	char invisible: 1;
-	char strikethrough: 1;
-	char wide: 1;
+	bool bold: 1;
+	bool faint: 1;
+	bool italic: 1;
+	bool underline: 1;
+	bool blink: 1;
+	bool reverse: 1;
+	bool invisible: 1;
+	bool strikethrough: 1;
+	bool wide: 1;
 } Attrs;
 
 // single character cell
@@ -66,7 +69,19 @@ typedef struct Term {
 	} scrollback;
 	RGBColor palette[256];
 	RGBColor foreground, background;
+	
+	struct parse {
+		bool in_string;
+		char string[1030];
+		int string_length;
+		int state;
+		int argv[100];
+		int argc;
+		bool csi_private;
+	} parse;
 } Term;
 
 void draw_screen(Term* t);
 void init_term(Term* t, int width, int height);
+int term_write(Term* t, int len, char buf[len]);
+void put_char(Term* t, Char c);

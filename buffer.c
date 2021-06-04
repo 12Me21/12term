@@ -1,6 +1,7 @@
 #include <stdlib.h>
 
 #include "buffer.h"
+#include "debug.h"
 
 const RGBColor default_palette[16] = {
 	//r , g , b 
@@ -21,7 +22,6 @@ const RGBColor default_palette[16] = {
 	{ 85,255,255},
 	{255,255,255},
 };
-
 const RGBColor default_foreground = {  0,  0,  0};
 const RGBColor default_background = {255,255,255};
 
@@ -83,7 +83,7 @@ void init_term(Term* t, int width, int height) {
 			rows[y] = malloc(width*sizeof(Cell));
 			for (int x=0; x<width; x++) {
 				rows[y][x] = (Cell){
-					.chr = 't',
+					.chr = 0,
 					.attrs = {
 						.color = (Color){.i = -1},
 						.background = (Color){.i = -2},
@@ -92,8 +92,16 @@ void init_term(Term* t, int width, int height) {
 			}
 		}
 	}
-	
-	for (int i=0; i<height; i++) {
-		
+}
+
+void put_char(Term* t, Char c) {
+	if (t->c.x >= t->width) {
+		t->c.x = 0;
+		t->c.y++;
 	}
+	t->current->rows[t->c.y][t->c.x] = (Cell){
+		.chr = c,
+		.attrs = t->c.attrs,
+	};
+	t->c.x++;
 }

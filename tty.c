@@ -21,6 +21,8 @@
 #endif
 
 #include "debug.h"
+#include "ctlseqs.h"
+#include "tty.h"
 
 static int iofd = 1;
 static int cmdfd;
@@ -170,13 +172,12 @@ int ttynew(const char *line, char *cmd, const char *out, char **args) {
 	return cmdfd;
 }
 
-size_t ttyread(void) {
-	static char buf[100];
-	static int buflen = 0;
+size_t ttyread(Term* t) {
+	char buf[100];
 	
 	/* append read bytes to unprocessed bytes */
-	int ret = read(cmdfd, buf+buflen, sizeof(buf)-buflen);
-
+	int ret = read(cmdfd, buf, sizeof(buf));
+	
 	switch (ret) {
 	case 0:
 		exit(0);
@@ -185,14 +186,13 @@ size_t ttyread(void) {
 		die("couldn't read from shell: %s\n", strerror(errno));
 		break;
 	default:
-		buflen += ret;
-		//int written = twrite(buf, buflen, 0);
-		print("read: %*.*s\n", buflen, buflen, buf);
-		int written = buflen;
-		buflen -= written;
-		/* keep any incomplete UTF-8 byte sequence for the next call */
-		if (buflen > 0)
-			memmove(buf, buf + written, buflen);
+		// todo: move this stuff into x.c maybe so we don't need buffer.h in this file
+		process_chars(t, ret, buf);
+		break;
 	}
 	return ret;
+}
+
+void tty_hangup(void) {
+	kill(pid, SIGHUP);
 }

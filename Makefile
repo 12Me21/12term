@@ -1,6 +1,6 @@
 output:= 12term
 
-srcs:= x tty debug buffer
+srcs:= x tty debug buffer ctlseqs
 
 CFLAGS+= -Wall -Wextra -g -pedantic
 
