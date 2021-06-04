@@ -1,4 +1,9 @@
+#define _XOPEN_SOURCE 600
 #include <stdlib.h>
+#include <wchar.h>
+#include <string.h>
+
+#define index index_
 
 #include "buffer.h"
 #include "debug.h"
@@ -51,7 +56,7 @@ void init_palette(Term* t) {
 
 void init_scrollback(Term* t) {
 	t->scrollback.size = 0;
-	t->scrollback.len = 0;
+	t->scrollback.lines = 0;
 }
 
 void init_term(Term* t, int width, int height) {
@@ -76,7 +81,7 @@ void init_term(Term* t, int width, int height) {
 		Row* rows = malloc(height*sizeof(Row*));
 		t->buffers[i] = (Buffer){
 			.rows = rows,
-			.scroll_top = 1,
+			.scroll_top = 0,
 			.scroll_bottom = height,
 		};
 		for (int y=0; y<height; y++) {
@@ -94,14 +99,133 @@ void init_term(Term* t, int width, int height) {
 	}
 }
 
-void put_char(Term* t, Char c) {
-	if (t->c.x >= t->width) {
-		t->c.x = 0;
-		t->c.y++;
+static int char_width(Char c) {
+	int width;
+	if (c<=128) {
+		width = 1;
+	} else {
+		width = wcwidth(c);
+		if (width<0)
+			width = 1;
 	}
-	t->current->rows[t->c.y][t->c.x] = (Cell){
-		.chr = c,
-		.attrs = t->c.attrs,
-	};
-	t->c.x++;
+	return width;
+}
+
+void init_row(Term* t, int y) {
+	for (int i=0; i<t->width; i++) {
+		t->current->rows[y][i] = (Cell){
+			.chr=0,
+			.attrs = {
+				.color = t->c.attrs.color,
+				.background = t->c.attrs.background,
+			},
+		};
+	}
+}
+
+static void push_scrollback(Term* t, int y) {
+	if (y<0 || y>=t->height)
+		return;
+	// if scrollback is full, allocate more space
+	if (t->scrollback.lines >= t->scrollback.size) {
+		int length = t->scrollback.size + 1000;
+		t->scrollback.rows = realloc(t->scrollback.rows, sizeof(Cell*)*length);
+		t->scrollback.size = length;
+	}
+	// now insert the row
+	t->scrollback.rows[t->scrollback.lines++] = t->current->rows[y];
+	// remove the row from the buffer itself so it doesn't get freed later
+	t->current->rows[y] = NULL;
+}
+
+void rotate(int count, int itemsize, unsigned char data[count][itemsize], int amount) {
+	while (amount<0)
+		amount += count;
+	amount %= count;
+	int a=0;
+	int b=0;
+	unsigned char temp[itemsize];
+	for (int i=0; i<count; i++) {
+		b = (b+amount) % count;
+		if (b==a)
+			b = ++a;
+		if (b!=a) {
+			memcpy(temp, data[a], itemsize);
+			memcpy(data[a], data[b], itemsize);
+			memcpy(data[b], temp, itemsize);
+		}
+	}
+}
+
+void scroll_up(Term* t, int amount) {
+	if (!amount)
+		return;
+	int y1 = t->current->scroll_top;
+	int y2 = t->current->scroll_bottom;
+	print("scrolling (%d,%d)\n", y1, y2);
+	if (y1<0)
+		y1 = 0;
+	if (y2>t->height)
+		y2 = t->height;
+	
+	for (int y=y1; y<y1+amount; y++) {
+		//if (y1==0) {
+		//	push_scrollback(t, y);
+		//	t->current->rows[y] = malloc(sizeof(Cell)*t->width);
+		//}
+		init_row(t, y);
+	}
+	rotate(y2-y1, sizeof(Cell*), (void*)&t->current->rows[y1], -amount);
+}
+
+int cursor_down(Term* t, int amount) {
+	if (amount<=0)
+		return 0;
+	int next = t->c.y + amount;
+	int m = t->current->scroll_bottom;
+	// cursor started above bottom margin,
+	if (t->c.y < m) {
+		// and hit the margin
+		if (next >= m) {
+			t->c.y = m-1;
+			return next - (m-1);
+		}
+	} else //otherwise
+		// if cursor hit bottom of screen
+		if (next >= t->height)
+			next = t->height-1;
+	// move cursor
+	t->c.y = next;
+	return 0;
+}
+
+void index(Term* t, int amount) {
+	if (amount<=0)
+		return;
+	// cursor is below scrolling region already, so we just move it down
+	if (t->c.y >= t->current->scroll_bottom) {
+		cursor_down(t, amount);
+	} else { //when the cursor starts out above the scrolling region
+		int push = cursor_down(t, amount);
+		// check if the cursor tried to pass through the margin
+		if (push > 0)
+			scroll_up(t, push);
+	}
+}
+
+void put_char(Term* t, Char c) {
+	int width = char_width(c);
+	
+	if (t->c.x >= t->width) {
+		index(t, 1);
+		t->c.x = 0;
+	}
+	
+	Cell* dest = &t->current->rows[t->c.y][t->c.x];
+	dest->chr = c;
+	dest->attrs = t->c.attrs;
+	if (width==2)
+		dest->attrs.wide = width;
+	
+	t->c.x += width;
 }

@@ -3,6 +3,8 @@
 
 #include "buffer.h"
 
-extern int ttynew(const char *line, char *cmd, const char *out, char **args);
+extern int tty_new(char** args);
 extern size_t ttyread(Term* t);
+extern void tty_write(Term* t, size_t n, const char str[n]);
+extern void tty_printf(Term* t, const char* format, ...);
 extern void tty_hangup(void);

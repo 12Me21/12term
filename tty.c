@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <pwd.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
 #if defined(__linux)
  #include <pty.h>
@@ -18,17 +19,21 @@
  #include <util.h>
 #elif defined(__FreeBSD__) || defined(__DragonFly__)
  #include <libutil.h>
+#else
+ #error unsupported system
 #endif
 
 #include "debug.h"
 #include "ctlseqs.h"
 #include "tty.h"
 
+// todo: move all this stuff into a struct and attach it to Term.
+
+const char* termname = "xterm-24bit";
+
 static int iofd = 1;
 static int cmdfd;
-const char* termname = "xterm-24bit";
 static pid_t pid;
-char *stty_args = "stty raw pass8 nl -echo -iexten -cstopb 38400";
 
 void sigchld(int a) {
 	int stat;
@@ -47,31 +52,7 @@ void sigchld(int a) {
 	_exit(0);
 }
 
-void stty(char **args) {
-	char cmd[_POSIX_ARG_MAX];
-	
-	size_t n = strlen(stty_args);
-	if (n > sizeof(cmd)-1)
-		die("incorrect stty parameters\n");
-	memcpy(cmd, stty_args, n);
-	char* q = cmd + n;
-	size_t siz = sizeof(cmd) - n;
-	char* s;
-	for (char** p = args; p && (s = *p); ++p) {
-		n = strlen(s);
-		if (n > siz-1)
-			die("stty parameter length too long\n");
-		*q++ = ' ';
-		memcpy(q, s, n);
-		q += n;
-		siz -= n + 1;
-	}
-	*q = '\0';
-	if (system(cmd) != 0)
-		perror("Couldn't call stty");
-}
-
-void execsh(char *cmd, char **args) {
+void execsh(char** args) {
 	errno = 0;
 	const struct passwd* pw = getpwuid(getuid());
 	if (pw == NULL) {
@@ -82,7 +63,7 @@ void execsh(char *cmd, char **args) {
 	}
 	char* sh = getenv("SHELL");
 	if (sh == NULL)
-		sh = (pw->pw_shell[0]) ? pw->pw_shell : cmd;
+		sh = (pw->pw_shell[0]) ? pw->pw_shell : "/bin/sh";
 	
 	char *prog, *arg;
 	if (args) {
@@ -91,10 +72,9 @@ void execsh(char *cmd, char **args) {
 	} else {
 		prog = sh;
 		arg = NULL;
+		args = (char*[]){prog, arg, NULL};
 	}
-#define DEFAULT(a, b)		(a) = (a) ? (a) : (b)
-	DEFAULT(args, ((char *[]) {prog, arg, NULL}));
-
+	
 	unsetenv("COLUMNS");
 	unsetenv("LINES");
 	unsetenv("TERMCAP");
@@ -115,25 +95,7 @@ void execsh(char *cmd, char **args) {
 	_exit(1);
 }
 
-int ttynew(const char *line, char *cmd, const char *out, char **args) {
-	if (out) {
-		//term.mode |= MODE_PRINT;
-		iofd = (!strcmp(out, "-")) ? 1 : open(out, O_WRONLY | O_CREAT, 0666);
-		if (iofd < 0) {
-			print("Error opening %s:%s\n",
-				out, strerror(errno));
-		}
-	}
-
-	if (line) {
-		cmdfd = open(line, O_RDWR);
-		if (cmdfd < 0)
-			die("open line '%s' failed: %s\n", line, strerror(errno));
-		dup2(cmdfd, 0);
-		stty(args);
-		return cmdfd;
-	}
-
+int tty_new(char** args) {
 	/* seems to work fine on linux, openbsd and freebsd */
 	int m, s;
 	if (openpty(&m, &s, NULL, NULL, NULL) < 0)
@@ -157,7 +119,7 @@ int ttynew(const char *line, char *cmd, const char *out, char **args) {
 		if (pledge("stdio getpw proc exec", NULL) == -1)
 			die("pledge\n");
 #endif
-		execsh(cmd, args);
+		execsh(args);
 		break;
 	default:
 #ifdef __OpenBSD__
@@ -191,6 +153,63 @@ size_t ttyread(Term* t) {
 		break;
 	}
 	return ret;
+}
+
+void tty_printf(Term* t, const char* format, ...) {
+	va_list ap;
+	va_start(ap, format);
+	static char buf[1024];
+	int len = vsnprintf(buf, sizeof(buf), format, ap);
+	va_end(ap);
+	tty_write(t, len, buf);
+}
+
+	
+void tty_write(Term* t, size_t n, const char str[n]) {
+	const char* s = str;
+	fd_set wfd, rfd;
+	size_t lim = 256;
+	while (n > 0) {
+		FD_ZERO(&wfd);
+		FD_ZERO(&rfd);
+		FD_SET(cmdfd, &wfd);
+		FD_SET(cmdfd, &rfd);
+		if (pselect(cmdfd+1, &rfd, &wfd, NULL, NULL, NULL) < 0) {
+			if (errno == EINTR)
+				continue;
+			die("select failed: %s\n", strerror(errno));
+		}
+		if (FD_ISSET(cmdfd, &wfd)) {
+			/*
+			 * Only write the bytes written by ttywrite() or the
+			 * default of 256. This seems to be a reasonable value
+			 * for a serial line. Bigger values might clog the I/O.
+			 */
+			ssize_t r = write(cmdfd, s, (n < lim)? n : lim);
+			if (r < 0)
+				goto write_error;
+			if (r < n) {
+				/*
+				 * We weren't able to write out everything.
+				 * This means the buffer is getting full
+				 * again. Empty it.
+				 */
+				if (n < lim)
+					lim = ttyread(t);
+				n -= r;
+				s += r;
+			} else {
+				/* All bytes have been written. */
+				break;
+			}
+		}
+		if (FD_ISSET(cmdfd, &rfd))
+			lim = ttyread(t);
+	}
+	return;
+
+ write_error:
+	die("write error on tty: %s\n", strerror(errno));
 }
 
 void tty_hangup(void) {

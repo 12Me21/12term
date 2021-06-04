@@ -54,6 +54,13 @@ typedef struct Xw {
 		Atom utf8_string;
 		Atom clipboard;
 	} atoms;
+	
+	struct {
+		XIM xim;
+		XIC xic;
+		XPoint spot;
+		XVaNestedList spotlist;
+	} ime;
 } Xw;
 
 Xw W;
@@ -90,8 +97,82 @@ static void on_clientmessage(XEvent* e) {
 	}
 }
 
+int utf8_encode(Char c, char* out) {
+	if (c<0)
+		return 0;
+	int len=0;
+	if (c < 1<<7) {
+		out[len++] = c;
+	} else if (c < 1<<5+6) {
+		out[len++] = 192 | (c>>6 & (1<<5)-1);
+		last1:
+		out[len++] = 128 | (c & (1<<6)-1);
+	} else if (c < 1<<4+6*2) {
+		out[len++] = 224 | (c>>6*2 & (1<<4)-1);
+		last2:
+		out[len++] = 128 | (c>>6 & (1<<6)-1);
+		goto last1;
+	} else if (c < 1<<3+6*3) {
+		out[len++] = 240 | (c>>6*3 & (1<<3)-1);
+		goto last2;
+	} else { //too big
+		return 0;
+	}
+	return len;
+}
+
+static void on_keypress(XEvent *ev) {
+	XKeyEvent *e = &ev->xkey;
+	
+	//if (IS_SET(MODE_KBDLOCK))
+	//	return;
+	
+	KeySym ksym;
+	char buf[64] = {0};
+	int len;
+	Status status;
+	if (W.ime.xic)
+		len = XmbLookupString(W.ime.xic, e, buf, sizeof buf, &ksym, &status);
+	else
+		len = XLookupString(e, buf, sizeof buf, &ksym, NULL);
+	
+	/* 1. shortcuts */
+	/*for (Shortcut* bp = shortcuts; bp < shortcuts + LEN(shortcuts); bp++) {
+		if (ksym == bp->keysym && match(bp->mod, e->state)) {
+			bp->func(&bp->arg);
+			return;
+		}
+		}*/
+
+	/* 2. custom keys from config.h */
+	/*char* customkey = kmap(ksym, e->state);
+	if (customkey) {
+		ttywrite(customkey, strlen(customkey), 1);
+		return;
+		}*/
+
+	/* 3. composed string from input method */
+	if (len == 0)
+		return;
+	if (len == 1 && e->state & Mod1Mask) {
+		//if (IS_SET(MODE_8BIT)) {
+		//	if (*buf < 0177) {
+		//		Rune c = *buf | 0x80;
+		//		len = utf8encode(c, buf);
+		//	}
+		//} else {
+		buf[1] = buf[0];
+		buf[0] = '\033';
+		len = 2;
+		//}
+	}
+	print("got keypresses: %s\n", buf);
+	tty_write(&T, len, buf);
+}
+
 static HandlerFunc handler[LASTEvent] = {
 	[ClientMessage] = on_clientmessage,
+	[KeyPress] = on_keypress,
 };
 
 int max(int a, int b) {
@@ -125,7 +206,7 @@ static void run(void) {
 	
 	time_log("window mapped");
 	
-	int ttyfd = ttynew(NULL, "/bin/sh", NULL, NULL);
+	int ttyfd = tty_new(NULL);
 	
 	time_log("created tty");
 	
@@ -312,21 +393,68 @@ static void init_fonts(const char* fontstr, double fontsize) {
 	// italic
 	FcPatternDel(pattern, FC_SLANT);
 	FcPatternAddInteger(pattern, FC_SLANT, FC_SLANT_ITALIC);
-	load_font(&W.fonts[1], pattern);
-	time_log("loaded font 1");
+	load_font(&W.fonts[2], pattern);
+	time_log("loaded font 2");
 	
 	// bold+italic
 	FcPatternDel(pattern, FC_WEIGHT);
 	FcPatternAddInteger(pattern, FC_WEIGHT, FC_WEIGHT_BOLD);
-	load_font(&W.fonts[2], pattern);
-	time_log("loaded font 2");
+	load_font(&W.fonts[3], pattern);
+	time_log("loaded font 3");
 	// bold
 	FcPatternDel(pattern, FC_SLANT);
 	FcPatternAddInteger(pattern, FC_SLANT, FC_SLANT_ROMAN);
-	load_font(&W.fonts[3], pattern);
-	time_log("loaded font 3");
+	load_font(&W.fonts[1], pattern);
+	time_log("loaded font 1");
 	
 	FcPatternDestroy(pattern);
+}
+
+void ximinstantiate(Display* d, XPointer client, XPointer call);
+
+void ximdestroy(XIM xim, XPointer client, XPointer call) {
+	W.ime.xim = NULL;
+	XRegisterIMInstantiateCallback(W.d, NULL, NULL, NULL, ximinstantiate, NULL);
+	XFree(W.ime.spotlist);
+}
+
+int xicdestroy(XIC xim, XPointer client, XPointer call) {
+	W.ime.xic = NULL;
+	return 1;
+}
+
+int ximopen(Display* d) {
+	W.ime.xim = XOpenIM(d, NULL, NULL, NULL);
+	if (W.ime.xim == NULL)
+		return 0;
+	
+	if (XSetIMValues(W.ime.xim, XNDestroyCallback, &(XIMCallback){.callback = ximdestroy}, NULL))
+		print("XSetIMValues: Could not set XNDestroyCallback.\n");
+	
+	W.ime.spotlist = XVaCreateNestedList(0, XNSpotLocation, &W.ime.spot, NULL);
+	
+	if (W.ime.xic == NULL) {
+		W.ime.xic = XCreateIC(W.ime.xim, XNInputStyle,
+			XIMPreeditNothing | XIMStatusNothing,
+			XNClientWindow, W.win,
+			XNDestroyCallback, &(XICCallback){.callback = xicdestroy},
+			NULL);
+	}
+	if (W.ime.xic == NULL)
+		print("XCreateIC: Could not create input context.\n");
+	
+	return 1;
+}
+
+void ximinstantiate(Display* d, XPointer client, XPointer call) {
+	if (ximopen(d))
+		XUnregisterIMInstantiateCallback(d, NULL, NULL, NULL, ximinstantiate, NULL);
+}
+
+static void init_xim(void) {
+	if (!ximopen(W.d)) {
+		XRegisterIMInstantiateCallback(W.d, NULL, NULL, NULL, ximinstantiate, NULL);
+	}
 }
 
 static void init_pixmap(void) {
@@ -347,7 +475,7 @@ int main(int argc, char* argv[argc+1]) {
 	setlocale(LC_CTYPE, "");
 	XSetLocaleModifiers("");
 	
-	int w = 20;
+	int w = 50;
 	int h = 10;
 	
 	// temp
@@ -392,7 +520,7 @@ int main(int argc, char* argv[argc+1]) {
 	
 	init_pixmap();
 	
-	// TODO: xim
+	init_xim();
 	
 	init_atoms();
 	
@@ -478,11 +606,11 @@ int xmakeglyphfontspecs(XftGlyphFontSpec* specs, int len, const Cell cells[len],
 		//	prevmode = mode;
 		frcflags = 0;
 		runewidth = W.cw * (attrs.wide ? 2 : 1);
-		if (attrs.italic && attrs.bold) {
+		if (attrs.italic && attrs.weight==1) {
 			frcflags = 3;
 		} else if (attrs.italic) {
 			frcflags = 2;
-		} else if (attrs.bold) {
+		} else if (attrs.weight==1) {
 			frcflags = 1;
 		}
 		font = &W.fonts[frcflags];
@@ -573,7 +701,8 @@ void draw_char(Term* t, int x, int y, Cell* c) {
 	XRenderColor bg = get_color(t, c->attrs.background);
 	XftColor xcol;
 	alloc_color(&bg, &xcol);
-	XftDrawRect(W.draw, &xcol, W.border+W.cw*x, W.border+W.ch*y, W.cw, W.ch);
+	int width = c->attrs.wide ? 2 : 1;
+	XftDrawRect(W.draw, &xcol, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch);
 	
 	if (c->chr) {
 		XRenderColor fg = get_color(t, c->attrs.color);
