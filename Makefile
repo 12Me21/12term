@@ -4,7 +4,7 @@ srcs:= x tty debug buffer ctlseqs
 
 CFLAGS+= -Wall -Wextra -g -pedantic
 
-CFLAGS+= -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -Wno-type-limits -Werror=implicit-function-declaration
+CFLAGS+= -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -Wno-type-limits -Werror=implicit-function-declaration -Wno-parentheses
 
 libs:= m rt X11 util Xft
 

@@ -169,10 +169,11 @@ void scroll_up(Term* t, int amount) {
 		y2 = t->height;
 	
 	for (int y=y1; y<y1+amount; y++) {
-		//if (y1==0) {
-		//	push_scrollback(t, y);
-		//	t->current->rows[y] = malloc(sizeof(Cell)*t->width);
-		//}
+		// if we are on the main screen, and the scroll region starts at the top of the screen, we add the lines to the scrollback list.
+		if (y1==0 && t->current==&t->buffers[0]) {
+			push_scrollback(t, y);
+			t->current->rows[y] = malloc(sizeof(Cell)*t->width);
+		}
 		init_row(t, y);
 	}
 	rotate(y2-y1, sizeof(Cell*), (void*)&t->current->rows[y1], -amount);
