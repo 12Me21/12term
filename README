@@ -1,0 +1,4 @@
+Much the X and pseudoterminal code is borrowed from st (https://st.suckless.org/)
+This probably complicates licensing, but fortunately I don't care :)
+
+I hope to perhaps add image support eventually, using the kitty graphics protocol.
