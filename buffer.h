@@ -78,6 +78,7 @@ typedef struct Term {
 	bool blink_cursor;
 	Cursor saved_cursor;
 	
+	RGBColor cursor_background;
 	RGBColor background, foreground; // these can maybe be accessed as palette[-1] and [-2] but don't try it lol
 	RGBColor palette[256];
 	
@@ -103,25 +104,27 @@ typedef struct Term {
 		int argv[100];
 		bool arg_colon[100]; //todo
 		int argc;
-		bool csi_private;
+		char csi_private;
 		int charset;
 	} parse;
 } Term;
 
-void draw_screen(Term* t);
-void init_term(Term* t, int width, int height);
-int term_write(Term* t, int len, char buf[len]);
-void put_char(Term* t, Char c);
-void index(Term* t, int amount);
-void backspace(Term* t);
-void clear_region(Term* t, int x1, int y1, int x2, int y2);
+void draw_screen(void);
+void init_term(int width, int height);
+int term_write(int len, char buf[len]);
+void put_char(Char c);
+void index(int amount);
+void backspace(void);
+void clear_region(int x1, int y1, int x2, int y2);
 
-int cursor_up(Term* t, int amount);
-int cursor_down(Term* t, int amount);
-void cursor_right(Term* t, int amount);
-void cursor_left(Term* t, int amount);
-void cursor_to(Term* t, int x, int y);
-void delete_chars(Term* t, int n);
-void insert_blank(Term* t, int n);
-void term_resize(Term* t, int width, int height);
-void delete_lines(Term* t, int n);
+int cursor_up(int amount);
+int cursor_down(int amount);
+void cursor_right(int amount);
+void cursor_left(int amount);
+void cursor_to(int x, int y);
+void delete_chars(int n);
+void insert_blank(int n);
+void term_resize(int width, int height);
+void delete_lines(int n);
+
+extern Term T;

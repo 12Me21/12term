@@ -2,4 +2,4 @@
 
 #include "buffer.h"
 
-void process_chars(Term* t, int len, char c[len]);
+void process_chars(int len, char c[len]);

@@ -33,24 +33,26 @@ typedef struct {
 	FcPattern* pattern;
 } Font;
 
-typedef struct Xw {
+// globals
+struct Xw {
 	Display* d;
 	int scr;
 	Visual* vis;
 	Colormap cmap;
 	Window win;
 	Pixmap pix;
+	GC gc;
+	XftDraw* draw;
 	
-	Pixmap cursor;
+	// for rendering the cursor
+	Pixmap under_cursor;
 	bool cursor_drawn;
 	int cursor_x, cursor_y;
 	
-	GC gc;
 	Px w,h;
 	Px cw,ch;
 	Px border;
 	float cwscale, chscale;// todo
-	XftDraw* draw;
 	
 	Font fonts[4]; // normal, bold, italic, bold+italic
 	
@@ -70,11 +72,7 @@ typedef struct Xw {
 		XPoint spot;
 		XVaNestedList spotlist;
 	} ime;
-} Xw;
-
-Xw W;
-
-Term T;
+} W;
 
 typedef struct {
 	XftFont *font;
@@ -137,6 +135,13 @@ bool match_modifiers(int want, int got) {
 	return want==got;
 }
 
+void reset_clip(void) {
+	XftDrawSetClipRectangles(W.draw, W.border, W.border, &(XRectangle){
+			.width = W.w-W.border*2,
+			.height = W.h-W.border*2,
+		}, 1);
+}
+
 static void on_keypress(XEvent *ev) {
 	XKeyEvent *e = &ev->xkey;
 	
@@ -195,7 +200,7 @@ static void on_keypress(XEvent *ev) {
 	
  found:
 	//print("got keypresses: [%d] %s\n", ksym, out);
-	tty_write(&T, len, out);
+	tty_write(len, out);
 }
 
 void repaint(void) {
@@ -207,19 +212,52 @@ void on_expose(XEvent* e) {
 	repaint();
 }
 
+XRenderColor get_color(Color c, bool bold) {
+	RGBColor rgb;
+	if (c.truecolor)
+		rgb = c.rgb;
+	else {
+		int i = c.i;
+		if (i>=0 && i<256) {
+			if (bold && i<8)
+				i+=8;
+			rgb = T.palette[i];
+		}
+		else if (i == -1)
+			rgb = T.foreground;
+		else if (i == -3)
+			rgb = T.cursor_background;
+		else
+			rgb = T.background;
+	}
+	return (XRenderColor){
+		.red = rgb.r*65535/255,
+		.green = rgb.g*65535/255,
+		.blue = rgb.b*65535/255,
+		.alpha = 65535,
+	};
+}
+
+// do we need this??
+void alloc_color(XRenderColor* col, XftColor* out) {
+	XftColorAllocValue(W.d, W.vis, W.cmap, col, out);
+}
+
 static void init_pixmap(void) {
 	if (W.pix)
 		XFreePixmap(W.d, W.pix);
 	W.pix = XCreatePixmap(W.d, W.win, W.w, W.h, DefaultDepth(W.d, W.scr));
-	//XSetForeground(W.dpy, W.gc, T.palette[defaultbg].pixel);
-	//XFillRectangle(xw.dpy, xw.buf, dc.gc, 0, 0, win.w, win.h);
-	
-	
 	if (W.draw) {
 		XftDrawChange(W.draw, W.pix);
 	} else {
 		W.draw = XftDrawCreate(W.d, W.pix, W.vis, W.cmap);
 	}
+	XRenderColor bg = get_color((Color){
+			.truecolor=true,
+			.rgb=T.background}, 0);
+	XftColor xcol;
+	alloc_color(&bg, &xcol);
+	XftDrawRect(W.draw, &xcol, 0, 0, W.w, W.h);
 }
 
 // (size in characters)
@@ -227,17 +265,18 @@ void update_size(int width, int height) {
 	W.w = W.border*2+width*W.cw;
 	W.h = W.border*2+height*W.ch;
 	init_pixmap();
-	term_resize(&T, width, height);
-	tty_resize(&T, width*W.cw, height*W.ch);
+	term_resize(width, height);
+	tty_resize(width*W.cw, height*W.ch);
+	reset_clip();
 }
 
 // when the size of the character cells changes (i.e. when changing fontsize)
 void update_charsize(Px w, Px h) {
 	W.cw = w;
 	W.ch = h;
-	if (W.cursor)
-		XFreePixmap(W.d, W.cursor);
-	W.cursor = XCreatePixmap(W.d, W.win, W.cw, W.ch, DefaultDepth(W.d, W.scr));
+	if (W.under_cursor)
+		XFreePixmap(W.d, W.under_cursor);
+	W.under_cursor = XCreatePixmap(W.d, W.win, W.cw, W.ch, DefaultDepth(W.d, W.scr));
 }
 
 void on_configurenotify(XEvent* e) {
@@ -270,7 +309,7 @@ static double minlatency = 8;
 static double maxlatency = 33;
 
 static void draw(void) {
-	draw_screen(&T);
+	draw_screen();
 }
 
 static void run(void) {
@@ -322,7 +361,7 @@ static void run(void) {
 		clock_gettime(CLOCK_MONOTONIC, &now);
 		
 		if (FD_ISSET(ttyfd, &rfd))
-			ttyread(&T);
+			ttyread();
 		
 		int xev = 0;
 		while (XPending(W.d)) {
@@ -611,43 +650,14 @@ int main(int argc, char* argv[argc+1]) {
 	
 	update_charsize(W.cw, W.ch);
 	
-	init_term(&T, w, h);
+	init_term(w, h);
 	
 	run();
 	return 0;
 }
 
-XRenderColor get_color(Term* t, Color c, bool bold) {
-	RGBColor rgb;
-	if (c.truecolor)
-		rgb = c.rgb;
-	else {
-		int i = c.i;
-		if (i>=0 && i<256) {
-			if (bold && i<8)
-				i+=8;
-			rgb = t->palette[i];
-		}
-		else if (i == -1)
-			rgb = t->foreground;
-		else
-			rgb = t->background;
-	}
-	return (XRenderColor){
-		.red = rgb.r*65535/255,
-		.green = rgb.g*65535/255,
-		.blue = rgb.b*65535/255,
-		.alpha = 65535,
-	};
-}
-
 int same_color(XRenderColor a, XRenderColor b) {
 	return a.red==b.red && a.green==b.green && a.blue==b.blue && a.alpha==b.alpha;
-}
-
-// do we need this??
-void alloc_color(XRenderColor* col, XftColor* out) {
-	XftColorAllocValue(W.d, W.vis, W.cmap, col, out);
 }
 
 void fill_bg(int x, int y, int w, int h, XRenderColor col) {
@@ -657,11 +667,11 @@ void fill_bg(int x, int y, int w, int h, XRenderColor col) {
 }
 
 // todo: we should cache this for all the text onscreen mayb
-int xmakeglyphfontspecs(XftGlyphFontSpec* specs, int len, const Cell cells[len], int x, int y) {
+int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], const Cell cells[len], int x, int y) {
 	float winx = W.border+x*W.cw;
 	float winy = W.border+y*W.ch;
 	
-	unsigned short prevmode = USHRT_MAX;
+	//unsigned short prevmode = USHRT_MAX;
 	Font* font = &W.fonts[0];
 	int frcflags = 0;
 	float runewidth = W.cw;
@@ -727,13 +737,6 @@ int xmakeglyphfontspecs(XftGlyphFontSpec* specs, int len, const Cell cells[len],
 			font->set = FcFontSort(0, font->pattern, 1, 0, &fcres);
 		fcsets[0] = font->set;
 		
-		/*
-		 * Nothing was found in the cache. Now use
-		 * some dozen of Fontconfig calls to get the
-		 * font for one single character.
-		 *
-		 * Xft and fontconfig are design failures.
-		 */
 		fcpattern = FcPatternDuplicate(font->pattern);
 		fccharset = FcCharSetCreate();
 		
@@ -774,14 +777,13 @@ int xmakeglyphfontspecs(XftGlyphFontSpec* specs, int len, const Cell cells[len],
 		xp += runewidth;
 		numspecs++;
 	}
-
 	return numspecs;
 }
 
-void draw_background(Term* t, int x, int y, Cell* c) {
+void draw_background(int x, int y, Cell* c) {
 	if (c->wide == -1)
 		return;
-	XRenderColor bg = get_color(t, c->attrs.background, 0);
+	XRenderColor bg = get_color(c->attrs.background, 0);
 	XftColor xcol;
 	alloc_color(&bg, &xcol);
 	int width = c->wide ? 2 : 1;
@@ -790,17 +792,25 @@ void draw_background(Term* t, int x, int y, Cell* c) {
 		W.cursor_drawn = false;
 }
 
-void draw_char(Term* t, int x, int y, Cell* c) {
+void draw_char(int x, int y, Cell* c) {
 	if (c->wide == -1)
 		return;
 	XftColor xcol;
+	int width = c->wide ? 2 : 1;
+	int winx = W.border+x*W.cw;
+	int winy = W.border+y*W.ch;
 	if (c->chr) {
-		XRenderColor fg = get_color(t, c->attrs.color, c->attrs.weight==1);
+		XRenderColor fg = get_color(c->attrs.color, c->attrs.weight==1);
 		alloc_color(&fg, &xcol);
 		XftGlyphFontSpec specs;
-		xmakeglyphfontspecs(&specs, 1, c, x, y);
+		xmakeglyphfontspecs(1, &specs, c, x, y);
 		XftDrawGlyphFontSpec(W.draw, &xcol, &specs, 1);
 	}
+	if (c->attrs.underline)
+		XftDrawRect(W.draw, &xcol, winx, winy+W.fonts[0].ascent+1, width*W.cw, 1);
+	if (c->attrs.strikethrough)
+		XftDrawRect(W.draw, &xcol, winx, winy+W.fonts[0].ascent*2/3, width*W.cw, 1);
+	
 	if (W.cursor_drawn && W.cursor_x==x && W.cursor_y==y)
 		W.cursor_drawn = false;
 }
@@ -811,7 +821,7 @@ void erase_cursor(void) {
 		return;
 	int x = W.cursor_x;
 	int y = W.cursor_y;
-	XCopyArea(W.d, W.cursor, W.pix, W.gc, 0, 0, W.cw, W.ch, W.border+W.cw*x, W.border+W.ch*y);
+	XCopyArea(W.d, W.under_cursor, W.pix, W.gc, 0, 0, W.cw, W.ch, W.border+W.cw*x, W.border+W.ch*y);
 	W.cursor_drawn = false;
 }
 
@@ -819,13 +829,12 @@ void draw_cursor(int x, int y) {
 	if (W.cursor_drawn)
 		erase_cursor();
 	// todo: adding border each time is a pain. can we specify an origin somehow?
-	XCopyArea(W.d, W.pix, W.cursor, W.gc, W.border+W.cw*x, W.border+W.ch*y, W.cw, W.ch, 0, 0);
+	XCopyArea(W.d, W.pix, W.under_cursor, W.gc, W.border+W.cw*x, W.border+W.ch*y, W.cw, W.ch, 0, 0);
 	
 	Cell temp = T.current->rows[y][x]; //a copy
 	temp.attrs.color = temp.attrs.background;
 	temp.attrs.background = (Color) {
-		.truecolor = true,
-		.rgb = {0,128,0},
+		.i = -3,
 	};
 	int width = temp.wide==1 ? 2 : 1;
 	
@@ -835,30 +844,30 @@ void draw_cursor(int x, int y) {
 			.height = W.ch,
 		}, 1);
 	
-	draw_background(&T, x, y, &temp);
-	draw_char(&T, x, y, &temp);
-	
-	XftDrawSetClip(W.draw, 0);
+	draw_background(x, y, &temp);
+	draw_char(x, y, &temp);
+
+	reset_clip();
 	
 	W.cursor_x = x;
 	W.cursor_y = y;
 	W.cursor_drawn = true;
 }
 
-void draw_line(Term* t, int y) {
-	for (int x=0; x<t->width; x++) {
-		draw_background(&T, x, y, &t->current->rows[y][x]);
+void draw_line(int y) {
+	for (int x=0; x<T.width; x++) {
+		draw_background(x, y, &T.current->rows[y][x]);
 	}
-	for (int x=0; x<t->width; x++) {
-		draw_char(t, x, y, &t->current->rows[y][x]);
+	for (int x=0; x<T.width; x++) {
+		draw_char(x, y, &T.current->rows[y][x]);
 	}
 }
 
-void draw_screen(Term* t) {
-	for (int y=0; y<t->height; y++)
-		draw_line(t, y);
-	if (t->show_cursor)
-		draw_cursor(t->c.x, t->c.y);
+void draw_screen() {
+	for (int y=0; y<T.height; y++)
+		draw_line(y);
+	if (T.show_cursor)
+		draw_cursor(T.c.x, T.c.y);
 	repaint();
 }
 
@@ -874,7 +883,7 @@ void draw_underline(int x, int y, int w, XRenderColor col) {
 	XftDrawRect(W.draw, &xcol, W.border+W.cw*x, W.border+W.ch*y+W.fonts[0].ascent*2/3, W.cw*w, 1);
 	}*/
 
-/*void render_line(Term* t, int width, Cell line[width], int y) {
+/*void render_line(int width, Cell line[width], int y) {
 	// first, draw the background colors
 	XRenderColor prev;
 	int prevstart = -1;

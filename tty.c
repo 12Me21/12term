@@ -134,7 +134,7 @@ int tty_new(char** args) {
 	return cmdfd;
 }
 
-size_t ttyread(Term* t) {
+size_t ttyread() {
 	char buf[100];
 	
 	/* append read bytes to unprocessed bytes */
@@ -149,23 +149,23 @@ size_t ttyread(Term* t) {
 		break;
 	default:
 		// todo: move this stuff into x.c maybe so we don't need buffer.h in this file
-		process_chars(t, ret, buf);
+		process_chars(ret, buf);
 		break;
 	}
 	return ret;
 }
 
-void tty_printf(Term* t, const char* format, ...) {
+void tty_printf(const char* format, ...) {
 	va_list ap;
 	va_start(ap, format);
 	static char buf[1024];
 	int len = vsnprintf(buf, sizeof(buf), format, ap);
 	va_end(ap);
-	tty_write(t, len, buf);
+	tty_write(len, buf);
 }
 
 	
-void tty_write(Term* t, size_t n, const char str[n]) {
+void tty_write(size_t n, const char str[n]) {
 	const char* s = str;
 	fd_set wfd, rfd;
 	size_t lim = 256;
@@ -195,7 +195,7 @@ void tty_write(Term* t, size_t n, const char str[n]) {
 				 * again. Empty it.
 				 */
 				if (n < lim)
-					lim = ttyread(t);
+					lim = ttyread();
 				n -= written;
 				s += written;
 			} else {
@@ -204,7 +204,7 @@ void tty_write(Term* t, size_t n, const char str[n]) {
 			}
 		}
 		if (FD_ISSET(cmdfd, &rfd))
-			lim = ttyread(t);
+			lim = ttyread();
 	}
 	return;
 
@@ -217,10 +217,10 @@ void tty_hangup(void) {
 }
 
 // ugly
-void tty_resize(Term* t, int w, int h) {
+void tty_resize(int w, int h) {
 	if (ioctl(cmdfd, TIOCSWINSZ, &(struct winsize){
-				.ws_col = t->width,
-				.ws_row = t->height,
+				.ws_col = T.width,
+				.ws_row = T.height,
 				.ws_xpixel = w,
 				.ws_ypixel = h,
 			}) < 0)

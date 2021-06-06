@@ -37,13 +37,13 @@ int limit(int x, int min, int max) {
 	return x;
 }
 
-void process_sgr_color(Term* t, int* i, Color* out) {
-	int type = t->parse.argv[*i+1];
+void process_sgr_color(int* i, Color* out) {
+	int type = T.parse.argv[*i+1];
 	switch (type) {
 	case 2:;
-		int r = t->parse.argv[*i+2];
-		int g = t->parse.argv[*i+3];
-		int b = t->parse.argv[*i+4];
+		int r = T.parse.argv[*i+2];
+		int g = T.parse.argv[*i+3];
+		int b = T.parse.argv[*i+4];
 		*out = (Color){
 			.truecolor = true,
 			.rgb = (RGBColor){
@@ -55,7 +55,7 @@ void process_sgr_color(Term* t, int* i, Color* out) {
 		*i += 4;
 		break;
 	case 5:;
-		int c = t->parse.argv[*i+2];
+		int c = T.parse.argv[*i+2];
 		if (c<0 || c>=256) {
 			print("invalid color index in SGR: %d\n", c);
 		} else {
@@ -70,30 +70,30 @@ void process_sgr_color(Term* t, int* i, Color* out) {
 }
 
 // CSI [ ... m
-void process_sgr(Term* t) {
-	int c = t->parse.argc;
+void process_sgr() {
+	int c = T.parse.argc;
 #define SEVEN(x) x: case x+1: case x+2: case x+3: case x+4: case x+5: case x+6: case x+7
 	for (int i=0; i<c; i++) {
-		int a = t->parse.argv[i];
+		int a = T.parse.argv[i];
 		switch (a) {
 		case 0:
-			t->c.attrs = (Attrs){
+			T.c.attrs = (Attrs){
 				.color = {.i=-1},
 				.background = {.i=-2},
 				// rest are set to 0
 			};
 			break;
 		case 1:
-			t->c.attrs.weight = 1;
+			T.c.attrs.weight = 1;
 			break;
 		case 2:
-			t->c.attrs.weight = -1; //this should blend fg with bg color maybe. but no one uses faint anyway so whatever
+			T.c.attrs.weight = -1; //this should blend fg with bg color maybe. but no one uses faint anyway so whatever
 			break;
 		case 3:
-			t->c.attrs.italic = true;
+			T.c.attrs.italic = true;
 			break;
 		case 4:
-			t->c.attrs.underline = true;
+			T.c.attrs.underline = true;
 			break;
 		case 5:
 			//slow blink
@@ -102,58 +102,58 @@ void process_sgr(Term* t) {
 			//fast blink
 			break;
 		case 7:
-			t->c.attrs.reverse = true; //todo: how to implement this nicely
+			T.c.attrs.reverse = true; //todo: how to implement this nicely
 			break;
 		case 8:
-			t->c.attrs.invisible = true;
+			T.c.attrs.invisible = true;
 			break;
 		case 9:
-			t->c.attrs.strikethrough = true;
+			T.c.attrs.strikethrough = true;
 			break;
 		case 22:
-			t->c.attrs.weight = 0;
+			T.c.attrs.weight = 0;
 			break;
 		case 23:
-			t->c.attrs.italic = false;
+			T.c.attrs.italic = false;
 			break;
 		case 24:
-			t->c.attrs.underline = false;
+			T.c.attrs.underline = false;
 			break;
 		case 25:
 			// disable blink
 			break;
 		case 27:
-			t->c.attrs.reverse = true;
+			T.c.attrs.reverse = true;
 			break;
 		case 28:
-			t->c.attrs.invisible = true;
+			T.c.attrs.invisible = true;
 			break;
 		case 29:
-			t->c.attrs.strikethrough = true;
+			T.c.attrs.strikethrough = true;
 			break;
 		case SEVEN(30):
-			t->c.attrs.color = (Color){.i = a-30};
+			T.c.attrs.color = (Color){.i = a-30};
 			break;
 		case 38:
-			process_sgr_color(t, &i, &t->c.attrs.color);
+			process_sgr_color(&i, &T.c.attrs.color);
 			break;
 		case 39:
-			t->c.attrs.color = (Color){.i = -1};
+			T.c.attrs.color = (Color){.i = -1};
 			break;
 		case SEVEN(40):
-			t->c.attrs.background = (Color){.i = a-40};
+			T.c.attrs.background = (Color){.i = a-40};
 			break;
 		case 48:
-			process_sgr_color(t, &i, &t->c.attrs.background);
+			process_sgr_color(&i, &T.c.attrs.background);
 			break;
 		case 49:
-			t->c.attrs.background = (Color){.i = -2};
+			T.c.attrs.background = (Color){.i = -2};
 			break;
 		case SEVEN(90):
-			t->c.attrs.color = (Color){.i = a-90+8};
+			T.c.attrs.color = (Color){.i = a-90+8};
 			break;
 		case SEVEN(100):
-			t->c.attrs.background = (Color){.i = a-100+8};
+			T.c.attrs.background = (Color){.i = a-100+8};
 			break;
 		default:
 			print("unknown sgr: %d\n", a);
@@ -161,9 +161,9 @@ void process_sgr(Term* t) {
 	}
 }
 
-void set_private_modes(Term* t, bool state) {
-	for (int i=0; i<t->parse.argc; i++) {
-		int a = t->parse.argv[i];
+void set_private_modes(bool state) {
+	for (int i=0; i<T.parse.argc; i++) {
+		int a = T.parse.argv[i];
 		switch (a) {
 		case 0: // ignore
 			break;
@@ -177,37 +177,45 @@ void set_private_modes(Term* t, bool state) {
 		case 7: // wrap?
 			break;
 		case 12: // enable/disable cursor blink
-			t->blink_cursor = state;
+			T.blink_cursor = state;
 			break;
 		case 25: // show/hide cursor
-			t->show_cursor = state;
+			T.show_cursor = state;
+			break;
+		case 1000: // send mouse position on button press
+			break;
+		case 1003: // All Motion Mouse Tracking
+			break;
+		case 1004: // Send FocusIn/FocusOut events
+			break;
+		case 1006: // SGR mouse mode
 			break;
 		case 1047: // to alt/main buffer
 			if (state) {
-				t->current = &t->buffers[1];
+				T.current = &T.buffers[1];
 				// do we clear when already in alt screen?
-				clear_region(t, 0, 0, t->width, t->height);
+				clear_region(0, 0, T.width, T.height);
 			} else
-				t->current = &t->buffers[0];
+				T.current = &T.buffers[0];
 			break;
 		case 1048: // save/load cursor
 			if (state)
-				t->saved_cursor = t->c;
+				T.saved_cursor = T.c;
 			else
-				t->c = t->saved_cursor;
+				T.c = T.saved_cursor;
 			break;
 		case 1049: // 1048 and 1049
 			if (state) {
-				t->saved_cursor = t->c;
-				t->current = &t->buffers[1];
-				clear_region(t, 0, 0, t->width, t->height);
+				T.saved_cursor = T.c;
+				T.current = &T.buffers[1];
+				clear_region(0, 0, T.width, T.height);
 			} else {
-				t->c = t->saved_cursor;
-				t->current = &t->buffers[0];
+				T.c = T.saved_cursor;
+				T.current = &T.buffers[0];
 			}
 			break;
 		case 2004: // set bracketed paste mode
-			t->bracketed_paste = state;
+			T.bracketed_paste = state;
 			break;
 		default:
 			print("unknown private mode: %d\n", a);
@@ -215,117 +223,126 @@ void set_private_modes(Term* t, bool state) {
 	}
 }
 
-static int get_arg(Term* t, int n, int def) {
-	if (n>=t->parse.argc || t->parse.argv[n]==0)
+static int get_arg(int n, int def) {
+	if (n>=T.parse.argc || T.parse.argv[n]==0)
 		return def;
-	return t->parse.argv[n];
+	return T.parse.argv[n];
 }
 
 // get first arg; defaults to 1 if not set. (very commonly used)
-static int get_arg01(Term* t) {
-	return t->parse.argv[0] ? t->parse.argv[0] : 1;
+static int get_arg01() {
+	return T.parse.argv[0] ? T.parse.argv[0] : 1;
 }
 
-static void process_csi_command(Term* t, Char c) {	
-	int arg = t->parse.argv[0]; //will be 0 if no args were passed. this is intentional.
+static void process_csi_command(Char c) {	
+	int arg = T.parse.argv[0]; //will be 0 if no args were passed. this is intentional.
 	
-	if (t->parse.csi_private) { // CSI ? <args> <char>
+	switch (T.parse.csi_private) {
+	default:
+		// unknown
+		break;
+	case '?':
 		switch (c) {
 		case 'h':
-			set_private_modes(t, true);
+			set_private_modes(true);
 			break;
 		case 'l':
-			set_private_modes(t, false);
+			set_private_modes(false);
 			break;
 		default:
 			print("unknown CSI private terminator: %c\n", (char)c);
 		}
-		t->parse.state = NORMAL;
-	} else {  // CSI <args> <char>
+		T.parse.state = NORMAL;
+		break;
+	case '>':
+		//whatever;
+		T.parse.state = NORMAL;
+		break;
+	case 0:
 		switch (c) {
 		case '@':
-			insert_blank(t, get_arg01(t));
+			insert_blank(get_arg01());
 			break;
 		case 'A':
-			cursor_up(t, get_arg01(t));
+			cursor_up(get_arg01());
 			break;
 		case 'B':
 		case 'e':
-			cursor_down(t, get_arg01(t));
+			cursor_down(get_arg01());
 			break;
 		case 'C':
 		case 'a':
-			cursor_right(t, get_arg01(t));
+			cursor_right(get_arg01());
 			break;
 		case 'd':
-			cursor_to(t, t->c.x, get_arg01(t)-1);
+			cursor_to(T.c.x, get_arg01()-1);
 			break;
 		case 'H':
 		case 'f':
-			cursor_to(t,
- 				get_arg(t, 1, 1)-1,
-				get_arg(t, 0, 1)-1
-			);
+			cursor_to(get_arg(1, 1)-1,	get_arg(0, 1)-1);
 			break;
 		case 'J':
 			switch (arg) {
 			case 0: // after cursor
-				clear_region(t, t->c.x, t->c.y, t->width, t->c.y+1);
-				clear_region(t, 0, t->c.y+1, t->width, t->height);
+				clear_region(T.c.x, T.c.y, T.width, T.c.y+1);
+				clear_region(0, T.c.y+1, T.width, T.height);
 				break;
 			case 1: // before cursor
-				clear_region(t, 0, t->c.y, t->c.x, t->c.y+1);
-				clear_region(t, 0, 0, t->width, t->c.y);
+				clear_region(0, T.c.y, T.c.x, T.c.y+1);
+				clear_region(0, 0, T.width, T.c.y);
 				break;
 			case 2: // whole screen
-				clear_region(t, 0, 0, t->width, t->height);
+				clear_region(0, 0, T.width, T.height);
 				break;
 			case 3: // scollback
 				// ehhh
-				t->scrollback.lines = 0;
+				T.scrollback.lines = 0;
 				break;
 			}
 			break;
 		case 'K':
 			switch (arg) {
 			case 0: // clear line after cursor
-				clear_region(t, t->c.x, t->c.y, t->width, t->c.y+1);
+				clear_region(T.c.x, T.c.y, T.width, T.c.y+1);
 				break;
 			case 1: // clear line before cursor
-				clear_region(t, 0, t->c.y, t->c.x, t->c.y+1);
+				clear_region(0, T.c.y, T.c.x, T.c.y+1);
 				break;
 			case 2: // entire line
-				clear_region(t, 0, t->c.y, t->width, t->c.y+1);
+				clear_region(0, T.c.y, T.width, T.c.y+1);
 				break;
 			default:
 				goto invalid;
 			}
 			break;
 		case 'P':
-			delete_chars(t, get_arg01(t));
+			delete_chars(get_arg01());
 			break;
 		case 'M':
-			delete_lines(t, get_arg01(t));
+			delete_lines(get_arg01());
 			break;
 		case 'm':
-			process_sgr(t);
+			process_sgr();
 			break;
 		case 'r':
-			t->current->scroll_top = get_arg01(t)-1;
-			t->current->scroll_bottom = get_arg(t, 1, t->height);
+			T.current->scroll_top = get_arg01()-1;
+			T.current->scroll_bottom = get_arg(1, T.height);
 			// is this supposed to move the cursor?
 			break;
 		case 'n':
 			if (arg == 6) {
-				tty_printf(t, "\x1B[%d;%dR", t->c.y+1, t->c.x+1);
+				tty_printf("\x1B[%d;%dR", T.c.y+1, T.c.x+1);
 			} else {
 				print("unknown device status report: %d\n", arg);
 			}
 			break;
+		case 't': //window ops
+			// TODO
+			break;
 		default:
 			print("unknown CSI terminator: %c\n", (char)c);
 		}
-		t->parse.state = NORMAL;
+		T.parse.state = NORMAL;
 	}
 	return;
  invalid:
@@ -334,10 +351,10 @@ static void process_csi_command(Term* t, Char c) {
 	return;
 }
 
-void process_csi_char(Term* t, Char c) {
+void process_csi_char(Char c) {
 	if (c>='0' && c<='9') { // arg
-		t->parse.argv[t->parse.argc-1] *= 10;
-		t->parse.argv[t->parse.argc-1] += c - '0';
+		T.parse.argv[T.parse.argc-1] *= 10;
+		T.parse.argv[T.parse.argc-1] += c - '0';
 	} else if (c==':' || c==';') { // arg separator
 		// technically ; and : are used for different things, but it's not really ambiguous so I won't bother distinguishing for now.
 		
@@ -345,32 +362,32 @@ void process_csi_char(Term* t, Char c) {
 		// because all the other codes are a single number, so if they are not supported, it's nbd
 		// but multi-number codes can cause frame shift issues, if they aren't supported, then the terminal will interpret the later values as individual args which is wrong.
 		
-		t->parse.argc++;
-		t->parse.argv[t->parse.argc-1] = 0;
+		T.parse.argc++;
+		T.parse.argv[T.parse.argc-1] = 0;
 	} else {
 		// finished
-		process_csi_command(t, c);
-		t->parse.state = NORMAL;
+		process_csi_command(c);
+		T.parse.state = NORMAL;
 	}
 }
 
 // returns true if char was eaten
-bool process_control_char(Term* t, unsigned char c) {
+bool process_control_char(unsigned char c) {
 	switch (c) {
 	case '\a':
 		// bel
 		break;
 	case '\t':
-		cursor_to(t, (t->c.x+8)/8*8, t->c.y);
+		cursor_to((T.c.x+8)/8*8, T.c.y);
 		break;
 	case '\b':
-		backspace(t);
+		backspace();
 		break;
 	case '\r':
-		t->c.x = 0;
+		T.c.x = 0;
 		break;
 	case '\n':
-		index(t, 1);
+		index(1);
 		break;
 	default:
 		return false;
@@ -378,48 +395,48 @@ bool process_control_char(Term* t, unsigned char c) {
 	return true;
 }
 
-void process_escape_char(Term* t, Char c) {
+void process_escape_char(Char c) {
 	switch (c) {
 		// multi-char sequences
 	case '[':
-		t->parse.argc = 1;
-		t->parse.argv[0] = 0;
-		t->parse.state = CSI_START;
+		T.parse.argc = 1;
+		T.parse.argv[0] = 0;
+		T.parse.state = CSI_START;
 		return;
 	case '#':
-		t->parse.state = ESC_TEST;
+		T.parse.state = ESC_TEST;
 		return;
 	case '%':
-		t->parse.state = UTF8;
+		T.parse.state = UTF8;
 		return;
 	case '(':
 	case ')':
 	case '*':
 	case '+':
-		t->parse.state = ALTCHARSET;
-		t->parse.charset = c-'(';
+		T.parse.state = ALTCHARSET;
+		T.parse.charset = c-'(';
 		return;
 		
 		// things that take string parameters
 	case 'P':
-		t->parse.state = STRING;
-		t->parse.string_command = DCS;
+		T.parse.state = STRING;
+		T.parse.string_command = DCS;
 		return;
 	case '_':
-		t->parse.state = STRING;
-		t->parse.string_command = APC;
+		T.parse.state = STRING;
+		T.parse.string_command = APC;
 		return;
 	case '^':
-		t->parse.state = STRING;
-		t->parse.string_command = PM;
+		T.parse.state = STRING;
+		T.parse.string_command = PM;
 		return;
 	case ']':
-		t->parse.state = STRING;
-		t->parse.string_command = OSC;
+		T.parse.state = STRING;
+		T.parse.string_command = OSC;
 		return;
 	case 'k':
-		t->parse.state = STRING;
-		t->parse.string_command = TITLE;
+		T.parse.state = STRING;
+		T.parse.string_command = TITLE;
 		return;
 
 		// single char sequences
@@ -429,14 +446,18 @@ void process_escape_char(Term* t, Char c) {
 		break;
 	case 'D':
 		break;
+	case '=':
+		break;
+	case '>':
+		break;
 	default:
 		print("unknown ESC char: %d\n", c);
 	}
-	t->parse.state = NORMAL;
+	T.parse.state = NORMAL;
 }
 
-static void process_char(Term* t, Char c) {
-	struct parse* const p = &t->parse;
+static void process_char(Char c) {
+	struct parse* const p = &T.parse;
 	
 	if (p->state == STRING) {
 		// end of string
@@ -457,7 +478,7 @@ static void process_char(Term* t, Char c) {
 		return;
 	}
 	
-	if (c<256 && c>=0 && process_control_char(t, c))
+	if (c<256 && c>=0 && process_control_char(c))
 		return;
 	////////////////////////
 	switch (p->state) {
@@ -468,24 +489,26 @@ static void process_char(Term* t, Char c) {
 			p->state = ESC;
 			break;
 		default:
-			put_char(t, c);
+			put_char(c);
 		}
 		break;
 		// escape
 	case ESC:
-		process_escape_char(t, c);
+		process_escape_char(c);
 		break;
 	case CSI_START:
 		p->state = CSI;
 		if (c=='?')
-			p->csi_private = true;
+			p->csi_private = '?';
+		else if (c=='>')
+			p->csi_private = '>';
 		else {
-			p->csi_private = false;
-			process_csi_char(t, c);
+			p->csi_private = 0;
+			process_csi_char(c);
 		}
 		break;
 	case CSI:
-		process_csi_char(t, c);
+		process_csi_char(c);
 		break;
 	case ALTCHARSET:
 		if (c=='0')
@@ -511,14 +534,15 @@ char utf8_type[32] = {
 	[24] = 2,2,2,2, // 2 - start of 2 byte sequence
 	[28] = 3,3, // 3 - start of 3 byte sequence
 	[30] = 4, // 4 - start of 4 byte sequence
+	[31] = -1, // invalid
 };
 	
 Char utf8_buffer = 0;
 int utf8_state = 0;
-void process_chars(Term* t, int len, char cs[len]) {
+void process_chars(int len, char cs[len]) {
 	for (int i=0; i<len; i++) {
-		Char c = (unsigned char)cs[i]; //important! we need to convert to unsigned first
-		int type = utf8_type[c>>3]; // figure out what type of utf-8 byte this is
+		Char c = (int)(unsigned char)cs[i]; //important! we need to convert to unsigned before casting to int
+		int type = utf8_type[c>>3]; // figure out what type of utf-8 byte this is (number of leading 1 bits) using a lookup table
 		c = c & (1<<7-type)-1; // extract the data bits
 		// process the byte:
 		switch (utf8_state<<3 | type) {
@@ -529,14 +553,14 @@ void process_chars(Term* t, int len, char cs[len]) {
 			break;
 		// final/only byte
 		case 0:
-			process_char(t, c);
+			process_char(c);
 			utf8_state = 0;
 			break;
 		case 3<<3 | 1:
 		case 3*2+1<<3 | 1:
 		case 3*3+2<<3 | 1:
 			utf8_buffer |= c;
-			process_char(t, utf8_buffer);
+			process_char(utf8_buffer);
 			utf8_buffer = 0;
 			utf8_state = 0;
 			break;
