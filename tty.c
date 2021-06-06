@@ -185,10 +185,10 @@ void tty_write(Term* t, size_t n, const char str[n]) {
 			 * default of 256. This seems to be a reasonable value
 			 * for a serial line. Bigger values might clog the I/O.
 			 */
-			ssize_t r = write(cmdfd, s, (n < lim)? n : lim);
-			if (r < 0)
+			ssize_t written = write(cmdfd, s, (n < lim)? n : lim);
+			if (written < 0)
 				goto write_error;
-			if (r < n) {
+			if (written < n) {
 				/*
 				 * We weren't able to write out everything.
 				 * This means the buffer is getting full
@@ -196,8 +196,8 @@ void tty_write(Term* t, size_t n, const char str[n]) {
 				 */
 				if (n < lim)
 					lim = ttyread(t);
-				n -= r;
-				s += r;
+				n -= written;
+				s += written;
 			} else {
 				/* All bytes have been written. */
 				break;
@@ -214,4 +214,15 @@ void tty_write(Term* t, size_t n, const char str[n]) {
 
 void tty_hangup(void) {
 	kill(pid, SIGHUP);
+}
+
+// ugly
+void tty_resize(Term* t, int w, int h) {
+	if (ioctl(cmdfd, TIOCSWINSZ, &(struct winsize){
+				.ws_col = t->width,
+				.ws_row = t->height,
+				.ws_xpixel = w,
+				.ws_ypixel = h,
+			}) < 0)
+		print("Couldn't set window size: %s\n", strerror(errno));
 }

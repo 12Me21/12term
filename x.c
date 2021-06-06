@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <locale.h>
 #include <errno.h>
+#include <time.h>
 
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
@@ -12,6 +13,9 @@
 #include "debug.h"
 #include "tty.h"
 #include "buffer.h"
+#include "keymap.h"
+
+typedef int Px;
 
 /* Font structure */
 #define Font Font_
@@ -20,13 +24,13 @@ typedef struct {
 	int width;
 	int ascent;
 	int descent;
-	int badslant;
-	int badweight;
+	bool badslant;
+	bool badweight;
 	short lbearing;
 	short rbearing;
-	XftFont *match;
-	FcFontSet *set;
-	FcPattern *pattern;
+	XftFont* match;
+	FcFontSet* set;
+	FcPattern* pattern;
 } Font;
 
 typedef struct Xw {
@@ -36,10 +40,15 @@ typedef struct Xw {
 	Colormap cmap;
 	Window win;
 	Pixmap pix;
+	
+	Pixmap cursor;
+	bool cursor_drawn;
+	int cursor_x, cursor_y;
+	
 	GC gc;
-	int w,h;
-	int cw,ch;
-	int border;
+	Px w,h;
+	Px cw,ch;
+	Px border;
 	float cwscale, chscale;// todo
 	XftDraw* draw;
 	
@@ -73,8 +82,7 @@ typedef struct {
 	Char unicodep;
 } Fontcache;
 
-/* Fontcache is an array now. A new font will be appended to the array. */
-static Fontcache *frc = NULL;
+static Fontcache* frc = NULL;
 static int frclen = 0;
 static int frccap = 0;
 
@@ -121,6 +129,14 @@ int utf8_encode(Char c, char* out) {
 	return len;
 }
 
+bool match_modifiers(int want, int got) {
+	if (want==-1)
+		return true;
+	if (want==-2)
+		return (got & ControlMask);
+	return want==got;
+}
+
 static void on_keypress(XEvent *ev) {
 	XKeyEvent *e = &ev->xkey;
 	
@@ -129,29 +145,40 @@ static void on_keypress(XEvent *ev) {
 	
 	KeySym ksym;
 	char buf[64] = {0};
-	int len;
+	const char* out = buf;
+	int len = 0;
 	Status status;
+	
 	if (W.ime.xic)
 		len = XmbLookupString(W.ime.xic, e, buf, sizeof buf, &ksym, &status);
 	else
 		len = XLookupString(e, buf, sizeof buf, &ksym, NULL);
 	
-	/* 1. shortcuts */
-	/*for (Shortcut* bp = shortcuts; bp < shortcuts + LEN(shortcuts); bp++) {
-		if (ksym == bp->keysym && match(bp->mod, e->state)) {
-			bp->func(&bp->arg);
-			return;
+	for (KeyMap* map=KEY_MAP; map->output; map++) {
+		if (map->k==ksym && match_modifiers(map->modifiers, e->state)) {
+			out = map->output;
+			if (map->special==0) {
+				len = strlen(out);
+			} else {
+				int mods = 0;
+				if (e->state & ShiftMask)
+					mods |= 1;
+				if (e->state & Mod1Mask)
+					mods |= 2;
+				if (e->state & ControlMask)
+					mods |= 4;
+				if (map->special==1)
+					len = snprintf(buf, sizeof(buf), map->output, mods+1);
+				else if (map->special==2)
+					len = snprintf(buf, sizeof(buf), map->output, mods+1, map->arg);
+				else if (map->special==3)
+					len = snprintf(buf, sizeof(buf), map->output, map->arg, mods+1);
+				out = buf;
+			}
+			goto found;
 		}
-		}*/
-
-	/* 2. custom keys from config.h */
-	/*char* customkey = kmap(ksym, e->state);
-	if (customkey) {
-		ttywrite(customkey, strlen(customkey), 1);
-		return;
-		}*/
-
-	/* 3. composed string from input method */
+	}
+	
 	if (len == 0)
 		return;
 	if (len == 1 && e->state & Mod1Mask) {
@@ -164,15 +191,69 @@ static void on_keypress(XEvent *ev) {
 		buf[1] = buf[0];
 		buf[0] = '\033';
 		len = 2;
-		//}
 	}
-	print("got keypresses: %s\n", buf);
-	tty_write(&T, len, buf);
+	
+ found:
+	//print("got keypresses: [%d] %s\n", ksym, out);
+	tty_write(&T, len, out);
+}
+
+void repaint(void) {
+	XCopyArea(W.d, W.pix, W.win, W.gc, 0, 0, W.w, W.h, 0, 0);
+}
+
+void on_expose(XEvent* e) {
+	(void)e;
+	repaint();
+}
+
+static void init_pixmap(void) {
+	if (W.pix)
+		XFreePixmap(W.d, W.pix);
+	W.pix = XCreatePixmap(W.d, W.win, W.w, W.h, DefaultDepth(W.d, W.scr));
+	//XSetForeground(W.dpy, W.gc, T.palette[defaultbg].pixel);
+	//XFillRectangle(xw.dpy, xw.buf, dc.gc, 0, 0, win.w, win.h);
+	
+	
+	if (W.draw) {
+		XftDrawChange(W.draw, W.pix);
+	} else {
+		W.draw = XftDrawCreate(W.d, W.pix, W.vis, W.cmap);
+	}
+}
+
+// (size in characters)
+void update_size(int width, int height) {
+	W.w = W.border*2+width*W.cw;
+	W.h = W.border*2+height*W.ch;
+	init_pixmap();
+	term_resize(&T, width, height);
+	tty_resize(&T, width*W.cw, height*W.ch);
+}
+
+// when the size of the character cells changes (i.e. when changing fontsize)
+void update_charsize(Px w, Px h) {
+	W.cw = w;
+	W.ch = h;
+	if (W.cursor)
+		XFreePixmap(W.d, W.cursor);
+	W.cursor = XCreatePixmap(W.d, W.win, W.cw, W.ch, DefaultDepth(W.d, W.scr));
+}
+
+void on_configurenotify(XEvent* e) {
+	Px width = e->xconfigure.width;
+	Px height = e->xconfigure.height;
+	if (width==W.w && height==W.h)
+		return;
+	
+	update_size((width-W.border*2)/W.cw, (height-W.border*2)/W.ch);
 }
 
 static HandlerFunc handler[LASTEvent] = {
 	[ClientMessage] = on_clientmessage,
 	[KeyPress] = on_keypress,
+	[Expose] = on_expose,
+	[ConfigureNotify] = on_configurenotify,
 };
 
 int max(int a, int b) {
@@ -210,6 +291,11 @@ static void run(void) {
 	
 	time_log("created tty");
 	
+	int w = (W.w-W.border*2) / W.cw;
+	int h = (W.h-W.border*2) / W.ch;
+	
+	update_size(w, h); // gehhhh
+	
 	int timeout = -1;
 	struct timespec seltv, *tv, now, trigger;
 	int drawing = 0;
@@ -233,6 +319,7 @@ static void run(void) {
 				continue;
 			die("select failed: %s\n", strerror(errno));
 		}
+		clock_gettime(CLOCK_MONOTONIC, &now);
 		
 		if (FD_ISSET(ttyfd, &rfd))
 			ttyread(&T);
@@ -270,7 +357,7 @@ static void run(void) {
 }
 
 static void init_hints(void) {
-	int base = W.border*2;
+	Px base = W.border*2;
 	XSetWMProperties(W.d, W.win, NULL, NULL, NULL, 0, &(XSizeHints){
 			.flags = PSize | PResizeInc | PBaseSize | PMinSize,
 			.width = W.w,
@@ -329,12 +416,12 @@ static int load_font(Font* f, FcPattern* pattern) {
 	// check slant/weight to see if
 	if (XftPatternGetInteger(pattern, "slant", 0, &wantattr) == XftResultMatch) {
 		if (XftPatternGetInteger(f->match->pattern, "slant", 0, &haveattr)!=XftResultMatch || haveattr<wantattr) {
-			f->badslant = 1;
+			f->badslant = true;
 		}
 	}
 	if (XftPatternGetInteger(pattern, "weight", 0, &wantattr) == XftResultMatch) {
 		if (XftPatternGetInteger(f->match->pattern, "weight", 0, &haveattr)!=XftResultMatch || haveattr != wantattr) {
-			f->badweight = 1;
+			f->badweight = true;
 		}
 	}
 	
@@ -386,9 +473,6 @@ static void init_fonts(const char* fontstr, double fontsize) {
 	load_font(&W.fonts[0], pattern);
 	
 	time_log("loaded font 0");
-	
-	W.cw = (int)ceil(W.fonts[0].width);
-	W.ch = (int)ceil(W.fonts[0].height);
 	
 	// italic
 	FcPatternDel(pattern, FC_SLANT);
@@ -457,17 +541,6 @@ static void init_xim(void) {
 	}
 }
 
-static void init_pixmap(void) {
-	if (W.pix)
-		XFreePixmap(W.d, W.pix);
-	W.pix = XCreatePixmap(W.d, W.win, W.w, W.h, DefaultDepth(W.d, W.scr));
-	if (W.draw) {
-		XftDrawChange(W.draw, W.pix);
-	} else {
-		W.draw = XftDrawCreate(W.d, W.pix, W.vis, W.cmap);
-	}
-}
-
 int main(int argc, char* argv[argc+1]) {
 	time_log("");
 	
@@ -475,6 +548,7 @@ int main(int argc, char* argv[argc+1]) {
 	setlocale(LC_CTYPE, "");
 	XSetLocaleModifiers("");
 	
+	// default size
 	int w = 50;
 	int h = 10;
 	
@@ -492,11 +566,13 @@ int main(int argc, char* argv[argc+1]) {
 	FcInit();
 	init_fonts("cascadia code:pixelsize=16:antialias=true:autohint=true", 0);
 	
+	W.cw = ceil(W.fonts[0].width);
+	W.ch = ceil(W.fonts[0].height);
+	
 	W.w = W.cw*w+W.border*2;
 	W.h = W.ch*h+W.border*2;
 	
 	W.cmap = XDefaultColormap(W.d, W.scr);
-	// todo: load colors
 	
 	Window parent = XRootWindow(W.d, W.scr);
 	W.win = XCreateWindow(W.d, parent,
@@ -518,8 +594,6 @@ int main(int argc, char* argv[argc+1]) {
 			.graphics_exposures = False,	
 		});
 	
-	init_pixmap();
-	
 	init_xim();
 	
 	init_atoms();
@@ -535,20 +609,26 @@ int main(int argc, char* argv[argc+1]) {
 	
 	time_log("created window");
 	
+	update_charsize(W.cw, W.ch);
+	
 	init_term(&T, w, h);
 	
 	run();
 	return 0;
 }
 
-XRenderColor get_color(Term* t, Color c) {
+XRenderColor get_color(Term* t, Color c, bool bold) {
 	RGBColor rgb;
 	if (c.truecolor)
 		rgb = c.rgb;
 	else {
-		if (c.i>=0 && c.i<256)
-			rgb = t->palette[c.i];
-		else if (c.i == -1)
+		int i = c.i;
+		if (i>=0 && i<256) {
+			if (bold && i<8)
+				i+=8;
+			rgb = t->palette[i];
+		}
+		else if (i == -1)
 			rgb = t->foreground;
 		else
 			rgb = t->background;
@@ -597,15 +677,16 @@ int xmakeglyphfontspecs(XftGlyphFontSpec* specs, int len, const Cell cells[len],
 		Char rune = cells[i].chr;
 		Attrs attrs = cells[i].attrs;
 		
+		
 		/* Skip dummy wide-character spacing. */
-		//if (mode == ATTR_WDUMMY)
-		//	continue;
-
+		if (cells[i].wide == -1)
+			continue;
+		
 		/* Determine font for glyph if different from previous glyph. */
 		//if (prevmode != mode) {
 		//	prevmode = mode;
 		frcflags = 0;
-		runewidth = W.cw * (attrs.wide ? 2 : 1);
+		runewidth = W.cw * (cells[i].wide==1 ? 2 : 1);
 		if (attrs.italic && attrs.weight==1) {
 			frcflags = 3;
 		} else if (attrs.italic) {
@@ -697,29 +778,88 @@ int xmakeglyphfontspecs(XftGlyphFontSpec* specs, int len, const Cell cells[len],
 	return numspecs;
 }
 
-void draw_char(Term* t, int x, int y, Cell* c) {
-	XRenderColor bg = get_color(t, c->attrs.background);
+void draw_background(Term* t, int x, int y, Cell* c) {
+	if (c->wide == -1)
+		return;
+	XRenderColor bg = get_color(t, c->attrs.background, 0);
 	XftColor xcol;
 	alloc_color(&bg, &xcol);
-	int width = c->attrs.wide ? 2 : 1;
+	int width = c->wide ? 2 : 1;
 	XftDrawRect(W.draw, &xcol, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch);
-	
+	if (W.cursor_drawn && W.cursor_x==x && W.cursor_y==y)
+		W.cursor_drawn = false;
+}
+
+void draw_char(Term* t, int x, int y, Cell* c) {
+	if (c->wide == -1)
+		return;
+	XftColor xcol;
 	if (c->chr) {
-		XRenderColor fg = get_color(t, c->attrs.color);
+		XRenderColor fg = get_color(t, c->attrs.color, c->attrs.weight==1);
 		alloc_color(&fg, &xcol);
 		XftGlyphFontSpec specs;
 		xmakeglyphfontspecs(&specs, 1, c, x, y);
 		XftDrawGlyphFontSpec(W.draw, &xcol, &specs, 1);
 	}
+	if (W.cursor_drawn && W.cursor_x==x && W.cursor_y==y)
+		W.cursor_drawn = false;
+}
+
+
+void erase_cursor(void) {
+	if (!W.cursor_drawn)
+		return;
+	int x = W.cursor_x;
+	int y = W.cursor_y;
+	XCopyArea(W.d, W.cursor, W.pix, W.gc, 0, 0, W.cw, W.ch, W.border+W.cw*x, W.border+W.ch*y);
+	W.cursor_drawn = false;
+}
+
+void draw_cursor(int x, int y) {
+	if (W.cursor_drawn)
+		erase_cursor();
+	// todo: adding border each time is a pain. can we specify an origin somehow?
+	XCopyArea(W.d, W.pix, W.cursor, W.gc, W.border+W.cw*x, W.border+W.ch*y, W.cw, W.ch, 0, 0);
+	
+	Cell temp = T.current->rows[y][x]; //a copy
+	temp.attrs.color = temp.attrs.background;
+	temp.attrs.background = (Color) {
+		.truecolor = true,
+		.rgb = {0,128,0},
+	};
+	int width = temp.wide==1 ? 2 : 1;
+	
+	// this time we do NOT want it to overflow ever
+	XftDrawSetClipRectangles(W.draw, x*W.cw+W.border, y*W.ch+W.border, &(XRectangle){
+			.width = W.cw*width,
+			.height = W.ch,
+		}, 1);
+	
+	draw_background(&T, x, y, &temp);
+	draw_char(&T, x, y, &temp);
+	
+	XftDrawSetClip(W.draw, 0);
+	
+	W.cursor_x = x;
+	W.cursor_y = y;
+	W.cursor_drawn = true;
+}
+
+void draw_line(Term* t, int y) {
+	for (int x=0; x<t->width; x++) {
+		draw_background(&T, x, y, &t->current->rows[y][x]);
+	}
+	for (int x=0; x<t->width; x++) {
+		draw_char(t, x, y, &t->current->rows[y][x]);
+	}
 }
 
 void draw_screen(Term* t) {
-	for (int y=0; y<t->height; y++) {
-		for (int x=0; x<t->width; x++) {
-			draw_char(t, x, y, &t->current->rows[y][x]);
-		}
-	}
-	XCopyArea(W.d, W.pix, W.win, W.gc, 0, 0, W.w, W.h, 0, 0);
+	for (int y=0; y<t->height; y++)
+		draw_line(t, y);
+	if (t->show_cursor)
+		draw_cursor(t->c.x, t->c.y);
+	repaint();
 }
 
 /*void draw_strikethrough(int x, int y, int w, XRenderColor col) {
@@ -804,7 +944,7 @@ p		} else {
 					draw_underline(prevstart, y, i-prevstart, prev);
 				prevstart = i;
 			}
-		}
+p		}
 		prev = col;
 	}
 	}*/

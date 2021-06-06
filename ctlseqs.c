@@ -61,6 +61,7 @@ void process_sgr_color(Term* t, int* i, Color* out) {
 		} else {
 			*out = (Color){.i = c};
 		}
+		*i += 2;
 		break;
 	default:
 		print("unknown SGR color type: %d\n", type);
@@ -68,6 +69,7 @@ void process_sgr_color(Term* t, int* i, Color* out) {
 	}
 }
 
+// CSI [ ... m
 void process_sgr(Term* t) {
 	int c = t->parse.argc;
 #define SEVEN(x) x: case x+1: case x+2: case x+3: case x+4: case x+5: case x+6: case x+7
@@ -120,6 +122,15 @@ void process_sgr(Term* t) {
 		case 25:
 			// disable blink
 			break;
+		case 27:
+			t->c.attrs.reverse = true;
+			break;
+		case 28:
+			t->c.attrs.invisible = true;
+			break;
+		case 29:
+			t->c.attrs.strikethrough = true;
+			break;
 		case SEVEN(30):
 			t->c.attrs.color = (Color){.i = a-30};
 			break;
@@ -154,13 +165,68 @@ void set_private_modes(Term* t, bool state) {
 	for (int i=0; i<t->parse.argc; i++) {
 		int a = t->parse.argv[i];
 		switch (a) {
+		case 0: // ignore
+			break;
+		case 1: // application cursor mode
+			// do we actually care about this lol??
+			break;
+		case 5: // reverse video eye bleeding mode
+			break;
+		case 6: // cursor origin mode??
+			break;
+		case 7: // wrap?
+			break;
+		case 12: // enable/disable cursor blink
+			t->blink_cursor = state;
+			break;
+		case 25: // show/hide cursor
+			t->show_cursor = state;
+			break;
+		case 1047: // to alt/main buffer
+			if (state) {
+				t->current = &t->buffers[1];
+				// do we clear when already in alt screen?
+				clear_region(t, 0, 0, t->width, t->height);
+			} else
+				t->current = &t->buffers[0];
+			break;
+		case 1048: // save/load cursor
+			if (state)
+				t->saved_cursor = t->c;
+			else
+				t->c = t->saved_cursor;
+			break;
+		case 1049: // 1048 and 1049
+			if (state) {
+				t->saved_cursor = t->c;
+				t->current = &t->buffers[1];
+				clear_region(t, 0, 0, t->width, t->height);
+			} else {
+				t->c = t->saved_cursor;
+				t->current = &t->buffers[0];
+			}
+			break;
+		case 2004: // set bracketed paste mode
+			t->bracketed_paste = state;
+			break;
 		default:
 			print("unknown private mode: %d\n", a);
 		}
 	}
 }
 
-void process_csi_command(Term* t, Char c) {	
+static int get_arg(Term* t, int n, int def) {
+	if (n>=t->parse.argc || t->parse.argv[n]==0)
+		return def;
+	return t->parse.argv[n];
+}
+
+// get first arg; defaults to 1 if not set. (very commonly used)
+static int get_arg01(Term* t) {
+	return t->parse.argv[0] ? t->parse.argv[0] : 1;
+}
+
+static void process_csi_command(Term* t, Char c) {	
 	int arg = t->parse.argv[0]; //will be 0 if no args were passed. this is intentional.
 	
 	if (t->parse.csi_private) { // CSI ? <args> <char>
@@ -177,8 +243,77 @@ void process_csi_command(Term* t, Char c) {
 		t->parse.state = NORMAL;
 	} else {  // CSI <args> <char>
 		switch (c) {
+		case '@':
+			insert_blank(t, get_arg01(t));
+			break;
+		case 'A':
+			cursor_up(t, get_arg01(t));
+			break;
+		case 'B':
+		case 'e':
+			cursor_down(t, get_arg01(t));
+			break;
+		case 'C':
+		case 'a':
+			cursor_right(t, get_arg01(t));
+			break;
+		case 'd':
+			cursor_to(t, t->c.x, get_arg01(t)-1);
+			break;
+		case 'H':
+		case 'f':
+			cursor_to(t,
+ 				get_arg(t, 1, 1)-1,
+				get_arg(t, 0, 1)-1
+			);
+			break;
+		case 'J':
+			switch (arg) {
+			case 0: // after cursor
+				clear_region(t, t->c.x, t->c.y, t->width, t->c.y+1);
+				clear_region(t, 0, t->c.y+1, t->width, t->height);
+				break;
+			case 1: // before cursor
+				clear_region(t, 0, t->c.y, t->c.x, t->c.y+1);
+				clear_region(t, 0, 0, t->width, t->c.y);
+				break;
+			case 2: // whole screen
+				clear_region(t, 0, 0, t->width, t->height);
+				break;
+			case 3: // scollback
+				// ehhh
+				t->scrollback.lines = 0;
+				break;
+			}
+			break;
+		case 'K':
+			switch (arg) {
+			case 0: // clear line after cursor
+				clear_region(t, t->c.x, t->c.y, t->width, t->c.y+1);
+				break;
+			case 1: // clear line before cursor
+				clear_region(t, 0, t->c.y, t->c.x, t->c.y+1);
+				break;
+			case 2: // entire line
+				clear_region(t, 0, t->c.y, t->width, t->c.y+1);
+				break;
+			default:
+				goto invalid;
+			}
+			break;
+		case 'P':
+			delete_chars(t, get_arg01(t));
+			break;
+		case 'M':
+			delete_lines(t, get_arg01(t));
+			break;
 		case 'm':
 			process_sgr(t);
+			break;
+		case 'r':
+			t->current->scroll_top = get_arg01(t)-1;
+			t->current->scroll_bottom = get_arg(t, 1, t->height);
+			// is this supposed to move the cursor?
 			break;
 		case 'n':
 			if (arg == 6) {
@@ -192,6 +327,11 @@ void process_csi_command(Term* t, Char c) {
 		}
 		t->parse.state = NORMAL;
 	}
+	return;
+ invalid:
+	//todo
+	print("unknown command args for %c\n", (char)c);
+	return;
 }
 
 void process_csi_char(Term* t, Char c) {
@@ -217,9 +357,14 @@ void process_csi_char(Term* t, Char c) {
 // returns true if char was eaten
 bool process_control_char(Term* t, unsigned char c) {
 	switch (c) {
+	case '\a':
+		// bel
+		break;
 	case '\t':
+		cursor_to(t, (t->c.x+8)/8*8, t->c.y);
 		break;
 	case '\b':
+		backspace(t);
 		break;
 	case '\r':
 		t->c.x = 0;
@@ -319,7 +464,7 @@ static void process_char(Term* t, Char c) {
 		 //normal
 	case 0:
 		switch (c) {
-		case 0x1B:
+		case '\x1B':
 			p->state = ESC;
 			break;
 		default:
