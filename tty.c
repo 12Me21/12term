@@ -29,6 +29,8 @@
 #include "ctlseqs.h"
 #include "tty.h"
 
+void sleep_forever(bool hangup);
+
 // todo: move all this stuff into a struct and attach it to Term.
 
 const char* termname = "xterm-24bit";
@@ -43,15 +45,17 @@ void sigchld(int a) {
 	
 	if (p < 0)
 		die("waiting for pid %hd failed: %s\n", pid, strerror(errno));
-
+	
 	if (pid != p)
 		return;
-
+	
 	if (WIFEXITED(stat) && WEXITSTATUS(stat))
-		die("child exited with status %d\n", WEXITSTATUS(stat));
+		print("child exited with status %d\n", WEXITSTATUS(stat));
 	else if (WIFSIGNALED(stat))
-		die("child terminated due to signal %d\n", WTERMSIG(stat));
-	_exit(0);
+		print("child terminated due to signal %d\n", WTERMSIG(stat));
+	
+	sleep_forever(false);
+	//_exit(0); todo!
 }
 
 void execsh(char** args) {
@@ -144,10 +148,11 @@ size_t ttyread() {
 	
 	switch (ret) {
 	case 0:
-		exit(0);
+		sleep_forever(true);
 		break;
 	case -1:
-		die("couldn't read from shell: %s\n", strerror(errno));
+		print("couldn't read from shell: %s\n", strerror(errno));
+		sleep_forever(true);
 		break;
 	default:
 		// todo: move this stuff into x.c maybe so we don't need buffer.h in this file

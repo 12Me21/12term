@@ -306,3 +306,9 @@ void clear_background(void) {
 	XftDrawRect(W.draw, &xcol, 0, 0, W.w, W.h);
 	reset_clip();
 }
+
+void draw_free(void) {
+	for (int i=0; i<frclen; i++)
+		XftFontClose(W.d, frc[i].font);
+	free(frc);
+}

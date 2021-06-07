@@ -30,7 +30,8 @@ typedef struct Attrs {
 	bool italic: 1;
 	bool underline: 1;
 	bool blink: 1;
-	bool reverse: 1;
+	bool reverse: 1; //the renderer doesn't actually read this flag: when writing chars to the screen, the color and background are swapped if this attrib is set.
+	
 	bool invisible: 1;
 	bool strikethrough: 1;
 } Attrs;
@@ -72,7 +73,6 @@ typedef struct Term {
 	
 	Buffer buffers[2]; // main, alt
 	Buffer* current; // always points to an item in .buffers
-	// todo: are these per-buffer?
 	
 	Cursor c;
 	bool show_cursor;
@@ -83,7 +83,11 @@ typedef struct Term {
 	RGBColor background, foreground; // these can maybe be accessed as palette[-1] and [-2] but don't try it lol
 	RGBColor palette[256];
 	
-	bool* tabs;
+	bool* tabs; // if we get more of these structures that store info per column/row we might want to make a dedicated "column" and "row" structure hmm? and also 
+	// also yes, tabs are not stored per-buffer.
+	// and some programs assume that tab stops are set to every 8 columns
+	// and don't bother checking or resetting these
+	// so honestly idk if even allowing setting them is a good idea...
 	
 	bool bracketed_paste;
 	

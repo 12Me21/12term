@@ -87,6 +87,14 @@ void clear_row(Buffer* buffer, int y, int start) {
 	}
 }
 
+void term_free(void) {
+	for (int i=0; i<2; i++) {
+		for (int y=0; y<T.height; y++)
+			free(T.buffers[i].rows[y]);
+	}
+	free(T.tabs);
+}
+
 static void push_scrollback(int y) {
 	if (y<0 || y>=T.height)
 		return;
@@ -394,6 +402,10 @@ void put_char(Char c) {
 	dest->chr = c;
 	dest->combining[0] = 0;
 	dest->attrs = T.c.attrs;
+	if (T.c.attrs.reverse) {
+		dest->attrs.color = T.c.attrs.background;
+		dest->attrs.background = T.c.attrs.color;
+	}
 	// inserting a wide character
 	if (width==2) {
 		dest->wide = 1;
@@ -593,4 +605,27 @@ void erase_characters(int n) {
 void select_charset(int g, Char set) {
 	if (g>=0 && g<4)
 		T.charsets[g] = set;
+}
+
+// todo: confirm which things are reset by this
+void full_reset(void) {
+	for (int i=0; i<T.width; i++)
+		T.tabs[i] = i%8==0;
+	for (int i=0; i<2; i++) {
+		T.buffers[i].scroll_top = 0;
+		T.buffers[i].scroll_bottom = T.height;
+		T.current = &T.buffers[i];
+		clear_region(0, 0, T.width, T.height);
+	}
+	T.current = &T.buffers[0];
+	T.c = (Cursor){
+		.x = 0,
+		.y = 0,
+	};
+	save_cursor();
+	T.show_cursor = true;
+	T.blink_cursor = false;
+	
+	T.charsets[0] = 0;
+	init_palette();
 }

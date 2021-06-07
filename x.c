@@ -169,7 +169,7 @@ static void update_charsize(Px w, Px h) {
 	}, &(XWMHints){
 		.flags = InputHint, .input = 1
 	}, NULL); //todo: class hint?
-
+	
 }
 
 static void on_configurenotify(XEvent* e) {
@@ -181,6 +181,28 @@ static void on_configurenotify(XEvent* e) {
 	update_size((width-W.border*2)/W.cw, (height-W.border*2)/W.ch);
 }
 
+void sleep_forever(bool hangup) {
+	print("goodnight...\n");
+	
+	if (hangup)
+		tty_hangup();
+	
+	for (int i=0; i<4; i++) {
+		FcPatternDestroy(W.fonts[i].pattern);
+		XftFontClose(W.d, W.fonts[i].match);
+	}
+	
+	//if (W.draw)
+		//	XftDrawDestroy(W.draw);
+	
+	draw_free();
+	//FcFini(); // aaa
+	
+	XCloseDisplay(W.d);
+	
+	_exit(0); //is this right??
+}
+
 static void on_clientmessage(XEvent* e) {
 	if (e->xclient.message_type == W.atoms.xembed && e->xclient.format == 32) {
 		if (e->xclient.data.l[1] == XEMBED_FOCUS_IN) {
@@ -190,8 +212,7 @@ static void on_clientmessage(XEvent* e) {
 			//win.mode &= ~MODE_FOCUSED;
 		}
 	} else if (e->xclient.data.l[0] == W.atoms.wm_delete_window) {
-		tty_hangup();
-		exit(0);
+		sleep_forever(true);
 	}
 }
 
@@ -432,7 +453,6 @@ static void run(void) {
 				(handler[ev.type])(&ev);
 		}
 		
-		
 		// idea: instead of using just a timeout
 		// we can be more intelligent about this.
 		// detect newlines etc.
@@ -526,7 +546,7 @@ int main(int argc, char* argv[argc+1]) {
 	XChangeProperty(W.d, W.win, W.atoms.net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (unsigned char*)&thispid, 1);
 	
 	XMapWindow(W.d, W.win);
-	XSync(W.d, False);
+	//XSync(W.d, False); //do we need this?
 	
 	time_log("created window");
 	

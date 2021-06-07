@@ -60,3 +60,5 @@ typedef struct Xw {
 } Xw;
 
 extern Xw W;
+
+void sleep_forever(bool hangup);

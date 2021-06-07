@@ -278,6 +278,9 @@ void process_escape_char(Char c) {
 		break;
 	case '>': // Normal keypad
 		break;
+	case 'c':
+		full_reset();
+		break;
 	default:
 		print("unknown ESC char: %d\n", c);
 	}

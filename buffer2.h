@@ -24,3 +24,4 @@ void insert_lines(int n);
 void erase_characters(int n);
 
 void select_charset(int g, Char set);
+void full_reset(void);
