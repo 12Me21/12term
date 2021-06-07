@@ -7,14 +7,11 @@ typedef int Px;
 
 #define Font Font_
 typedef struct {
-	Px height;
-	Px width;
-	Px ascent;
-	Px descent;
-	bool badslant;
-	bool badweight;
-	short lbearing;
-	short rbearing;
+	Px width, height;
+	Px ascent, descent;
+	Px lbearing, rbearing;
+	
+	bool badslant, badweight;
 	XftFont* match;
 	FcFontSet* set;
 	FcPattern* pattern;

@@ -36,7 +36,7 @@ const RGBColor default_cursor = {  0,192,  0};
 const RGBColor default_foreground = {  0,  0,  0};
 const RGBColor default_background = {255,255,255};
 
-void init_palette(void) {
+static void init_palette(void) {
 	T.foreground = default_foreground;
 	T.background = default_background;
 	T.cursor_background = default_cursor;
@@ -199,7 +199,7 @@ static int char_width(Char c) {
 	return width;
 }
 
-void rotate(int count, int itemsize, unsigned char data[count][itemsize], int amount) {
+static void rotate(int count, int itemsize, unsigned char data[count][itemsize], int amount) {
 	while (amount<0)
 		amount += count;
 	amount %= count;
@@ -339,7 +339,23 @@ static int add_combining_char(int x, int y, Char c) {
 	return 1; //we still return 1, because we don't want to put the combining char into the next cell
 }
 
+// utf-8 decoding macro lol
+//#define U(str) sizeof(str)==2 ? str[0] : sizeof(str)==3 ? (int)(str[0]&31)<<6 | (int)(str[1]&63) : sizeof(str)==4 ? (int)(str[0]&15)<<6*2 | (int)(str[1]&63)<<6 | (int)(str[2]&63) : sizeof(str)==5 ? (int)(str[0]&8)<<6*3 | (int)(str[1]&63)<<6*2 | (int)(str[2]&63)<<6 | (int)(str[3]&63) : 0
+
+static const Char DEC_GRAPHICS_CHARSET[128] = {
+	['A'] = L'↑', L'↓', L'→', L'←', L'█', L'▚', L'☃',
+	['_'] = L' ',
+	['`'] = L'◆', L'▒', L'␉', L'␌', L'␍', L'␊', L'°', L'±', L'␤', L'␋', L'┘', L'┐', L'┌', L'└', L'┼', L'⎺', L'⎻', L'─', L'⎼', L'⎽', L'├', L'┤', L'┴', L'┬', L'│', L'≤', L'≥', L'π', L'≠', L'£', L'·',
+};
+
 void put_char(Char c) {
+	print("charset 0 is %d\n", DEC_GRAPHICS_CHARSET[0]);
+	
+	if (T.charsets[0] == '0') {
+		if (c<128 && c>=0 && DEC_GRAPHICS_CHARSET[c])
+			c = DEC_GRAPHICS_CHARSET[c];
+	}
+	
 	int width = char_width(c);
 	
 	if (width==0) {
@@ -571,4 +587,9 @@ void erase_characters(int n) {
 	if (n > T.width-T.c.x)
 		n = T.width-T.c.x;
 	clear_region(T.c.x, T.c.y, T.c.x+n, T.c.y+1);
+}
+
+void select_charset(int g, Char set) {
+	if (g>=0 && g<4)
+		T.charsets[g] = set;
 }

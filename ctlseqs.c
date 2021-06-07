@@ -10,6 +10,8 @@
 
 #include "ctlseqs2.h"
 
+ParseState P;
+
 static int limit(int x, int min, int max) {
 	if (x<min)
 		return min;
@@ -19,12 +21,12 @@ static int limit(int x, int min, int max) {
 }
 
 void process_sgr_color(int* i, Color* out) {
-	int type = T.parse.argv[*i+1];
+	int type = P.argv[*i+1];
 	switch (type) {
 	case 2:;
-		int r = T.parse.argv[*i+2];
-		int g = T.parse.argv[*i+3];
-		int b = T.parse.argv[*i+4];
+		int r = P.argv[*i+2];
+		int g = P.argv[*i+3];
+		int b = P.argv[*i+4];
 		*out = (Color){
 			.truecolor = true,
 			.rgb = (RGBColor){
@@ -36,7 +38,7 @@ void process_sgr_color(int* i, Color* out) {
 		*i += 4;
 		break;
 	case 5:;
-		int c = T.parse.argv[*i+2];
+		int c = P.argv[*i+2];
 		if (c<0 || c>=256) {
 			print("invalid color index in SGR: %d\n", c);
 		} else {
@@ -52,10 +54,10 @@ void process_sgr_color(int* i, Color* out) {
 
 // CSI [ ... m
 void process_sgr(void) {
-	int c = T.parse.argc;
+	int c = P.argc;
 #define SEVEN(x) x: case x+1: case x+2: case x+3: case x+4: case x+5: case x+6: case x+7
 	for (int i=0; i<c; i++) {
-		int a = T.parse.argv[i];
+		int a = P.argv[i];
 		switch (a) {
 		case 0:
 			T.c.attrs = (Attrs){
@@ -143,8 +145,8 @@ void process_sgr(void) {
 }
 
 void set_private_modes(bool state) {
-	for (int i=0; i<T.parse.argc; i++) {
-		int a = T.parse.argv[i];
+	for (int i=0; i<P.argc; i++) {
+		int a = P.argv[i];
 		switch (a) {
 		case 0: // ignore
 			break;
@@ -228,47 +230,37 @@ void process_escape_char(Char c) {
 	switch (c) {
 		// multi-char sequences
 	case '[':
-		T.parse.argc = 1;
-		T.parse.argv[0] = 0;
-		T.parse.state = CSI_START;
+		P.argc = 1;
+		P.argv[0] = 0;
+		P.state = CSI_START;
 		return;
-	case '#':
-		T.parse.state = ESC_TEST;
-		return;
-	case '%':
-		T.parse.state = UTF8;
-		return;
-	case '(':
+	case '(': // designate G0-G3 char sets
 	case ')':
 	case '*':
 	case '+':
-		T.parse.state = ALTCHARSET;
-		T.parse.charset = c-'(';
+		P.state = ALTCHARSET;
+		P.charset = c-'(';
 		return;
 		
 		// things that take string parameters
-	case 'P':
-		T.parse.state = STRING;
-		T.parse.string_command = DCS;
+	case 'P': // Device Control String
+		P.state = STRING;
+		P.string_command = DCS;
 		return;
-	case '_':
-		T.parse.state = STRING;
-		T.parse.string_command = APC;
+	case '_': // Application Program Command
+		P.state = STRING;
+		P.string_command = APC;
 		return;
-	case '^':
-		T.parse.state = STRING;
-		T.parse.string_command = PM;
+	case '^': // Privacy Message
+		P.state = STRING;
+		P.string_command = PM;
 		return;
-	case ']':
-		T.parse.state = STRING;
-		T.parse.string_command = OSC;
+	case ']': // Operating System Command
+		P.state = STRING;
+		P.string_command = OSC;
 		return;
-	case 'k':
-		T.parse.state = STRING;
-		T.parse.string_command = TITLE;
-		return;
-
-		// single char sequences
+		
+	// single char sequences
 	case '7': // Save Cursor
 		save_cursor();
 		break;
@@ -282,12 +274,6 @@ void process_escape_char(Char c) {
 	case 'M': // Reverse Index
 		reverse_index(1);
 		break;
-	case 'n': 
-		break;
-	case 'o':
-		break;
-	case 'D':
-		break;
 	case '=': // Application keypad
 		break;
 	case '>': // Normal keypad
@@ -295,24 +281,22 @@ void process_escape_char(Char c) {
 	default:
 		print("unknown ESC char: %d\n", c);
 	}
-	T.parse.state = NORMAL;
+	P.state = NORMAL;
 }
 
 static void process_char(Char c) {
-	struct parse* const p = &T.parse;
-	
-	if (p->state == STRING) {
+	if (P.state == STRING) {
 		// end of string
 		// todo: maybe check other characters here just in case
 		if (c==0x07 || c==0x18 || c==0x1A || c==0x1B || (c>=0x80 && c<=0x9F)) {
 			// (then we want to process the string sequence)
 			// TODO
 			// and /sometimes/ also process the character itself
-			p->state = NORMAL;
+			P.state = NORMAL;
 		} else {
 			// add char to string if possible
-			if (p->string_length < sizeof(p->string)) {
-				p->string[p->string_length++] = c;
+			if (P.string_length < sizeof(P.string)) {
+				P.string[P.string_length++] = c;
 			} else { //string too long!!
 				
 			}
@@ -323,12 +307,12 @@ static void process_char(Char c) {
 	if (c<256 && c>=0 && process_control_char(c))
 		return;
 	////////////////////////
-	switch (p->state) {
+	switch (P.state) {
 		 //normal
 	case NORMAL:
 		switch (c) {
 		case '\x1B':
-			p->state = ESC;
+			P.state = ESC;
 			break;
 		default:
 			put_char(c);
@@ -339,13 +323,13 @@ static void process_char(Char c) {
 		process_escape_char(c);
 		break;
 	case CSI_START:
-		p->state = CSI;
+		P.state = CSI;
 		if (c=='?')
-			p->csi_private = '?';
+			P.csi_private = '?';
 		else if (c=='>')
-			p->csi_private = '>';
+			P.csi_private = '>';
 		else {
-			p->csi_private = 0;
+			P.csi_private = 0;
 			process_csi_char(c);
 		}
 		break;
@@ -353,24 +337,22 @@ static void process_char(Char c) {
 		process_csi_char(c);
 		break;
 	case ALTCHARSET:
-		if (c=='0')
-			;
-		else if (c=='B')
-			;
+		if (c=='0' || c=='B')
+			select_charset(P.charset, c);
 		else
 			print("unknown charset: %c\n", c);
-		p->state = NORMAL;
+		P.state = NORMAL;
 		break;
 		// ???
 	default:
-		print("unknown parse state? (%d)\n", p->state);
-		p->state = NORMAL;
+		print("unknown parse state? (%d)\n", P.state);
+		P.state = NORMAL;
 	}
 }
 
 // 128, 192, 224, 240, 248
 
-char utf8_type[32] = {
+static const char utf8_type[32] = {
 	// 0 - ascii byte
 	[16] = 1,1,1,1,1,1,1,1, // 1 - continuation byte
 	[24] = 2,2,2,2, // 2 - start of 2 byte sequence
@@ -379,9 +361,9 @@ char utf8_type[32] = {
 	[31] = -1, // invalid
 };
 	
-Char utf8_buffer = 0;
-int utf8_state = 0;
-void process_chars(int len, char cs[len]) {
+static Char utf8_buffer = 0;
+static int utf8_state = 0;
+void process_chars(int len, const char cs[len]) {
 	for (int i=0; i<len; i++) {
 		Char c = (int)(unsigned char)cs[i]; //important! we need to convert to unsigned before casting to int
 		int type = utf8_type[c>>3]; // figure out what type of utf-8 byte this is (number of leading 1 bits) using a lookup table
@@ -426,4 +408,10 @@ void process_chars(int len, char cs[len]) {
 		}
 	}
 	//write_char(c[i]);
+}
+
+void reset_parser(void) {
+	utf8_state = 0;
+	utf8_buffer = 0;
+	P.state = NORMAL;
 }

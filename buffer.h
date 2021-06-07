@@ -89,23 +89,13 @@ typedef struct Term {
 	
 	bool* dirty_rows;
 	
+	int charsets[4];
+	
 	struct scrollback {
 		Row* rows;
 		int size;
 		int lines;
 	} scrollback;
-	
-	struct parse {
-		char string[1030];
-		int string_command;
-		int string_length;
-		int state;
-		int argv[100];
-		bool arg_colon[100]; //todo
-		int argc;
-		char csi_private;
-		int charset;
-	} parse;
 } Term;
 
 void init_term(int width, int height);

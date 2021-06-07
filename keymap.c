@@ -1,5 +1,8 @@
 #include "keymap.h"
 
+// these are mostly to reduce memory usage + make this file shorter
+// many keys use similar sequences with different numbers/terminator chars
+
 #define ESC "\x1B"
 const char* const AUTO_SEQ = ESC"[27;%d;%d~";
 
@@ -37,20 +40,6 @@ static KeyMap KEY_MAP_ARRAY[] = {
 	
 	{XK_Delete, 0, CSI_n_T(3)},
 	{XK_Delete, -1, CSI_n_M_T(3)},
-	
-	{'I', M, AUTO_SEQ, 2, 'i'},
-	{'I', C, AUTO_SEQ, 2, 'i'},
-	{'i', M, AUTO_SEQ, 2, 'i'},
-	{'i', C, AUTO_SEQ, 2, 'i'},
-	
-	{'M', M, AUTO_SEQ, 2, 'm'},
-	{'M', C, AUTO_SEQ, 2, 'm'},
-	{'m', M, AUTO_SEQ, 2, 'm'},
-	{'m', C, AUTO_SEQ, 2, 'm'},
-	
-	{XK_period, -2, AUTO_SEQ, 2, '.'},
-	{XK_i, -2, AUTO_SEQ, 2, 'i'},
-	{XK_m, -2, AUTO_SEQ, 2, 'm'},
 	
 	{XK_Up   , 0, CSI_c('A')},
 	{XK_Down , 0, CSI_c('B')},
@@ -99,6 +88,17 @@ static KeyMap KEY_MAP_ARRAY[] = {
 	{XK_F10, -1, CSI_n_M_T(21)},
 	{XK_F11, -1, CSI_n_M_T(23)},
 	{XK_F12, -1, CSI_n_M_T(24)},
+	
+	// xterm and others allow detection of ctrl+<char> for a few extra chars, using a standard format for responses:
+	// ESC [ 26 ; <modifier mask+1> ; <key code> ~
+	{XK_period, -2, AUTO_SEQ, 2, '.'},
+	{XK_grave, -2, AUTO_SEQ, 2, '`'},
+	{XK_asciitilde, -2, AUTO_SEQ, 2, '`'},
+	
+	// I extend this to make ctrl+i different from tab, and ctrl+m different from enter
+	// you will likely need to configure your editor to accept these
+	{XK_i, -2, AUTO_SEQ, 2, 'i'},
+	{XK_m, -2, AUTO_SEQ, 2, 'm'},
 	
 	{0},
 };

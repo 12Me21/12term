@@ -4,39 +4,24 @@
 #include <locale.h>
 #include <errno.h>
 #include <time.h>
+#include <stdbool.h>
 
-#include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xft/Xft.h>
-#define Cursor Cursor_
+#include <X11/Xatom.h>
 
 #include "debug.h"
 #include "tty.h"
-#include "buffer.h"
 #include "keymap.h"
 #include "draw.h"
 #include "x.h"
 
-Xw W;
+Xw W = {0};
 
 typedef void (*HandlerFunc)(XEvent*);
 
 #define XEMBED_FOCUS_IN  4
 #define XEMBED_FOCUS_OUT 5
-
-static void on_clientmessage(XEvent* e) {
-	if (e->xclient.message_type == W.atoms.xembed && e->xclient.format == 32) {
-		if (e->xclient.data.l[1] == XEMBED_FOCUS_IN) {
-			//win.mode |= MODE_FOCUSED;
-			//xseturgency(0);
-		} else if (e->xclient.data.l[1] == XEMBED_FOCUS_OUT) {
-			//win.mode &= ~MODE_FOCUSED;
-		}
-	} else if (e->xclient.data.l[0] == W.atoms.wm_delete_window) {
-		tty_hangup();
-		exit(0);
-	}
-}
 
 static int utf8_encode(Char c, char* out) {
 	if (c<0)
@@ -80,8 +65,8 @@ static void on_keypress(XEvent *ev) {
 	char buf[64] = {0};
 	const char* out = buf;
 	int len = 0;
-	Status status;
 	
+	Status status;
 	if (W.ime.xic)
 		len = XmbLookupString(W.ime.xic, e, buf, sizeof buf, &ksym, &status);
 	else
@@ -166,6 +151,22 @@ static void update_charsize(Px w, Px h) {
 	if (W.under_cursor)
 		XFreePixmap(W.d, W.under_cursor);
 	W.under_cursor = XCreatePixmap(W.d, W.win, W.cw*2, W.ch, DefaultDepth(W.d, W.scr));
+	
+	Px base = W.border*2;
+	XSetWMProperties(W.d, W.win, NULL, NULL, NULL, 0, &(XSizeHints){
+		.flags = PSize | PResizeInc | PBaseSize | PMinSize,
+		.width = W.w,
+		.height = W.h,
+		.width_inc = W.cw,
+		.height_inc = W.ch,
+		.base_width = base,
+		.base_height = base,
+		.min_width = base + W.cw*2,
+		.min_height = base + W.ch*2,
+	}, &(XWMHints){
+		.flags = InputHint, .input = 1
+	}, NULL); //todo: class hint?
+
 }
 
 static void on_configurenotify(XEvent* e) {
@@ -175,6 +176,20 @@ static void on_configurenotify(XEvent* e) {
 		return;
 	
 	update_size((width-W.border*2)/W.cw, (height-W.border*2)/W.ch);
+}
+
+static void on_clientmessage(XEvent* e) {
+	if (e->xclient.message_type == W.atoms.xembed && e->xclient.format == 32) {
+		if (e->xclient.data.l[1] == XEMBED_FOCUS_IN) {
+			//win.mode |= MODE_FOCUSED;
+			//xseturgency(0);
+		} else if (e->xclient.data.l[1] == XEMBED_FOCUS_OUT) {
+			//win.mode &= ~MODE_FOCUSED;
+		}
+	} else if (e->xclient.data.l[0] == W.atoms.wm_delete_window) {
+		tty_hangup();
+		exit(0);
+	}
 }
 
 static HandlerFunc handler[LASTEvent] = {
@@ -188,43 +203,6 @@ static int max(int a, int b) {
 	if (a>b)
 		return a;
 	return b;
-}
-
-static int timediff(struct timespec t1, struct timespec t2) {
-	return (t1.tv_sec-t2.tv_sec)*1000 + (t1.tv_nsec-t2.tv_nsec)/1E6;
-}
-
-static double minlatency = 8;
-static double maxlatency = 33;
-
-
-static void init_hints(void) {
-	Px base = W.border*2;
-	XSetWMProperties(W.d, W.win, NULL, NULL, NULL, 0, &(XSizeHints){
-			.flags = PSize | PResizeInc | PBaseSize | PMinSize,
-			.width = W.w,
-			.height = W.h,
-			.width_inc = W.cw,
-			.height_inc = W.ch,
-			.base_width = base,
-			.base_height = base,
-			.min_width = base + W.cw*2,
-			.min_height = base + W.ch*2,
-		}, &(XWMHints){
-			.flags = InputHint, .input = 1
-		}, NULL); //todo: class hint?
-}
-
-static void init_atoms(void) {
-	W.atoms.xembed = XInternAtom(W.d, "_XEMBED", False);
-	W.atoms.wm_delete_window = XInternAtom(W.d, "WM_DELETE_WINDOW", False);
-	W.atoms.net_wm_name = XInternAtom(W.d, "_NET_WM_NAME", False);
-	W.atoms.net_wm_icon_name = XInternAtom(W.d, "_NET_WM_ICON_NAME", False);
-	W.atoms.net_wm_pid = XInternAtom(W.d, "_NET_WM_PID", False);
-	W.atoms.utf8_string = XInternAtom(W.d, "UTF8_STRING", False);
-	if (W.atoms.utf8_string == None)
-		W.atoms.utf8_string = XA_STRING;
-	W.atoms.clipboard = XInternAtom(W.d, "CLIPBOARD", False);
 }
 
 static int ceildiv(int a, int b) {
@@ -383,6 +361,13 @@ static void init_xim(void) {
 	}
 }
 
+static int timediff(struct timespec t1, struct timespec t2) {
+	return (t1.tv_sec-t2.tv_sec)*1000 + (t1.tv_nsec-t2.tv_nsec)/1E6;
+}
+
+static double minlatency = 8;
+static double maxlatency = 33;
+
 static void run(void) {
 	XEvent ev;
 	do {
@@ -404,7 +389,7 @@ static void run(void) {
 	int w = (W.w-W.border*2) / W.cw;
 	int h = (W.h-W.border*2) / W.ch;
 	
-	update_size(w, h); // gehhhh
+	update_size(w, h); // must be called after tty is created
 	
 	int timeout = -1;
 	struct timespec seltv, *tv, now, trigger;
@@ -466,81 +451,17 @@ static void run(void) {
 	}
 }
 
-/*void render_line(int width, Cell line[width], int y) {
-	// first, draw the background colors
-	XRenderColor prev;
-	int prevstart = -1;
-	int i;
-	for (i=0; i<width; i++) {
-		XRenderColor col = get_color(t, line[i].attrs.background);
-		if (prevstart==-1) {
-			prevstart = i;
-		} else {
-			if (!same_color(col, prev)) {
-				fill_bg(prevstart, y, i-prevstart, 1, prev);
-				prevstart = i;
-			}
-		}
-		prev = col;
-	}
-	if (i>prevstart) {
-		fill_bg(prevstart, y, i-prevstart, 1, prev);
-	}
-	
-	// now characters
-	// we also group them based on attributes to minimize the number of draws.
-	Attrs preva;
-	for (i=0; i<width; i++) {
-		XRenderColor col = get_color(t, line[i].attrs.color);
-		Attrs attrs = line[i].attrs;
-		if (prevstart==-1) {
-			prevstart = i;
-		} else {
-			if (!same_color(col, prev) || attrs.italic != preva.italic || attrs.bold != preva.bold ) {
-				
-				prevstart = i;
-			}
-		}
-		prev = col;
-		preva = attrs;
-	}
-	
-	// next, the strikethroughs
-	prevstart = -1;
-	for (i=0; i<width; i++) {
-		XRenderColor col = {0};
-		if (line[i].attrs.strikethrough)
-			col = get_color(t, line[i].attrs.color);
-		if (prevstart==-1) {
-			prevstart = i;
-		} else {
-			if (!same_color(col, prev)) {
-				if (prev.alpha)
-					draw_strikethrough(prevstart, y, i-prevstart, prev);
-				prevstart = i;
-			}
-		}
-		prev = col;
-	}
-	// and then underlines
-	prevstart = -1;
-	for (i=0; i<width; i++) {
-		XRenderColor col = {0};
-		if (!line[i].attrs.underline)
-			col = get_color(t, line[i].attrs.color);
-		if (prevstart==-1) {
-			prevstart = i;
-p		} else {
-			if (!same_color(col, prev)) {
-				if (prev.alpha)
-					draw_underline(prevstart, y, i-prevstart, prev);
-				prevstart = i;
-			}
-p		}
-		prev = col;
-	}
-	}*/
-
+static void init_atoms(void) {
+	W.atoms.xembed = XInternAtom(W.d, "_XEMBED", False);
+	W.atoms.wm_delete_window = XInternAtom(W.d, "WM_DELETE_WINDOW", False);
+	W.atoms.net_wm_name = XInternAtom(W.d, "_NET_WM_NAME", False);
+	W.atoms.net_wm_icon_name = XInternAtom(W.d, "_NET_WM_ICON_NAME", False);
+	W.atoms.net_wm_pid = XInternAtom(W.d, "_NET_WM_PID", False);
+	W.atoms.utf8_string = XInternAtom(W.d, "UTF8_STRING", False);
+	if (W.atoms.utf8_string == None)
+		W.atoms.utf8_string = XA_STRING;
+	W.atoms.clipboard = XInternAtom(W.d, "CLIPBOARD", False);
+}
 
 int main(int argc, char* argv[argc+1]) {
 	time_log("");
@@ -553,10 +474,7 @@ int main(int argc, char* argv[argc+1]) {
 	int w = 50;
 	int h = 10;
 	
-	// temp
 	W.border = 3;
-	//W.cw = 10;
-	//W.ch = 10;
 	
 	W.d = XOpenDisplay(NULL);
 	W.scr = XDefaultScreen(W.d);
@@ -565,7 +483,8 @@ int main(int argc, char* argv[argc+1]) {
 	time_log("x stuff 1");
 	
 	FcInit();
-	init_fonts("cascadia code:pixelsize=16:antialias=true:autohint=true", 0);
+	// todo: this
+	init_fonts("cascadia code,monospace:pixelsize=16:antialias=true:autohint=true", 0);
 	
 	W.cw = ceil(W.fonts[0].width);
 	W.ch = ceil(W.fonts[0].height);
@@ -592,8 +511,8 @@ int main(int argc, char* argv[argc+1]) {
 		}
 	);
 	W.gc = XCreateGC(W.d, parent, GCGraphicsExposures, &(XGCValues){
-			.graphics_exposures = False,	
-		});
+		.graphics_exposures = False,	
+	});
 	
 	init_xim();
 	
@@ -605,8 +524,6 @@ int main(int argc, char* argv[argc+1]) {
 	
 	XMapWindow(W.d, W.win);
 	XSync(W.d, False);
-	
-	init_hints();
 	
 	time_log("created window");
 	

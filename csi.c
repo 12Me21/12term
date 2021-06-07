@@ -1,20 +1,20 @@
 #include "ctlseqs2.h"
 
 static int get_arg(int n, int def) {
-	if (n>=T.parse.argc || T.parse.argv[n]==0)
+	if (n>=P.argc || P.argv[n]==0)
 		return def;
-	return T.parse.argv[n];
+	return P.argv[n];
 }
 
 // get first arg; defaults to 1 if not set. (very commonly used)
-static int get_arg01() {
-	return T.parse.argv[0] ? T.parse.argv[0] : 1;
+static int get_arg01(void) {
+	return P.argv[0] ? P.argv[0] : 1;
 }
 
 static void process_csi_command(Char c) {	
-	int arg = T.parse.argv[0]; //will be 0 if no args were passed. this is intentional.
+	int arg = P.argv[0]; //will be 0 if no args were passed. this is intentional.
 	
-	switch (T.parse.csi_private) {
+	switch (P.csi_private) {
 	default:
 		// unknown
 		break;
@@ -29,11 +29,11 @@ static void process_csi_command(Char c) {
 		default:
 			print("unknown CSI private terminator: %c\n", (char)c);
 		}
-		T.parse.state = NORMAL;
+		P.state = NORMAL;
 		break;
 	case '>':
 		//whatever;
-		T.parse.state = NORMAL;
+		P.state = NORMAL;
 		break;
 	case 0:
 		switch (c) {
@@ -134,7 +134,7 @@ static void process_csi_command(Char c) {
 		default:
 			print("unknown CSI terminator: %c\n", (char)c);
 		}
-		T.parse.state = NORMAL;
+		P.state = NORMAL;
 	}
 	return;
  invalid:
@@ -145,20 +145,19 @@ static void process_csi_command(Char c) {
 
 void process_csi_char(Char c) {
 	if (c>='0' && c<='9') { // arg
-		T.parse.argv[T.parse.argc-1] *= 10;
-		T.parse.argv[T.parse.argc-1] += c - '0';
+		P.argv[P.argc-1] *= 10;
+		P.argv[P.argc-1] += c - '0';
 	} else if (c==':' || c==';') { // arg separator
 		// technically ; and : are used for different things, but it's not really ambiguous so I won't bother distinguishing for now.
 		
 		// really I think the purpose of the colons is to allow for argument grouping.
 		// because all the other codes are a single number, so if they are not supported, it's nbd
 		// but multi-number codes can cause frame shift issues, if they aren't supported, then the terminal will interpret the later values as individual args which is wrong.
-		
-		T.parse.argc++;
-		T.parse.argv[T.parse.argc-1] = 0;
+		P.argc++;
+		P.argv[P.argc-1] = 0;
 	} else {
 		// finished
 		process_csi_command(c);
-		T.parse.state = NORMAL;
+		P.state = NORMAL;
 	}
 }

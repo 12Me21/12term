@@ -22,3 +22,5 @@ void insert_blank(int n);
 void delete_lines(int n);
 void insert_lines(int n);
 void erase_characters(int n);
+
+void select_charset(int g, Char set);
