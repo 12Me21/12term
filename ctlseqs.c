@@ -1,8 +1,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "buffer.h"
-//#include "coroutine.h"
 #include "ctlseqs.h"
 #include "debug.h"
 #include "tty.h" //todo: get rid of this.
@@ -10,26 +8,9 @@
 #define DEFAULT break; default
 #define CASE(x) break; case(x)
 
-enum parse_state {
-	NORMAL,
-	ESC,
-	CSI_START,
-	CSI,
-	ESC_TEST,
-	UTF8,
-	ALTCHARSET,
-	STRING,
-};
+#include "ctlseqs2.h"
 
-enum string_command {
-	DCS = 1,
-	APC,
-	PM,
-	OSC,
-	TITLE,
-};
-
-int limit(int x, int min, int max) {
+static int limit(int x, int min, int max) {
 	if (x<min)
 		return min;
 	if (x>max)
@@ -70,7 +51,7 @@ void process_sgr_color(int* i, Color* out) {
 }
 
 // CSI [ ... m
-void process_sgr() {
+void process_sgr(void) {
 	int c = T.parse.argc;
 #define SEVEN(x) x: case x+1: case x+2: case x+3: case x+4: case x+5: case x+6: case x+7
 	for (int i=0; i<c; i++) {
@@ -217,157 +198,6 @@ void set_private_modes(bool state) {
 	}
 }
 
-static int get_arg(int n, int def) {
-	if (n>=T.parse.argc || T.parse.argv[n]==0)
-		return def;
-	return T.parse.argv[n];
-}
-
-// get first arg; defaults to 1 if not set. (very commonly used)
-static int get_arg01() {
-	return T.parse.argv[0] ? T.parse.argv[0] : 1;
-}
-
-static void process_csi_command(Char c) {	
-	int arg = T.parse.argv[0]; //will be 0 if no args were passed. this is intentional.
-	
-	switch (T.parse.csi_private) {
-	default:
-		// unknown
-		break;
-	case '?':
-		switch (c) {
-		case 'h':
-			set_private_modes(true);
-			break;
-		case 'l':
-			set_private_modes(false);
-			break;
-		default:
-			print("unknown CSI private terminator: %c\n", (char)c);
-		}
-		T.parse.state = NORMAL;
-		break;
-	case '>':
-		//whatever;
-		T.parse.state = NORMAL;
-		break;
-	case 0:
-		switch (c) {
-		case '@':
-			insert_blank(get_arg01());
-			break;
-		case 'A':
-			cursor_up(get_arg01());
-			break;
-		case 'B':
-		case 'e':
-			cursor_down(get_arg01());
-			break;
-		case 'C':
-		case 'a':
-			cursor_right(get_arg01());
-			break;
-		case 'd':
-			cursor_to(T.c.x, get_arg01()-1);
-			break;
-		case 'H':
-		case 'f':
-			cursor_to(get_arg(1, 1)-1,	get_arg(0, 1)-1);
-			break;
-		case 'J':
-			switch (arg) {
-			case 0: // after cursor
-				clear_region(T.c.x, T.c.y, T.width, T.c.y+1);
-				clear_region(0, T.c.y+1, T.width, T.height);
-				break;
-			case 1: // before cursor
-				clear_region(0, T.c.y, T.c.x, T.c.y+1);
-				clear_region(0, 0, T.width, T.c.y);
-				break;
-			case 2: // whole screen
-				clear_region(0, 0, T.width, T.height);
-				break;
-			case 3: // scollback
-				// ehhh
-				T.scrollback.lines = 0;
-				break;
-			}
-			break;
-		case 'K':
-			switch (arg) {
-			case 0: // clear line after cursor
-				clear_region(T.c.x, T.c.y, T.width, T.c.y+1);
-				break;
-			case 1: // clear line before cursor
-				clear_region(0, T.c.y, T.c.x, T.c.y+1);
-				break;
-			case 2: // entire line
-				clear_region(0, T.c.y, T.width, T.c.y+1);
-				break;
-			default:
-				goto invalid;
-			}
-			break;
-		case 'L':
-			insert_lines(get_arg01());
-			break;
-		case 'P':
-			delete_chars(get_arg01());
-			break;
-		case 'M':
-			delete_lines(get_arg01());
-			break;
-		case 'm':
-			process_sgr();
-			break;
-		case 'r':
-			T.current->scroll_top = get_arg01()-1;
-			T.current->scroll_bottom = get_arg(1, T.height);
-			// is this supposed to move the cursor?
-			break;
-		case 'n':
-			if (arg == 6) {
-				tty_printf("\x1B[%d;%dR", T.c.y+1, T.c.x+1);
-			} else {
-				print("unknown device status report: %d\n", arg);
-			}
-			break;
-		case 't': //window ops
-			// TODO
-			break;
-		default:
-			print("unknown CSI terminator: %c\n", (char)c);
-		}
-		T.parse.state = NORMAL;
-	}
-	return;
- invalid:
-	//todo
-	print("unknown command args for %c\n", (char)c);
-	return;
-}
-
-void process_csi_char(Char c) {
-	if (c>='0' && c<='9') { // arg
-		T.parse.argv[T.parse.argc-1] *= 10;
-		T.parse.argv[T.parse.argc-1] += c - '0';
-	} else if (c==':' || c==';') { // arg separator
-		// technically ; and : are used for different things, but it's not really ambiguous so I won't bother distinguishing for now.
-		
-		// really I think the purpose of the colons is to allow for argument grouping.
-		// because all the other codes are a single number, so if they are not supported, it's nbd
-		// but multi-number codes can cause frame shift issues, if they aren't supported, then the terminal will interpret the later values as individual args which is wrong.
-		
-		T.parse.argc++;
-		T.parse.argv[T.parse.argc-1] = 0;
-	} else {
-		// finished
-		process_csi_command(c);
-		T.parse.state = NORMAL;
-	}
-}
-
 // returns true if char was eaten
 bool process_control_char(unsigned char c) {
 	switch (c) {
@@ -375,7 +205,7 @@ bool process_control_char(unsigned char c) {
 		// bel
 		break;
 	case '\t':
-		cursor_to((T.c.x+8)/8*8, T.c.y);
+		forward_tab(1);
 		break;
 	case '\b':
 		backspace();

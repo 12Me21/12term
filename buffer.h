@@ -82,9 +82,7 @@ typedef struct Term {
 	RGBColor background, foreground; // these can maybe be accessed as palette[-1] and [-2] but don't try it lol
 	RGBColor palette[256];
 	
-	int* tabs; ///todo
-	// this is stored as a lookup table where .tabs[x] is the column to jump to when recieving a tab in column x.
-	// for example, by default it will look like {8,8,8,8,8,8,8,16,16,16...}
+	bool* tabs;
 	
 	bool bracketed_paste;
 	
@@ -111,26 +109,6 @@ typedef struct Term {
 
 void init_term(int width, int height);
 void term_resize(int width, int height);
-
-void put_char(Char c);
-
-void clear_region(int x1, int y1, int x2, int y2);
-
-int cursor_up(int amount);
-int cursor_down(int amount);
-void cursor_right(int amount);
-void cursor_left(int amount);
-void cursor_to(int x, int y);
-void index(int amount);
-void reverse_index(int amount);
-void backspace(void);
-void save_cursor(void);
-void restore_cursor(void);
-
-void delete_chars(int n);
-void insert_blank(int n);
-void delete_lines(int n);
-void insert_lines(int n);
 
 void dirty_all(void);
 

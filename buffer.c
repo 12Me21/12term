@@ -7,6 +7,7 @@
 
 #include "common.h"
 #include "buffer.h"
+#include "buffer2.h"
 #include "debug.h"
 #include "render.h"
 
@@ -116,6 +117,9 @@ void term_resize(int width, int height) {
 		}
 		// update tab stops
 		REALLOC(T.tabs, T.width); //todo: init this
+		for (int x=0; x<T.width; x++) {
+			T.tabs[x] = (x%8 == 0);
+		}
 	}
 	
 	// height decrease
@@ -543,4 +547,26 @@ void delete_lines(int n) {
 	
 	for (int y=T.c.y; y<T.current->scroll_bottom; y++)
 		T.dirty_rows[y] = true;
+}
+
+void back_tab(int n) {
+	while (T.c.x > 0 && n > 0) {
+		T.c.x--;
+		if (T.tabs[T.c.x])
+			n--;
+	}
+}
+
+void forward_tab(int n) {
+	while (T.c.x < T.width-1 && n > 0) {
+		T.c.x++;
+		if (T.tabs[T.c.x])
+			n--;
+	}
+}
+
+void erase_characters(int n) {
+	if (n > T.width-T.c.x)
+		n = T.width-T.c.x;
+	clear_region(T.c.x, T.c.y, T.c.x+n, T.c.y+1);
 }

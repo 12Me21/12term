@@ -49,6 +49,7 @@ struct Xw {
 	Pixmap under_cursor;
 	bool cursor_drawn;
 	int cursor_x, cursor_y;
+	int cursor_width;
 	
 	Px w,h;
 	Px cw,ch;
@@ -90,6 +91,14 @@ typedef void (*HandlerFunc)(XEvent*);
 #define XEMBED_FOCUS_IN  4
 #define XEMBED_FOCUS_OUT 5
 
+static int wx(int x) {
+	return x+W.border;
+}
+
+static int wy(int y) {
+	return y+W.border;
+}
+
 static void on_clientmessage(XEvent* e) {
 	if (e->xclient.message_type == W.atoms.xembed && e->xclient.format == 32) {
 		if (e->xclient.data.l[1] == XEMBED_FOCUS_IN) {
@@ -104,7 +113,7 @@ static void on_clientmessage(XEvent* e) {
 	}
 }
 
-int utf8_encode(Char c, char* out) {
+static int utf8_encode(Char c, char* out) {
 	if (c<0)
 		return 0;
 	int len=0;
@@ -128,7 +137,7 @@ int utf8_encode(Char c, char* out) {
 	return len;
 }
 
-bool match_modifiers(int want, int got) {
+static bool match_modifiers(int want, int got) {
 	if (want==-1)
 		return true;
 	if (want==-2)
@@ -136,7 +145,7 @@ bool match_modifiers(int want, int got) {
 	return want==got;
 }
 
-void reset_clip(void) {
+static void reset_clip(void) {
 	XftDrawSetClipRectangles(W.draw, W.border, W.border, &(XRectangle){
 			.width = W.w-W.border*2,
 			.height = W.h-W.border*2,
@@ -204,16 +213,16 @@ static void on_keypress(XEvent *ev) {
 	tty_write(len, out);
 }
 
-void repaint(void) {
+static void repaint(void) {
 	XCopyArea(W.d, W.pix, W.win, W.gc, 0, 0, W.w, W.h, 0, 0);
 }
 
-void on_expose(XEvent* e) {
+static void on_expose(XEvent* e) {
 	(void)e;
 	repaint();
 }
 
-XRenderColor get_color(Color c, bool bold) {
+static XRenderColor get_color(Color c, bool bold) {
 	RGBColor rgb;
 	if (c.truecolor)
 		rgb = c.rgb;
@@ -240,7 +249,7 @@ XRenderColor get_color(Color c, bool bold) {
 }
 
 // do we need this??
-void alloc_color(XRenderColor* col, XftColor* out) {
+static void alloc_color(XRenderColor* col, XftColor* out) {
 	XftColorAllocValue(W.d, W.vis, W.cmap, col, out);
 }
 
@@ -264,7 +273,7 @@ static void init_pixmap(void) {
 }
 
 // (size in characters)
-void update_size(int width, int height) {
+static void update_size(int width, int height) {
 	W.w = W.border*2+width*W.cw;
 	W.h = W.border*2+height*W.ch;
 	init_pixmap();
@@ -274,15 +283,15 @@ void update_size(int width, int height) {
 }
 
 // when the size of the character cells changes (i.e. when changing fontsize)
-void update_charsize(Px w, Px h) {
+static void update_charsize(Px w, Px h) {
 	W.cw = w;
 	W.ch = h;
 	if (W.under_cursor)
 		XFreePixmap(W.d, W.under_cursor);
-	W.under_cursor = XCreatePixmap(W.d, W.win, W.cw, W.ch, DefaultDepth(W.d, W.scr));
+	W.under_cursor = XCreatePixmap(W.d, W.win, W.cw*2, W.ch, DefaultDepth(W.d, W.scr));
 }
 
-void on_configurenotify(XEvent* e) {
+static void on_configurenotify(XEvent* e) {
 	Px width = e->xconfigure.width;
 	Px height = e->xconfigure.height;
 	if (width==W.w && height==W.h)
@@ -298,7 +307,7 @@ static HandlerFunc handler[LASTEvent] = {
 	[ConfigureNotify] = on_configurenotify,
 };
 
-int max(int a, int b) {
+static int max(int a, int b) {
 	if (a>b)
 		return a;
 	return b;
@@ -450,20 +459,20 @@ static void init_fonts(const char* fontstr, double fontsize) {
 	FcPatternDestroy(pattern);
 }
 
-void ximinstantiate(Display* d, XPointer client, XPointer call);
+static void ximinstantiate(Display* d, XPointer client, XPointer call);
 
-void ximdestroy(XIM xim, XPointer client, XPointer call) {
+static void ximdestroy(XIM xim, XPointer client, XPointer call) {
 	W.ime.xim = NULL;
 	XRegisterIMInstantiateCallback(W.d, NULL, NULL, NULL, ximinstantiate, NULL);
 	XFree(W.ime.spotlist);
 }
 
-int xicdestroy(XIC xim, XPointer client, XPointer call) {
+static int xicdestroy(XIC xim, XPointer client, XPointer call) {
 	W.ime.xic = NULL;
 	return 1;
 }
 
-int ximopen(Display* d) {
+static int ximopen(Display* d) {
 	W.ime.xim = XOpenIM(d, NULL, NULL, NULL);
 	if (W.ime.xim == NULL)
 		return 0;
@@ -486,7 +495,7 @@ int ximopen(Display* d) {
 	return 1;
 }
 
-void ximinstantiate(Display* d, XPointer client, XPointer call) {
+static void ximinstantiate(Display* d, XPointer client, XPointer call) {
 	if (ximopen(d))
 		XUnregisterIMInstantiateCallback(d, NULL, NULL, NULL, ximinstantiate, NULL);
 }
@@ -497,18 +506,12 @@ static void init_xim(void) {
 	}
 }
 
-int same_color(XRenderColor a, XRenderColor b) {
+static int same_color(XRenderColor a, XRenderColor b) {
 	return a.red==b.red && a.green==b.green && a.blue==b.blue && a.alpha==b.alpha;
 }
 
-void fill_bg(int x, int y, int w, int h, XRenderColor col) {
-	XftColor xcol;
-	alloc_color(&col, &xcol);
-	XftDrawRect(W.draw, &xcol, W.border+W.cw*x, W.border+W.ch*y, W.cw*w, W.ch*h);
-}
-
 // todo: we should cache this for all the text onscreen mayb
-int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], const Cell cells[len], int x, int y) {
+static int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], const Cell cells[len], int x, int y) {
 	int winx = W.border+x*W.cw;
 	int winy = W.border+y*W.ch;
 	
@@ -528,7 +531,6 @@ int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], const Cell cells[l
 		Char rune = cells[i].chr;
 		Attrs attrs = cells[i].attrs;
 		
-		
 		/* Skip dummy wide-character spacing. */
 		if (cells[i].wide == -1)
 			continue;
@@ -546,7 +548,7 @@ int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], const Cell cells[l
 			frcflags = 1;
 		}
 		font = &W.fonts[frcflags];
-		yp = winy + font->ascent;
+		yp = winy + font->ascent; //-1
 		//}
 
 		/* Lookup character index with default font. */
@@ -621,19 +623,7 @@ int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], const Cell cells[l
 	return numspecs;
 }
 
-void draw_background(int x, int y, Cell* c) {
-	if (c->wide == -1)
-		return;
-	XRenderColor bg = get_color(c->attrs.background, 0);
-	XftColor xcol;
-	alloc_color(&bg, &xcol);
-	int width = c->wide ? 2 : 1;
-	XftDrawRect(W.draw, &xcol, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch);
-	if (W.cursor_drawn && W.cursor_x==x && W.cursor_y==y)
-		W.cursor_drawn = false;
-}
-
-void draw_char(int x, int y, Cell* c) {
+static void draw_char(int x, int y, Cell* c) {
 	if (c->wide == -1)
 		return;
 	XftColor xcol;
@@ -656,41 +646,46 @@ void draw_char(int x, int y, Cell* c) {
 		W.cursor_drawn = false;
 }
 
-void erase_cursor(void) {
+static void erase_cursor(void) {
 	if (!W.cursor_drawn)
 		return;
 	int x = W.cursor_x;
 	int y = W.cursor_y;
-	XCopyArea(W.d, W.under_cursor, W.pix, W.gc, 0, 0, W.cw, W.ch, W.border+W.cw*x, W.border+W.ch*y);
+	int w = W.cursor_width;
+	XCopyArea(W.d, W.under_cursor, W.pix, W.gc, 0, 0, W.cw*w, W.ch, W.border+W.cw*x, W.border+W.ch*y);
 	W.cursor_drawn = false;
 }
 
-void draw_cursor(int x, int y) {
+static void draw_cursor(int x, int y) {
 	if (W.cursor_drawn)
 		erase_cursor();
 	// todo: adding border each time is a pain. can we specify an origin somehow?
-	XCopyArea(W.d, W.pix, W.under_cursor, W.gc, W.border+W.cw*x, W.border+W.ch*y, W.cw, W.ch, 0, 0);
 	
-	Cell temp = T.current->rows[y][x]; //a copy
-	temp.attrs.color = temp.attrs.background;
-	temp.attrs.background = (Color) {
-		.i = -3,
-	};
+	Cell temp = T.current->rows[y][x];
+	
 	int width = temp.wide==1 ? 2 : 1;
+	
+	XCopyArea(W.d, W.pix, W.under_cursor, W.gc, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch, 0, 0);
 	
 	// this time we do NOT want it to overflow ever
 	XftDrawSetClipRectangles(W.draw, x*W.cw+W.border, y*W.ch+W.border, &(XRectangle){
-			.width = W.cw*width,
-			.height = W.ch,
-		}, 1);
+		.width = W.cw*width,
+		.height = W.ch,
+	}, 1);
 	
-	draw_background(x, y, &temp);
+	XftColor xcol;
+	XRenderColor bg = get_color((Color){.i=-3}, 0);
+	alloc_color(&bg, &xcol);
+	XftDrawRect(W.draw, &xcol, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch);
+	
+	temp.attrs.color = temp.attrs.background;
 	draw_char(x, y, &temp);
-
+	
 	reset_clip();
 	
 	W.cursor_x = x;
 	W.cursor_y = y;
+	W.cursor_width = width;
 	W.cursor_drawn = true;
 }
 
@@ -704,22 +699,49 @@ void shift_lines(int src, int dest, int count) {
 }
 
 static void draw_row(int y) {
-	for (int x=0; x<T.width; x++) {
-		draw_background(x, y, &T.current->rows[y][x]);
+	XftDrawSetClipRectangles(W.draw, W.border, y*W.ch+W.border, &(XRectangle){
+		.width = W.cw*T.width,
+		.height = W.ch,
+	}, 1);
+	
+	Row row = T.current->rows[y];
+	XftColor xcol;
+	
+	XRenderColor prev_color = get_color(row[0].attrs.background, 0);
+	int prev_start = 0;
+	int x;
+	for (x=1; x<T.width; x++) {
+		XRenderColor bg = get_color(row[x].attrs.background, 0);
+		if (!same_color(bg, prev_color)) {
+			alloc_color(&prev_color, &xcol);
+			XftDrawRect(W.draw, &xcol, W.border+W.cw*prev_start, W.border+W.ch*y, W.cw*(prev_start-x), W.ch);
+			prev_start = x;
+			prev_color = bg;
+		}
 	}
+	alloc_color(&prev_color, &xcol);
+	XftDrawRect(W.draw, &xcol, W.border+W.cw*prev_start, W.border+W.ch*y, W.cw*(prev_start-x), W.ch);
+	
 	for (int x=0; x<T.width; x++) {
 		draw_char(x, y, &T.current->rows[y][x]);
 	}
 	T.dirty_rows[y] = false;
+	
+	if (W.cursor_y==y)
+		W.cursor_drawn = false;
+	
+	reset_clip();
 }
 
-void draw_screen() {
+static void draw_screen() {
 	for (int y=0; y<T.height; y++) {
 		if (T.dirty_rows[y])
 			draw_row(y);
 	}
 	if (T.show_cursor)
 		draw_cursor(T.c.x, T.c.y);
+	else
+		erase_cursor();
 	repaint();
 }
 
@@ -809,18 +831,6 @@ static void run(void) {
 		drawing = 0;
 	}
 }
-
-/*void draw_strikethrough(int x, int y, int w, XRenderColor col) {
-	XftColor xcol;
-	alloc_color(&col, &xcol);
-	XftDrawRect(W.draw, &xcol, W.border+W.cw*x, W.border+W.ch*y+W.fonts[0].ascent+1, W.cw*w, 1);
-}
-
-void draw_underline(int x, int y, int w, XRenderColor col) {
-	XftColor xcol;
-	alloc_color(&col, &xcol);
-	XftDrawRect(W.draw, &xcol, W.border+W.cw*x, W.border+W.ch*y+W.fonts[0].ascent*2/3, W.cw*w, 1);
-	}*/
 
 /*void render_line(int width, Cell line[width], int y) {
 	// first, draw the background colors
