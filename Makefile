@@ -2,7 +2,7 @@ output:= 12term
 
 srcs:= x tty debug buffer ctlseqs keymap csi draw
 
-CFLAGS+= -Wall -Wextra -g -pedantic
+CFLAGS+= -Wall -Wextra -g -pedantic -std=c11
 
 CFLAGS+= -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -Wno-type-limits -Werror=implicit-function-declaration -Wno-parentheses
 

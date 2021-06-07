@@ -342,6 +342,9 @@ static int add_combining_char(int x, int y, Char c) {
 // utf-8 decoding macro lol
 //#define U(str) sizeof(str)==2 ? str[0] : sizeof(str)==3 ? (int)(str[0]&31)<<6 | (int)(str[1]&63) : sizeof(str)==4 ? (int)(str[0]&15)<<6*2 | (int)(str[1]&63)<<6 | (int)(str[2]&63) : sizeof(str)==5 ? (int)(str[0]&8)<<6*3 | (int)(str[1]&63)<<6*2 | (int)(str[2]&63)<<6 | (int)(str[3]&63) : 0
 
+// todo: many fonts have rather deformed box drawing chars
+// (at least, the one I use does lol)
+// maybe have an option like xterm's to override them
 static const Char DEC_GRAPHICS_CHARSET[128] = {
 	['A'] = L'↑', L'↓', L'→', L'←', L'█', L'▚', L'☃',
 	['_'] = L' ',
@@ -349,8 +352,6 @@ static const Char DEC_GRAPHICS_CHARSET[128] = {
 };
 
 void put_char(Char c) {
-	print("charset 0 is %d\n", DEC_GRAPHICS_CHARSET[0]);
-	
 	if (T.charsets[0] == '0') {
 		if (c<128 && c>=0 && DEC_GRAPHICS_CHARSET[c])
 			c = DEC_GRAPHICS_CHARSET[c];

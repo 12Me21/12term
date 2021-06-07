@@ -1,7 +1,9 @@
+#define _POSIX_C_SOURCE 200112L
 #include <limits.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
 #include <sys/types.h>
+#include <signal.h>
 #include <sys/wait.h>
 #include <termios.h>
 #include <unistd.h>

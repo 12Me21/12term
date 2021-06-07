@@ -1,6 +1,8 @@
+#define _POSIX_C_SOURCE 200112L
 #include <math.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <sys/select.h>
 #include <locale.h>
 #include <errno.h>
 #include <time.h>
