@@ -8,6 +8,7 @@
 #include "common.h"
 #include "buffer.h"
 #include "debug.h"
+#include "render.h"
 
 Term T; // ok there's really no reason to ever need more than one of these anyway.
 
@@ -62,6 +63,12 @@ void init_palette(void) {
 void init_scrollback(void) {
 	T.scrollback.size = 0;
 	T.scrollback.lines = 0;
+}
+
+void dirty_all(void) {
+	for (int y=0; y<T.height; y++) {
+		T.dirty_rows[y] = true;
+	}
 }
 
 void clear_row(Buffer* buffer, int y, int start) {
@@ -147,6 +154,7 @@ void term_resize(int width, int height) {
 		}
 	}
 	
+	dirty_all(); // whatever
 	// todo: how do we handle the scrolling regions?
 	for (int i=0; i<2; i++) {
 		T.buffers[i].scroll_top = 0;
@@ -206,12 +214,38 @@ void rotate(int count, int itemsize, unsigned char data[count][itemsize], int am
 	}
 }
 
-void scroll_up(int amount) {
-	if (!amount)
+void save_cursor(void) {
+	T.saved_cursor = T.c;
+}
+
+void restore_cursor(void) {
+	T.c = T.saved_cursor;
+	cursor_to(T.c.x, T.c.y);
+}
+
+static void scroll_down(int amount) {
+	if (amount<=0)
 		return;
 	int y1 = T.current->scroll_top;
 	int y2 = T.current->scroll_bottom;
-	print("scrolling (%d,%d)\n", y1, y2);
+	if (y1<0)
+		y1 = 0;
+	if (y2>T.height)
+		y2 = T.height;
+	
+	rotate(y2-y1, sizeof(Cell*), (void*)&T.current->rows[y1], amount);
+	for (int y=y1; y<y2; y++)
+		T.dirty_rows[y] = true;
+	
+	for (int y=y1; y<y2; y++)
+		clear_row(T.current, y, 0);
+}
+
+static void scroll_up(int amount) {
+	if (amount<=0)
+		return;
+	int y1 = T.current->scroll_top;
+	int y2 = T.current->scroll_bottom;
 	if (y1<0)
 		y1 = 0;
 	if (y2>T.height)
@@ -223,11 +257,25 @@ void scroll_up(int amount) {
 			push_scrollback(y);
 			ALLOC(T.current->rows[y], T.width);
 		}
-		clear_row(T.current, y, 0);
 	}
 	rotate(y2-y1, sizeof(Cell*), (void*)&T.current->rows[y1], -amount);
+	//shift_lines(y1+amount, y1, y2-y1-amount);
 	for (int y=y1; y<y2; y++)
 		T.dirty_rows[y] = true;
+	for (int y=y2-amount; y<y2; y++)
+		clear_row(T.current, y, 0);
+}
+
+void reverse_index(int amount) {
+	if (amount<=0)
+		return;
+	if (T.c.y < T.current->scroll_top)
+		cursor_up(amount);
+	else {
+		int push = cursor_up(amount);
+		if (push>0)
+			scroll_down(push);
+	}
 }
 
 int cursor_down(int amount) {
@@ -457,15 +505,35 @@ void insert_blank(int n) {
 	clear_region(src, T.c.y, dst, T.c.y+1);
 }
 
+void insert_lines(int n) {
+	if (T.c.y < T.current->scroll_top)
+		return;
+	if (T.c.y >= T.current->scroll_bottom)
+		return;
+	int max = T.current->scroll_bottom - T.c.y;
+	if (n > max)
+		n = max;
+	if (n <= 0)
+		return;
+	// scroll lines down
+	rotate(T.current->scroll_bottom-T.c.y, sizeof(Cell*), (void*)&T.current->rows[T.c.y], n);
+	// clear rows at top
+	for (int i=0; i<n; i++)
+		clear_row(T.current, T.c.y+i, 0);
+	
+	for (int y=T.c.y; y<T.current->scroll_bottom; y++)
+		T.dirty_rows[y] = true;
+}
+	
 void delete_lines(int n) {
 	if (T.c.y < T.current->scroll_top)
 		return;
 	if (T.c.y >= T.current->scroll_bottom)
 		return;
-	int max = T.current->scroll_bottom - T.current->scroll_top;
+	int max = T.current->scroll_bottom - T.c.y;
 	if (n > max)
 		n = max;
-	if (n < 0)
+	if (n <= 0)
 		return;
 	// scroll lines up
 	rotate(T.current->scroll_bottom-T.c.y, sizeof(Cell*), (void*)&T.current->rows[T.c.y], -n);
@@ -475,10 +543,4 @@ void delete_lines(int n) {
 	
 	for (int y=T.c.y; y<T.current->scroll_bottom; y++)
 		T.dirty_rows[y] = true;
-}
-
-void dirty_all(void) {
-	for (int y=0; y<T.height; y++) {
-		T.dirty_rows[y] = true;
-	}
 }

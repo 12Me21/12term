@@ -193,18 +193,18 @@ void set_private_modes(bool state) {
 			break;
 		case 1048: // save/load cursor
 			if (state)
-				T.saved_cursor = T.c;
+				save_cursor();
 			else
-				T.c = T.saved_cursor;
+				restore_cursor();
 			break;
 		case 1049: // 1048 and 1049
 			if (state) {
-				T.saved_cursor = T.c;
+				save_cursor();
 				T.current = &T.buffers[1];
 				clear_region(0, 0, T.width, T.height);
 			} else {
-				T.c = T.saved_cursor;
 				T.current = &T.buffers[0];
+				restore_cursor();
 			}
 			dirty_all();
 			break;
@@ -309,6 +309,9 @@ static void process_csi_command(Char c) {
 				goto invalid;
 			}
 			break;
+		case 'L':
+			insert_lines(get_arg01());
+			break;
 		case 'P':
 			delete_chars(get_arg01());
 			break;
@@ -381,6 +384,8 @@ bool process_control_char(unsigned char c) {
 		T.c.x = 0;
 		break;
 	case '\n':
+	case '\v':
+	case '\f':
 		index(1);
 		break;
 	default:
@@ -434,15 +439,28 @@ void process_escape_char(Char c) {
 		return;
 
 		// single char sequences
-	case 'n':
+	case '7': // Save Cursor
+		save_cursor();
+		break;
+	case '8': // Restore Cursor
+		restore_cursor();
+		break;
+	case 'E': // Next Line
+		index(1);
+		T.c.x = 0;
+		break;
+	case 'M': // Reverse Index
+		reverse_index(1);
+		break;
+	case 'n': 
 		break;
 	case 'o':
 		break;
 	case 'D':
 		break;
-	case '=':
+	case '=': // Application keypad
 		break;
-	case '>':
+	case '>': // Normal keypad
 		break;
 	default:
 		print("unknown ESC char: %d\n", c);

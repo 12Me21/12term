@@ -109,12 +109,11 @@ typedef struct Term {
 	} parse;
 } Term;
 
-void draw_screen(void);
 void init_term(int width, int height);
-int term_write(int len, char buf[len]);
+void term_resize(int width, int height);
+
 void put_char(Char c);
-void index(int amount);
-void backspace(void);
+
 void clear_region(int x1, int y1, int x2, int y2);
 
 int cursor_up(int amount);
@@ -122,10 +121,17 @@ int cursor_down(int amount);
 void cursor_right(int amount);
 void cursor_left(int amount);
 void cursor_to(int x, int y);
+void index(int amount);
+void reverse_index(int amount);
+void backspace(void);
+void save_cursor(void);
+void restore_cursor(void);
+
 void delete_chars(int n);
 void insert_blank(int n);
-void term_resize(int width, int height);
 void delete_lines(int n);
+void insert_lines(int n);
+
 void dirty_all(void);
 
 extern Term T;

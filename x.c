@@ -14,6 +14,7 @@
 #include "tty.h"
 #include "buffer.h"
 #include "keymap.h"
+#include "render.h"
 
 typedef int Px;
 
@@ -257,7 +258,9 @@ static void init_pixmap(void) {
 			.rgb=T.background}, 0);
 	XftColor xcol;
 	alloc_color(&bg, &xcol);
+	XftDrawSetClip(W.draw, 0);
 	XftDrawRect(W.draw, &xcol, 0, 0, W.w, W.h);
+	reset_clip();
 }
 
 // (size in characters)
@@ -267,7 +270,7 @@ void update_size(int width, int height) {
 	init_pixmap();
 	term_resize(width, height);
 	tty_resize(width*W.cw, height*W.ch);
-	reset_clip();
+	
 }
 
 // when the size of the character cells changes (i.e. when changing fontsize)
@@ -308,92 +311,6 @@ static int timediff(struct timespec t1, struct timespec t2) {
 static double minlatency = 8;
 static double maxlatency = 33;
 
-static void draw(void) {
-	draw_screen();
-}
-
-static void run(void) {
-	XEvent ev;
-	do {
-		XNextEvent(W.d, &ev);
-		if (XFilterEvent(&ev, None))
-			continue;
-		if (ev.type == ConfigureNotify) {
-			W.w = ev.xconfigure.width;
-			W.h = ev.xconfigure.height;
-		}
-	} while (ev.type != MapNotify);
-	
-	time_log("window mapped");
-	
-	int ttyfd = tty_new(NULL);
-	
-	time_log("created tty");
-	
-	int w = (W.w-W.border*2) / W.cw;
-	int h = (W.h-W.border*2) / W.ch;
-	
-	update_size(w, h); // gehhhh
-	
-	int timeout = -1;
-	struct timespec seltv, *tv, now, trigger;
-	int drawing = 0;
-	while (1) {
-		int xfd = XConnectionNumber(W.d);
-		
-		fd_set rfd;
-		FD_ZERO(&rfd);
-		FD_SET(ttyfd, &rfd);
-		FD_SET(xfd, &rfd);
-		
-		if (XPending(W.d))
-			timeout = 0;
-		
-		seltv.tv_sec = timeout / 1000;
-		seltv.tv_nsec = 1000000 * (timeout % 1000);
-		tv = timeout>=0 ? &seltv : NULL;
-		
-		if (pselect(max(xfd, ttyfd)+1, &rfd, NULL, NULL, tv, NULL) < 0) {
-			if (errno == EINTR)
-				continue;
-			die("select failed: %s\n", strerror(errno));
-		}
-		clock_gettime(CLOCK_MONOTONIC, &now);
-		
-		if (FD_ISSET(ttyfd, &rfd))
-			ttyread();
-		
-		int xev = 0;
-		while (XPending(W.d)) {
-			xev = 1;
-			XNextEvent(W.d, &ev);
-			if (XFilterEvent(&ev, None))
-				continue;
-			if (handler[ev.type])
-				(handler[ev.type])(&ev);
-		}
-		
-		
-		// idea: instead of using just a timeout
-		// we can be more intelligent about this.
-		// detect newlines etc.
-		if (FD_ISSET(ttyfd, &rfd) || xev) {
-			if (!drawing) {
-				trigger = now;
-				drawing = 1;
-			}
-			timeout = (maxlatency - timediff(now, trigger)) / maxlatency * minlatency;
-			if (timeout > 0)
-				continue; /* we have time, try to find idle */
-		}
-		
-		timeout = -1;
-		
-		draw();
-		XFlush(W.d);
-		drawing = 0;
-	}
-}
 
 static void init_hints(void) {
 	Px base = W.border*2;
@@ -580,82 +497,6 @@ static void init_xim(void) {
 	}
 }
 
-int main(int argc, char* argv[argc+1]) {
-	time_log("");
-	
-	// hecking locale
-	setlocale(LC_CTYPE, "");
-	XSetLocaleModifiers("");
-	
-	// default size
-	int w = 50;
-	int h = 10;
-	
-	// temp
-	W.border = 3;
-	//W.cw = 10;
-	//W.ch = 10;
-	
-	W.d = XOpenDisplay(NULL);
-	W.scr = XDefaultScreen(W.d);
-	W.vis = XDefaultVisual(W.d, W.scr);
-	
-	time_log("x stuff 1");
-	
-	FcInit();
-	init_fonts("cascadia code:pixelsize=16:antialias=true:autohint=true", 0);
-	
-	W.cw = ceil(W.fonts[0].width);
-	W.ch = ceil(W.fonts[0].height);
-	
-	W.w = W.cw*w+W.border*2;
-	W.h = W.ch*h+W.border*2;
-	
-	W.cmap = XDefaultColormap(W.d, W.scr);
-	
-	Window parent = XRootWindow(W.d, W.scr);
-	W.win = XCreateWindow(W.d, parent,
-		0, 0, W.w, W.h, // geometry
-		0, // border width
-		XDefaultDepth(W.d, W.scr), // depth
-		InputOutput, // class
-		W.vis, // visual
-		CWBackPixel | CWBorderPixel | CWBitGravity | CWEventMask | CWColormap, // value mask
-		&(XSetWindowAttributes){
-			//.background_pixel = TODO,
-			//.border_pixel = TODO,
-			.bit_gravity = NorthWestGravity,
-			.event_mask = FocusChangeMask | KeyPressMask | KeyReleaseMask | ExposureMask | VisibilityChangeMask | StructureNotifyMask | ButtonMotionMask | ButtonPressMask | ButtonReleaseMask,
-			.colormap = W.cmap,
-		}
-	);
-	W.gc = XCreateGC(W.d, parent, GCGraphicsExposures, &(XGCValues){
-			.graphics_exposures = False,	
-		});
-	
-	init_xim();
-	
-	init_atoms();
-	
-	XSetWMProtocols(W.d, W.win, &W.atoms.wm_delete_window, 1);
-	pid_t thispid = getpid();
-	XChangeProperty(W.d, W.win, W.atoms.net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (unsigned char*)&thispid, 1);
-	
-	XMapWindow(W.d, W.win);
-	XSync(W.d, False);
-	
-	init_hints();
-	
-	time_log("created window");
-	
-	update_charsize(W.cw, W.ch);
-	
-	init_term(w, h);
-	
-	run();
-	return 0;
-}
-
 int same_color(XRenderColor a, XRenderColor b) {
 	return a.red==b.red && a.green==b.green && a.blue==b.blue && a.alpha==b.alpha;
 }
@@ -668,20 +509,20 @@ void fill_bg(int x, int y, int w, int h, XRenderColor col) {
 
 // todo: we should cache this for all the text onscreen mayb
 int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], const Cell cells[len], int x, int y) {
-	float winx = W.border+x*W.cw;
-	float winy = W.border+y*W.ch;
+	int winx = W.border+x*W.cw;
+	int winy = W.border+y*W.ch;
 	
 	//unsigned short prevmode = USHRT_MAX;
 	Font* font = &W.fonts[0];
 	int frcflags = 0;
-	float runewidth = W.cw;
+	int runewidth = W.cw;
 	FcResult fcres;
 	FcPattern *fcpattern, *fontpattern;
 	FcFontSet *fcsets[] = {NULL};
 	FcCharSet *fccharset;
 	int numspecs = 0;
 	
-	float xp = winx, yp = winy+font->ascent;
+	int xp = winx, yp = winy+font->ascent;
 	for (int i=0; i<len; i++) {
 		// Fetch rune and mode for current glyph.
 		Char rune = cells[i].chr;
@@ -713,8 +554,8 @@ int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], const Cell cells[l
 		if (glyphidx) {
 			specs[numspecs].font = font->match;
 			specs[numspecs].glyph = glyphidx;
-			specs[numspecs].x = (short)xp;
-			specs[numspecs].y = (short)yp;
+			specs[numspecs].x = xp;
+			specs[numspecs].y = yp;
 			xp += runewidth;
 			numspecs++;
 			continue;
@@ -772,8 +613,8 @@ int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], const Cell cells[l
 	found:;
 		specs[numspecs].font = frc[f].font;
 		specs[numspecs].glyph = glyphidx;
-		specs[numspecs].x = (short)xp;
-		specs[numspecs].y = (short)yp;
+		specs[numspecs].x = xp;
+		specs[numspecs].y = yp;
 		xp += runewidth;
 		numspecs++;
 	}
@@ -815,7 +656,6 @@ void draw_char(int x, int y, Cell* c) {
 		W.cursor_drawn = false;
 }
 
-
 void erase_cursor(void) {
 	if (!W.cursor_drawn)
 		return;
@@ -854,6 +694,15 @@ void draw_cursor(int x, int y) {
 	W.cursor_drawn = true;
 }
 
+// todo: instead of calling this immediately,
+// keep track of this region until the next redraw
+void shift_lines(int src, int dest, int count) {
+	erase_cursor();
+	XCopyArea(W.d, W.pix, W.pix, W.gc, W.border, W.border+W.ch*src, W.cw*T.width, W.ch*count, W.border, W.border+W.ch*dest);
+	if (T.show_cursor)
+		draw_cursor(T.c.x, T.c.y);
+}
+
 static void draw_row(int y) {
 	for (int x=0; x<T.width; x++) {
 		draw_background(x, y, &T.current->rows[y][x]);
@@ -872,6 +721,93 @@ void draw_screen() {
 	if (T.show_cursor)
 		draw_cursor(T.c.x, T.c.y);
 	repaint();
+}
+
+static void draw(void) {
+	draw_screen();
+}
+
+static void run(void) {
+	XEvent ev;
+	do {
+		XNextEvent(W.d, &ev);
+		if (XFilterEvent(&ev, None))
+			continue;
+		if (ev.type == ConfigureNotify) {
+			W.w = ev.xconfigure.width;
+			W.h = ev.xconfigure.height;
+		}
+	} while (ev.type != MapNotify);
+	
+	time_log("window mapped");
+	
+	int ttyfd = tty_new(NULL);
+	
+	time_log("created tty");
+	
+	int w = (W.w-W.border*2) / W.cw;
+	int h = (W.h-W.border*2) / W.ch;
+	
+	update_size(w, h); // gehhhh
+	
+	int timeout = -1;
+	struct timespec seltv, *tv, now, trigger;
+	int drawing = 0;
+	while (1) {
+		int xfd = XConnectionNumber(W.d);
+		
+		fd_set rfd;
+		FD_ZERO(&rfd);
+		FD_SET(ttyfd, &rfd);
+		FD_SET(xfd, &rfd);
+		
+		if (XPending(W.d))
+			timeout = 0;
+		
+		seltv.tv_sec = timeout / 1000;
+		seltv.tv_nsec = 1000000 * (timeout % 1000);
+		tv = timeout>=0 ? &seltv : NULL;
+		
+		if (pselect(max(xfd, ttyfd)+1, &rfd, NULL, NULL, tv, NULL) < 0) {
+			if (errno == EINTR)
+				continue;
+			die("select failed: %s\n", strerror(errno));
+		}
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		
+		if (FD_ISSET(ttyfd, &rfd))
+			ttyread();
+		
+		int xev = 0;
+		while (XPending(W.d)) {
+			xev = 1;
+			XNextEvent(W.d, &ev);
+			if (XFilterEvent(&ev, None))
+				continue;
+			if (handler[ev.type])
+				(handler[ev.type])(&ev);
+		}
+		
+		
+		// idea: instead of using just a timeout
+		// we can be more intelligent about this.
+		// detect newlines etc.
+		if (FD_ISSET(ttyfd, &rfd) || xev) {
+			if (!drawing) {
+				trigger = now;
+				drawing = 1;
+			}
+			timeout = (maxlatency - timediff(now, trigger)) / maxlatency * minlatency;
+			if (timeout > 0)
+				continue; /* we have time, try to find idle */
+		}
+		
+		timeout = -1;
+		
+		draw();
+		XFlush(W.d);
+		drawing = 0;
+	}
 }
 
 /*void draw_strikethrough(int x, int y, int w, XRenderColor col) {
@@ -960,3 +896,80 @@ p		}
 		prev = col;
 	}
 	}*/
+
+
+int main(int argc, char* argv[argc+1]) {
+	time_log("");
+	
+	// hecking locale
+	setlocale(LC_CTYPE, "");
+	XSetLocaleModifiers("");
+	
+	// default size
+	int w = 50;
+	int h = 10;
+	
+	// temp
+	W.border = 3;
+	//W.cw = 10;
+	//W.ch = 10;
+	
+	W.d = XOpenDisplay(NULL);
+	W.scr = XDefaultScreen(W.d);
+	W.vis = XDefaultVisual(W.d, W.scr);
+	
+	time_log("x stuff 1");
+	
+	FcInit();
+	init_fonts("cascadia code:pixelsize=16:antialias=true:autohint=true", 0);
+	
+	W.cw = ceil(W.fonts[0].width);
+	W.ch = ceil(W.fonts[0].height);
+	
+	W.w = W.cw*w+W.border*2;
+	W.h = W.ch*h+W.border*2;
+	
+	W.cmap = XDefaultColormap(W.d, W.scr);
+	
+	Window parent = XRootWindow(W.d, W.scr);
+	W.win = XCreateWindow(W.d, parent,
+		0, 0, W.w, W.h, // geometry
+		0, // border width
+		XDefaultDepth(W.d, W.scr), // depth
+		InputOutput, // class
+		W.vis, // visual
+		CWBackPixel | CWBorderPixel | CWBitGravity | CWEventMask | CWColormap, // value mask
+		&(XSetWindowAttributes){
+			//.background_pixel = TODO,
+			//.border_pixel = TODO,
+			.bit_gravity = NorthWestGravity,
+			.event_mask = FocusChangeMask | KeyPressMask | KeyReleaseMask | ExposureMask | VisibilityChangeMask | StructureNotifyMask | ButtonMotionMask | ButtonPressMask | ButtonReleaseMask,
+			.colormap = W.cmap,
+		}
+	);
+	W.gc = XCreateGC(W.d, parent, GCGraphicsExposures, &(XGCValues){
+			.graphics_exposures = False,	
+		});
+	
+	init_xim();
+	
+	init_atoms();
+	
+	XSetWMProtocols(W.d, W.win, &W.atoms.wm_delete_window, 1);
+	pid_t thispid = getpid();
+	XChangeProperty(W.d, W.win, W.atoms.net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (unsigned char*)&thispid, 1);
+	
+	XMapWindow(W.d, W.win);
+	XSync(W.d, False);
+	
+	init_hints();
+	
+	time_log("created window");
+	
+	update_charsize(W.cw, W.ch);
+	
+	init_term(w, h);
+	
+	run();
+	return 0;
+}
