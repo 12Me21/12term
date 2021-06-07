@@ -66,6 +66,7 @@ void init_scrollback(void) {
 
 void clear_row(Buffer* buffer, int y, int start) {
 	Row row = buffer->rows[y];
+	T.dirty_rows[y] = true;
 	for (int i=start; i<T.width; i++) {
 		// todo: check for wide char halves!
 		row[i] = (Cell){
@@ -122,15 +123,17 @@ void term_resize(int width, int height) {
 		for (int y=0; y<height; y++)
 			T.buffers[0].rows[y] = T.buffers[0].rows[y+diff];
 		// realloc lists of lines
+		T.height = height;
 		REALLOC(T.buffers[1].rows, height);
 		REALLOC(T.buffers[0].rows, height);
-		T.height = height;
+		REALLOC(T.dirty_rows, height);
 	} else if (height > T.height) { // height INCREASE
 		// realloc lists of lines
 		int old_height = T.height;
-		T.height = height;
 		REALLOC(T.buffers[1].rows, height);
 		REALLOC(T.buffers[0].rows, height);
+		REALLOC(T.dirty_rows, height);
+		T.height = height;
 		// alt buffer: add rows at bottom
 		for (int y=old_height; y<T.height; y++) {
 			ALLOC(T.buffers[1].rows[y], T.width);
@@ -223,6 +226,8 @@ void scroll_up(int amount) {
 		clear_row(T.current, y, 0);
 	}
 	rotate(y2-y1, sizeof(Cell*), (void*)&T.current->rows[y1], -amount);
+	for (int y=y1; y<y2; y++)
+		T.dirty_rows[y] = true;
 }
 
 int cursor_down(int amount) {
@@ -274,6 +279,7 @@ static int add_combining_char(int x, int y, Char c) {
 		if (dest->combining[i]==0) {
 			dest->combining[i] = c;
 			dest->combining[i+1] = 0;
+			T.dirty_rows[y] = true;
 			return 1;
 		}
 	}
@@ -340,6 +346,8 @@ void put_char(Char c) {
 	}
 	
 	T.c.x += width;
+	
+	T.dirty_rows[T.c.y] = true;
 }
 
 void clear_region(int x1, int y1, int x2, int y2) {
@@ -355,6 +363,7 @@ void clear_region(int x1, int y1, int x2, int y2) {
 	// todo: handle wide chars
 	
 	for (int y=y1; y<y2; y++) {
+		T.dirty_rows[y] = true;
 		for (int x=x1; x<x2; x++) {
 			T.current->rows[y][x] = (Cell){
 				.chr=0,
@@ -448,7 +457,6 @@ void insert_blank(int n) {
 	clear_region(src, T.c.y, dst, T.c.y+1);
 }
 
-
 void delete_lines(int n) {
 	if (T.c.y < T.current->scroll_top)
 		return;
@@ -464,4 +472,13 @@ void delete_lines(int n) {
 	// clear the rows at the bottom
 	for (int i=0; i<n; i++)
 		clear_row(T.current, T.current->scroll_bottom-i-1, 0);
+	
+	for (int y=T.c.y; y<T.current->scroll_bottom; y++)
+		T.dirty_rows[y] = true;
+}
+
+void dirty_all(void) {
+	for (int y=0; y<T.height; y++) {
+		T.dirty_rows[y] = true;
+	}
 }

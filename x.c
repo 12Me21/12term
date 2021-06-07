@@ -854,18 +854,21 @@ void draw_cursor(int x, int y) {
 	W.cursor_drawn = true;
 }
 
-void draw_line(int y) {
+static void draw_row(int y) {
 	for (int x=0; x<T.width; x++) {
 		draw_background(x, y, &T.current->rows[y][x]);
 	}
 	for (int x=0; x<T.width; x++) {
 		draw_char(x, y, &T.current->rows[y][x]);
 	}
+	T.dirty_rows[y] = false;
 }
 
 void draw_screen() {
-	for (int y=0; y<T.height; y++)
-		draw_line(y);
+	for (int y=0; y<T.height; y++) {
+		if (T.dirty_rows[y])
+			draw_row(y);
+	}
 	if (T.show_cursor)
 		draw_cursor(T.c.x, T.c.y);
 	repaint();

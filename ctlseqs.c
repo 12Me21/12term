@@ -182,14 +182,6 @@ void set_private_modes(bool state) {
 		case 25: // show/hide cursor
 			T.show_cursor = state;
 			break;
-		case 1000: // send mouse position on button press
-			break;
-		case 1003: // All Motion Mouse Tracking
-			break;
-		case 1004: // Send FocusIn/FocusOut events
-			break;
-		case 1006: // SGR mouse mode
-			break;
 		case 1047: // to alt/main buffer
 			if (state) {
 				T.current = &T.buffers[1];
@@ -197,6 +189,7 @@ void set_private_modes(bool state) {
 				clear_region(0, 0, T.width, T.height);
 			} else
 				T.current = &T.buffers[0];
+			dirty_all();
 			break;
 		case 1048: // save/load cursor
 			if (state)
@@ -213,6 +206,7 @@ void set_private_modes(bool state) {
 				T.c = T.saved_cursor;
 				T.current = &T.buffers[0];
 			}
+			dirty_all();
 			break;
 		case 2004: // set bracketed paste mode
 			T.bracketed_paste = state;
@@ -483,7 +477,7 @@ static void process_char(Char c) {
 	////////////////////////
 	switch (p->state) {
 		 //normal
-	case 0:
+	case NORMAL:
 		switch (c) {
 		case '\x1B':
 			p->state = ESC;

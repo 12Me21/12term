@@ -126,5 +126,6 @@ void delete_chars(int n);
 void insert_blank(int n);
 void term_resize(int width, int height);
 void delete_lines(int n);
+void dirty_all(void);
 
 extern Term T;
