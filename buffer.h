@@ -53,6 +53,7 @@ typedef struct ScrollbackCell {
 typedef Cell* Row;
 
 // the cursor keeps track of a position as well as the attributes
+#define Cursor Cursor_
 typedef struct Cursor {
 	int x,y; // 0-indexed
 	Attrs attrs;
