@@ -305,8 +305,8 @@ static void process_char(Char c) {
 		// end of string
 		// todo: maybe check other characters here just in case
 		if (c==0x07 || c==0x18 || c==0x1A || c==0x1B || (c>=0x80 && c<=0x9F)) {
-			print("finished string\n");
 			// (then we want to process the string sequence)
+			// TODO
 			// and /sometimes/ also process the character itself
 			p->state = NORMAL;
 		} else {

@@ -97,9 +97,9 @@ static void push_scrollback(int y) {
 		T.scrollback.size = length;
 	}
 	// now insert the row
-	T.scrollback.rows[T.scrollback.lines++] = T.current->rows[y];
+	T.scrollback.rows[T.scrollback.lines++] = T.buffers[0].rows[y];
 	// remove the row from the buffer itself so it doesn't get freed later
-	T.current->rows[y] = NULL;
+	T.buffers[0].rows[y] = NULL;
 }
 
 void term_resize(int width, int height) {
@@ -403,6 +403,7 @@ void put_char(Char c) {
 }
 
 void clear_region(int x1, int y1, int x2, int y2) {
+	//print("clearing region (%d %d) (%d %d) with term size %d x %d\n", x1,y1,x2,y2,T.width,T.height);
 	// todo: warn about this
 	if (x1<0)
 		x1 = 0;
@@ -416,6 +417,7 @@ void clear_region(int x1, int y1, int x2, int y2) {
 	
 	for (int y=y1; y<y2; y++) {
 		T.dirty_rows[y] = true;
+		//print("clearing row %d: %p\n", y, T.current->rows[y]);
 		for (int x=x1; x<x2; x++) {
 			T.current->rows[y][x] = (Cell){
 				.chr=0,
