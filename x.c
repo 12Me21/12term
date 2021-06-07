@@ -65,57 +65,58 @@ static void on_keypress(XEvent *ev) {
 	
 	KeySym ksym;
 	char buf[64] = {0};
-	const char* out = buf;
 	int len = 0;
 	
 	Status status;
 	if (W.ime.xic)
 		len = XmbLookupString(W.ime.xic, e, buf, sizeof buf, &ksym, &status);
-	else
-		len = XLookupString(e, buf, sizeof buf, &ksym, NULL);
+	else {
+		len = XLookupString(e, buf, sizeof buf, &ksym, NULL); //can't we just use the last argument of this instead of xmb?
+		status = XLookupBoth;
+	}
 	
-	for (KeyMap* map=KEY_MAP; map->output; map++) {
-		if (map->k==ksym && match_modifiers(map->modifiers, e->state)) {
-			out = map->output;
-			if (map->special==0) {
-				len = strlen(out);
-			} else {
-				int mods = 0;
-				if (e->state & ShiftMask)
-					mods |= 1;
-				if (e->state & Mod1Mask)
-					mods |= 2;
-				if (e->state & ControlMask)
-					mods |= 4;
-				if (map->special==1)
-					len = snprintf(buf, sizeof(buf), map->output, mods+1);
-				else if (map->special==2)
-					len = snprintf(buf, sizeof(buf), map->output, mods+1, map->arg);
-				else if (map->special==3)
-					len = snprintf(buf, sizeof(buf), map->output, map->arg, mods+1);
-				out = buf;
+	if (status==XLookupKeySym || status==XLookupBoth) {
+		// look up keysym in the key mapping
+		for (KeyMap* map=KEY_MAP; map->output; map++) {
+			if (map->k==ksym && match_modifiers(map->modifiers, e->state)) {
+				if (map->special==0) {
+					tty_write(strlen(map->output), map->output);
+				} else {
+					int mods = 0;
+					if (e->state & ShiftMask)
+						mods |= 1;
+					if (e->state & Mod1Mask)
+						mods |= 2;
+					if (e->state & ControlMask)
+						mods |= 4;
+					if (map->special==1)
+						tty_printf(map->output, mods+1);
+					else if (map->special==2)
+						tty_printf(map->output, mods+1, map->arg);
+					else if (map->special==3)
+						tty_printf(map->output, map->arg, mods+1);
+				}
+				goto finish;
 			}
-			goto found;
 		}
 	}
-	
-	if (len == 0)
-		return;
-	if (len == 1 && e->state & Mod1Mask) {
-		//if (IS_SET(MODE_8BIT)) {
-		//	if (*buf < 0177) {
-		//		Rune c = *buf | 0x80;
-		//		len = utf8encode(c, buf);
-		//	}
-		//} else {
-		buf[1] = buf[0];
-		buf[0] = '\033';
-		len = 2;
+	// otherwise, the input is normal text
+	if ((status==XLookupChars || status==XLookupBoth) && len>0) {
+		// idk how good this is...
+		if (len == 1 && e->state & Mod1Mask) {
+			//if (IS_SET(MODE_8BIT)) {
+			//	if (*buf < 0177) {
+			//		Rune c = *buf | 0x80;
+			//		len = utf8encode(c, buf);
+			//	}
+			//} else {
+			buf[1] = buf[0];
+			buf[0] = '\033';
+			len = 2;
+		}
+		tty_write(len, buf);
 	}
-	
- found:
-	//print("got keypresses: [%d] %s\n", ksym, out);
-	tty_write(len, out);
+ finish:;
 }
 
 static void on_expose(XEvent* e) {
