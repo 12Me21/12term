@@ -182,8 +182,8 @@ void init_term(int width, int height) {
 		.c = {
 			.x = 0, .y = 0,
 			.attrs = {
-				.color = (Color){.i = -1},
-				.background = (Color){.i = -2},
+				.color = {.i = -1},
+				.background = {.i = -2},
 			},
 		},
 	};
@@ -619,8 +619,11 @@ void full_reset(void) {
 	}
 	T.current = &T.buffers[0];
 	T.c = (Cursor){
-		.x = 0,
-		.y = 0,
+		.x = 0, .y = 0,
+		.attrs = {
+			.color = {.i = -1},
+			.background = {.i = -2},
+		},
 	};
 	save_cursor();
 	T.show_cursor = true;

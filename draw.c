@@ -287,6 +287,7 @@ void repaint(void) {
 }
 
 void draw(void) {
+	time_log(NULL);
 	for (int y=0; y<T.height; y++) {
 		if (T.dirty_rows[y])
 			draw_row(y);
@@ -296,6 +297,7 @@ void draw(void) {
 	else
 		erase_cursor();
 	repaint();
+	time_log("screen draw");
 }
 
 void clear_background(void) {
@@ -312,3 +314,12 @@ void draw_free(void) {
 		XftFontClose(W.d, frc[i].font);
 	free(frc);
 }
+
+// todo: display characters CENTERED within the cell rather than aligned to the left side.
+
+//so here's a better idea.
+// we keep track of what is ACTUALLY rendered on screen
+// then when rendering, we just need to umm
+// compare to that and only render the cells (and nearby b/c italics)
+// which differ.
+// it is worth going through a lot of effort to prevent unneeded renders because these are the slowest parts

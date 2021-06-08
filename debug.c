@@ -13,8 +13,8 @@ void die(const char *errstr, ...) {
 	exit(1);
 }
 
-static int firsttime = 1;
-static struct timespec prevtime;
+static struct timespec first_time;
+static struct timespec prev_time;
 
 static int timediff(struct timespec t1, struct timespec t2) {
 	return (t1.tv_sec-t2.tv_sec)*1000 + (t1.tv_nsec-t2.tv_nsec)/1E6;
@@ -30,10 +30,11 @@ void print(const char* str, ...) {
 void time_log(const char* str) {
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
-	if (!firsttime) {
-		int ms = timediff(now, prevtime);
-		print("[%dms] %s\n", ms, str);
-	}
-	prevtime = now;
-	firsttime = 0;
+	if (str) {
+		int ms = timediff(now, prev_time);
+		int total = timediff(now, first_time);
+		print("@ %dms [+%dms] %s\n", total, ms, str);
+	} else
+		first_time = now;
+	prev_time = now;
 }

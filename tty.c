@@ -14,6 +14,7 @@
 #include <pwd.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdbool.h>
 
 #if defined(__linux)
  #include <pty.h>
@@ -28,14 +29,12 @@
 #include "debug.h"
 #include "ctlseqs.h"
 #include "tty.h"
+#include "buffer.h"
 
 void sleep_forever(bool hangup);
 
-// todo: move all this stuff into a struct and attach it to Term.
-
 const char* termname = "xterm-24bit";
 
-static int iofd = 1;
 static int cmdfd;
 static pid_t pid;
 
@@ -52,13 +51,12 @@ void sigchld(int a) {
 	if (WIFEXITED(stat) && WEXITSTATUS(stat))
 		print("child exited with status %d\n", WEXITSTATUS(stat));
 	else if (WIFSIGNALED(stat))
-		print("child terminated due to signal %d\n", WTERMSIG(stat));
+		print("child terminated due to signal %d\n", WTERMSIG(stat));	
 	
 	sleep_forever(false);
-	//_exit(0); todo!
 }
 
-void execsh(char** args) {
+static void execsh(void) {
 	errno = 0;
 	const struct passwd* pw = getpwuid(getuid());
 	if (pw == NULL) {
@@ -69,17 +67,7 @@ void execsh(char** args) {
 	}
 	char* sh = getenv("SHELL");
 	if (sh == NULL)
-		sh = (pw->pw_shell[0]) ? pw->pw_shell : "/bin/sh";
-	
-	char *prog, *arg;
-	if (args) {
-		prog = args[0];
-		arg = NULL;
-	} else {
-		prog = sh;
-		arg = NULL;
-		args = (char*[]){prog, arg, NULL};
-	}
+		sh = pw->pw_shell[0] ? pw->pw_shell : "/bin/sh";
 	
 	unsetenv("COLUMNS");
 	unsetenv("LINES");
@@ -96,12 +84,12 @@ void execsh(char** args) {
 	signal(SIGQUIT, SIG_DFL);
 	signal(SIGTERM, SIG_DFL);
 	signal(SIGALRM, SIG_DFL);
-
-	execvp(prog, args);
+	
+	execvp(sh, (char*[]){sh, NULL});
 	_exit(1);
 }
 
-int tty_new(char** args) {
+int tty_new(void) {
 	/* seems to work fine on linux, openbsd and freebsd */
 	int m, s;
 	if (openpty(&m, &s, NULL, NULL, NULL) < 0)
@@ -112,7 +100,6 @@ int tty_new(char** args) {
 		die("fork failed: %s\n", strerror(errno));
 		break;
 	case 0:
-		close(iofd);
 		setsid(); /* create a new process group */
 		dup2(s, 0);
 		dup2(s, 1);
@@ -125,7 +112,7 @@ int tty_new(char** args) {
 		if (pledge("stdio getpw proc exec", NULL) == -1)
 			die("pledge\n");
 #endif
-		execsh(args);
+		execsh();
 		break;
 	default:
 #ifdef __OpenBSD__
@@ -140,7 +127,7 @@ int tty_new(char** args) {
 	return cmdfd;
 }
 
-size_t ttyread() {
+size_t tty_read(void) {
 	char buf[100];
 	
 	/* append read bytes to unprocessed bytes */
@@ -202,7 +189,7 @@ void tty_write(size_t n, const char str[n]) {
 				 * again. Empty it.
 				 */
 				if (n < lim)
-					lim = ttyread();
+					lim = tty_read();
 				n -= written;
 				s += written;
 			} else {
@@ -211,7 +198,7 @@ void tty_write(size_t n, const char str[n]) {
 			}
 		}
 		if (FD_ISSET(cmdfd, &rfd))
-			lim = ttyread();
+			lim = tty_read();
 	}
 	return;
 
@@ -220,6 +207,7 @@ void tty_write(size_t n, const char str[n]) {
 }
 
 void tty_hangup(void) {
+	signal(SIGCHLD, SIG_DFL);
 	kill(pid, SIGHUP);
 }
 
@@ -232,4 +220,12 @@ void tty_resize(int w, int h) {
 				.ws_ypixel = h,
 			}) < 0)
 		print("Couldn't set window size: %s\n", strerror(errno));
+}
+
+void tty_paste_text(int len, const char text[len]) {
+	if (T.bracketed_paste)
+		tty_write(6, "\x1B[200~");
+	tty_write(len, text);
+	if (T.bracketed_paste)
+		tty_write(6, "\x1B[201~");
 }

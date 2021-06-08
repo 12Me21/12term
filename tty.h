@@ -1,11 +1,10 @@
 #pragma once
 #include <stdlib.h>
 
-#include "buffer.h"
-
-extern int tty_new(char** args);
-extern size_t ttyread(void);
-extern void tty_write(size_t n, const char str[n]);
-extern void tty_printf(const char* format, ...);
-extern void tty_hangup(void);
-extern void tty_resize(int w, int h);
+int tty_new(void);
+size_t tty_read(void);
+void tty_write(size_t n, const char str[n]);
+void tty_printf(const char* format, ...);
+void tty_hangup(void);
+void tty_resize(int w, int h);
+void tty_paste_text(int len, const char text[len]);

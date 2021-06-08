@@ -17,6 +17,7 @@
 #include "keymap.h"
 #include "draw.h"
 #include "x.h"
+#include "buffer.h"
 
 Xw W = {0};
 
@@ -47,6 +48,10 @@ static int utf8_encode(Char c, char* out) {
 		return 0;
 	}
 	return len;
+}
+
+void clippaste(void) {
+	XConvertSelection(W.d, W.atoms.clipboard, W.atoms.utf8_string, W.atoms.clipboard, W.win, CurrentTime);
 }
 
 static bool match_modifiers(int want, int got) {
@@ -198,7 +203,7 @@ void sleep_forever(bool hangup) {
 	draw_free();
 	//FcFini(); // aaa
 	
-	XCloseDisplay(W.d);
+	XCloseDisplay(W.d); // why does this hang sometimes
 	
 	_exit(0); //is this right??
 }
@@ -216,12 +221,105 @@ static void on_clientmessage(XEvent* e) {
 	}
 }
 
-static HandlerFunc handler[LASTEvent] = {
+static void on_focusin(XEvent* e) {
+	if (e->xfocus.mode == NotifyGrab)
+		return;
+	
+	if (W.ime.xic)
+		XSetICFocus(W.ime.xic);
+}
+
+static void on_focusout(XEvent* e) {
+	if (e->xfocus.mode == NotifyGrab)
+		return;
+	
+	if (W.ime.xic)
+		XUnsetICFocus(W.ime.xic);
+}
+
+void on_selectionnotify(XEvent* e) {
+	Atom property = None;
+	if (e->type == SelectionNotify)
+		property = e->xselection.property;
+	else if (e->type == PropertyNotify)
+		property = e->xproperty.atom;
+	
+	if (property == None)
+		return;
+	
+	unsigned long ofs = 0;
+	unsigned long rem;
+	do {
+		unsigned long nitems;
+		int format;
+		unsigned char* data;
+		Atom type;
+		if (XGetWindowProperty(W.d, W.win, property, ofs, BUFSIZ/4, False, AnyPropertyType, &type, &format, &nitems, &rem, &data)) {
+			print("Clipboard allocation failed\n");
+			return;
+		}
+		
+		if (e->type == PropertyNotify && nitems == 0 && rem == 0) {
+			/*
+			 * If there is some PropertyNotify with no data, then
+			 * this is the signal of the selection owner that all
+			 * data has been transferred. We won't need to receive
+			 * PropertyNotify events anymore.
+			 */
+			W.attrs.event_mask &= ~PropertyChangeMask;
+			XChangeWindowAttributes(W.d, W.win, CWEventMask, &W.attrs);
+		}
+		
+		if (type == W.atoms.incr) {
+			/*
+			 * Activate the PropertyNotify events so we receive
+			 * when the selection owner does send us the next
+			 * chunk of data.
+			 */
+			W.attrs.event_mask |= PropertyChangeMask;
+			XChangeWindowAttributes(W.d, W.win, CWEventMask, &W.attrs);
+			
+			/*
+			 * Deleting the property is the transfer start signal.
+			 */
+			XDeleteProperty(W.d, W.win, property);
+			continue;
+		}
+		
+		// replace \n with \r
+		unsigned char* repl = data;
+		unsigned char* last = data + nitems*format/8;
+		while ((repl = memchr(repl, '\n', last - repl))) {
+			*repl++ = '\r';
+		}
+		
+		tty_paste_text(nitems*format/8, (char*)data);
+		
+		XFree(data);
+		/* number of 32-bit chunks returned */
+		ofs += nitems * format/32;
+	} while (rem > 0);
+	
+	/*
+	 * Deleting the property again tells the selection owner to send the
+	 * next data chunk in the property.
+	 */
+	XDeleteProperty(W.d, W.win, property);
+}
+
+static const HandlerFunc handler[LASTEvent] = {
 	[ClientMessage] = on_clientmessage,
 	[KeyPress] = on_keypress,
 	[Expose] = on_expose,
 	[ConfigureNotify] = on_configurenotify,
+	[FocusIn] = on_focusin,
+	[FocusOut] = on_focusout,
+	[SelectionNotify] = on_selectionnotify,
 };
+
+void clipboard_copy() {
+	
+}
 
 static int max(int a, int b) {
 	if (a>b)
@@ -336,6 +434,18 @@ static void init_fonts(const char* fontstr, double fontsize) {
 	time_log("loaded font 1");
 	
 	FcPatternDestroy(pattern);
+	
+}
+
+void xim_spot(int x, int y) {
+	if (!W.ime.xic)
+		return;
+	
+	W.ime.spot = (XPoint){
+		.x = W.border + x * W.cw,
+		.y = W.border + (y+1) * W.ch,
+	};
+	XSetICValues(W.ime.xic, XNPreeditAttributes, W.ime.spotlist, NULL);
 }
 
 static void ximinstantiate(Display* d, XPointer client, XPointer call);
@@ -392,6 +502,8 @@ static int timediff(struct timespec t1, struct timespec t2) {
 static double minlatency = 8;
 static double maxlatency = 33;
 
+int ttyfd = 0;
+
 static void run(void) {
 	XEvent ev;
 	do {
@@ -406,10 +518,6 @@ static void run(void) {
 	
 	time_log("window mapped");
 	
-	int ttyfd = tty_new(NULL);
-	
-	time_log("created tty");
-	
 	int w = (W.w-W.border*2) / W.cw;
 	int h = (W.h-W.border*2) / W.ch;
 	
@@ -417,7 +525,11 @@ static void run(void) {
 	
 	int timeout = -1;
 	struct timespec seltv, *tv, now, trigger;
-	int drawing = 0;
+	bool drawing = false;
+	bool got_text = false;
+	bool got_draw = false;
+	bool readed = false;
+	
 	while (1) {
 		int xfd = XConnectionNumber(W.d);
 		
@@ -440,8 +552,15 @@ static void run(void) {
 		}
 		clock_gettime(CLOCK_MONOTONIC, &now);
 		
-		if (FD_ISSET(ttyfd, &rfd))
-			ttyread();
+		
+		if (FD_ISSET(ttyfd, &rfd)) {
+			if (!got_text) {
+				time_log("first text");
+				got_text = true;
+			}
+			tty_read();
+			readed = true;
+		}
 		
 		int xev = 0;
 		while (XPending(W.d)) {
@@ -459,7 +578,7 @@ static void run(void) {
 		if (FD_ISSET(ttyfd, &rfd) || xev) {
 			if (!drawing) {
 				trigger = now;
-				drawing = 1;
+				drawing = true;
 			}
 			timeout = (maxlatency - timediff(now, trigger)) / maxlatency * minlatency;
 			if (timeout > 0)
@@ -468,11 +587,23 @@ static void run(void) {
 		
 		timeout = -1;
 		
-		draw();
+		if (readed) {
+			if (!got_draw) {
+				time_log("first draw");
+				got_draw = true;
+			}
+			
+			draw();
+			xim_spot(T.c.x, T.c.y);
+			readed = false;
+			drawing = false;
+		}
+		
 		XFlush(W.d);
-		drawing = 0;
 	}
 }
+
+
 
 static void init_atoms(void) {
 	W.atoms.xembed = XInternAtom(W.d, "_XEMBED", False);
@@ -484,10 +615,11 @@ static void init_atoms(void) {
 	if (W.atoms.utf8_string == None)
 		W.atoms.utf8_string = XA_STRING;
 	W.atoms.clipboard = XInternAtom(W.d, "CLIPBOARD", False);
+	W.atoms.incr = XInternAtom(W.d, "INCR", False);
 }
 
 int main(int argc, char* argv[argc+1]) {
-	time_log("");
+	time_log(NULL);
 	
 	// hecking locale
 	setlocale(LC_CTYPE, "");
@@ -505,19 +637,29 @@ int main(int argc, char* argv[argc+1]) {
 	
 	time_log("x stuff 1");
 	
+	ttyfd = tty_new(); // todo: maybe try to pass the window size here if we can guess it?
+	
 	FcInit();
 	// todo: this
 	init_fonts("cascadia code,monospace:pixelsize=16:antialias=true:autohint=true", 0);
 	
-	W.cw = ceil(W.fonts[0].width);
-	W.ch = ceil(W.fonts[0].height);
+	int cw = ceil(W.fonts[0].width);
+	int ch = ceil(W.fonts[0].height);
 	
-	W.w = W.cw*w+W.border*2;
-	W.h = W.ch*h+W.border*2;
+	W.w = cw*w+W.border*2;
+	W.h = ch*h+W.border*2;
 	
 	W.cmap = XDefaultColormap(W.d, W.scr);
 	
 	Window parent = XRootWindow(W.d, W.scr);
+	
+	W.attrs = (XSetWindowAttributes){
+		//.background_pixel = TODO,
+		//.border_pixel = TODO,
+		.bit_gravity = NorthWestGravity,
+		.event_mask = FocusChangeMask | KeyPressMask | KeyReleaseMask | ExposureMask | VisibilityChangeMask | StructureNotifyMask | ButtonMotionMask | ButtonPressMask | ButtonReleaseMask,
+		.colormap = W.cmap,
+	};
 	W.win = XCreateWindow(W.d, parent,
 		0, 0, W.w, W.h, // geometry
 		0, // border width
@@ -525,13 +667,7 @@ int main(int argc, char* argv[argc+1]) {
 		InputOutput, // class
 		W.vis, // visual
 		CWBackPixel | CWBorderPixel | CWBitGravity | CWEventMask | CWColormap, // value mask
-		&(XSetWindowAttributes){
-			//.background_pixel = TODO,
-			//.border_pixel = TODO,
-			.bit_gravity = NorthWestGravity,
-			.event_mask = FocusChangeMask | KeyPressMask | KeyReleaseMask | ExposureMask | VisibilityChangeMask | StructureNotifyMask | ButtonMotionMask | ButtonPressMask | ButtonReleaseMask,
-			.colormap = W.cmap,
-		}
+		&W.attrs
 	);
 	W.gc = XCreateGC(W.d, parent, GCGraphicsExposures, &(XGCValues){
 		.graphics_exposures = False,	
@@ -550,7 +686,7 @@ int main(int argc, char* argv[argc+1]) {
 	
 	time_log("created window");
 	
-	update_charsize(W.cw, W.ch);
+	update_charsize(cw, ch);
 	
 	init_term(w, h);
 	

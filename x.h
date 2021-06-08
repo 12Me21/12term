@@ -27,6 +27,7 @@ typedef struct Xw {
 	Pixmap pix;
 	GC gc;
 	XftDraw* draw;
+	XSetWindowAttributes attrs;
 	
 	// for rendering the cursor
 	Pixmap under_cursor;
@@ -49,6 +50,7 @@ typedef struct Xw {
 		Atom net_wm_pid;
 		Atom utf8_string;
 		Atom clipboard;
+		Atom incr;
 	} atoms;
 	
 	struct {

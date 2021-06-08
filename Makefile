@@ -4,7 +4,8 @@ srcs:= x tty debug buffer ctlseqs keymap csi draw
 
 CFLAGS+= -Wall -Wextra -g -pedantic -std=c11
 
-CFLAGS+= -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -Wno-type-limits -Werror=implicit-function-declaration -Wno-parentheses
+CFLAGS+= -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -Wno-type-limits -Wno-parentheses
+CFLAGS+= -Werror=implicit-function-declaration -Werror=incompatible-pointer-types
 
 libs:= m rt X11 util Xft
 
