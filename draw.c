@@ -270,6 +270,18 @@ void shift_lines(int src, int dest, int count) {
 		draw_cursor(T.c.x, T.c.y);
 }
 
+/*static bool cell_needs_redraw(int x, int y) {
+	Cell* current = &drawn_chars[y][x];
+	Cell* new = T.current->rows[y][x];
+	if (current->attrs.all != new->attrs.all)
+		return true;
+	if (new->attrs.color.truecolor) {
+		if (current->attrs.color.truecolor) 
+			} else {
+				
+			}
+			}*/
+
 static void draw_row(int y) {
 	XftDrawSetClipRectangles(W.draw, W.border, y*W.ch+W.border, &(XRectangle){
 		.width = W.cw*T.width,

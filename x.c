@@ -191,8 +191,8 @@ static void on_configurenotify(XEvent* e) {
 void sleep_forever(bool hangup) {
 	print("goodnight...\n");
 	
-	if (hangup)
-		tty_hangup();
+	//if (hangup)
+	tty_hangup();
 	
 	for (int i=0; i<4; i++) {
 		FcPatternDestroy(W.fonts[i].pattern);
@@ -205,9 +205,9 @@ void sleep_forever(bool hangup) {
 	draw_free();
 	//FcFini(); // aaa
 	
-	XCloseDisplay(W.d); // why does this hang sometimes
+	XCloseDisplay(W.d);
 	
-	_exit(0); //is this right??
+	_exit(0); //is this right?
 }
 
 static void on_clientmessage(XEvent* e) {

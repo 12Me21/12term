@@ -92,6 +92,7 @@ typedef struct Term {
 	bool bracketed_paste;
 	
 	bool* dirty_rows;
+	//bool** dirty_chars;
 	
 	int charsets[4];
 	
