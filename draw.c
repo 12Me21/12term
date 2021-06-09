@@ -6,6 +6,29 @@
 #include "x.h"
 #include "debug.h"
 #include "buffer.h"
+#include "common.h"
+
+static Row* drawn_chars = NULL;
+static int drawn_width = -1;
+static int drawn_height = -1;
+
+void draw_resize(int width, int height) {
+	if (drawn_chars) {
+		for (int i=0; i<drawn_height; i++)
+			free(drawn_chars[i]);
+	}
+	drawn_height = height;
+	drawn_width = width;
+	REALLOC(drawn_chars, drawn_height);
+	for (int y=0; y<drawn_height; y++) {
+		ALLOC(drawn_chars[y], drawn_width);
+		for (int x=0; x<drawn_width; x++) {
+			drawn_chars[y][x] = (Cell){
+				.chr = -1,
+			};
+		}
+	}
+}
 
 typedef struct {
 	XftFont *font;
@@ -267,12 +290,20 @@ static void draw_row(int y) {
 			prev_start = x;
 			prev_color = bg;
 		}
+		/*drawn_chars[y][x] = (Cell) {
+			.chr = 0,
+			.attrs = {
+				.color = row[x].attrs.background,
+				.background = row[x].attrs.background,
+			},
+			};*/
 	}
 	alloc_color(&prev_color, &xcol);
 	XftDrawRect(W.draw, &xcol, W.border+W.cw*prev_start, W.border+W.ch*y, W.cw*(prev_start-x), W.ch);
 	
 	for (int x=0; x<T.width; x++) {
 		draw_char(x, y, &T.current->rows[y][x]);
+		drawn_chars[y][x] = T.current->rows[y][x];
 	}
 	T.dirty_rows[y] = false;
 	
@@ -288,15 +319,23 @@ void repaint(void) {
 
 void draw(void) {
 	time_log(NULL);
+	print("dirty rows: [");
+	for (int y=0; y<T.height; y++) {
+		print("%c", ".#"[T.dirty_rows[y]]);
+	}
+	print("] ");
 	for (int y=0; y<T.height; y++) {
 		if (T.dirty_rows[y])
 			draw_row(y);
 	}
+	// todo: optimize this to avoid extra redraws I guess
 	if (T.show_cursor)
 		draw_cursor(T.c.x, T.c.y);
 	else
 		erase_cursor();
+	// todo: definitely avoid extra repaints
 	repaint();
+	
 	time_log("screen draw");
 }
 

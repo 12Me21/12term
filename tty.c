@@ -204,13 +204,12 @@ void tty_hangup(void) {
 	kill(pid, SIGHUP);
 }
 
-// ugly
-void tty_resize(int w, int h) {
+void tty_resize(int w, int h, Px pw, Px ph) {
 	if (ioctl(cmdfd, TIOCSWINSZ, &(struct winsize){
-				.ws_col = T.width,
-				.ws_row = T.height,
-				.ws_xpixel = w,
-				.ws_ypixel = h,
+				.ws_col = w,
+				.ws_row = h,
+				.ws_xpixel = pw,
+				.ws_ypixel = ph,
 			}) < 0)
 		print("Couldn't set window size: %s\n", strerror(errno));
 }

@@ -142,14 +142,16 @@ static void init_pixmap(void) {
 }
 
 // when the size of the terminal (in character cells) changes
+// (also called to initialize size)
 // todo: what if the size (in pixels) changes but not the size in char cells?
 // like, if someone resizes the window by 1px, OR if the font size changes?
 static void update_size(int width, int height) {
 	W.w = W.border*2+width*W.cw;
 	W.h = W.border*2+height*W.ch;
+	tty_resize(width, height, width*W.cw, height*W.ch);
 	init_pixmap();
 	term_resize(width, height);
-	tty_resize(width*W.cw, height*W.ch);
+	draw_resize(width, height); //todo: order?
 }
 
 // when the size of the character cells changes (i.e. when changing fontsize)
