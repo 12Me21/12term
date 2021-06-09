@@ -424,7 +424,8 @@ void put_char(Char c) {
 			dest[1].attrs = dest->attrs;
 			dest[1].wide = -1;
 		}
-	}
+	} else
+		dest->wide = 0;
 	
 	T.c.x += width;
 	
