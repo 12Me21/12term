@@ -217,6 +217,7 @@ static void on_clientmessage(XEvent* e) {
 			//win.mode &= ~MODE_FOCUSED;
 		}
 	} else if (e->xclient.data.l[0] == W.atoms.wm_delete_window) {
+		print("window closing\n");
 		sleep_forever(true);
 	}
 }
@@ -307,7 +308,7 @@ void on_selectionnotify(XEvent* e) {
 	XDeleteProperty(W.d, W.win, property);
 }
 
-static const HandlerFunc handler[LASTEvent] = {
+static const HandlerFunc HANDLERS[LASTEvent] = {
 	[ClientMessage] = on_clientmessage,
 	[KeyPress] = on_keypress,
 	[Expose] = on_expose,
@@ -568,8 +569,8 @@ static void run(void) {
 			XNextEvent(W.d, &ev);
 			if (XFilterEvent(&ev, None))
 				continue;
-			if (handler[ev.type])
-				(handler[ev.type])(&ev);
+			if (HANDLERS[ev.type])
+				(HANDLERS[ev.type])(&ev);
 		}
 		
 		// idea: instead of using just a timeout

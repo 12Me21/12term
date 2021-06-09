@@ -53,7 +53,7 @@ void sigchld(int a) {
 	else if (WIFSIGNALED(stat))
 		print("child terminated due to signal %d\n", WTERMSIG(stat));	
 	
-	sleep_forever(false);
+	//	sleep_forever(false); // this causes problems. it's not necessary since the term will exit when reading fails anyway
 }
 
 static void execsh(void) {
@@ -128,25 +128,18 @@ int tty_new(void) {
 }
 
 size_t tty_read(void) {
-	char buf[100];
+	char buf[1024];
+	int len = read(cmdfd, buf, sizeof(buf));
 	
-	/* append read bytes to unprocessed bytes */
-	int ret = read(cmdfd, buf, sizeof(buf));
-	
-	switch (ret) {
-	case 0:
-		sleep_forever(true);
-		break;
-	case -1:
+	if (len>0) {
+		// todo: move this stuff into x.c maybe so we don't need buffer.h in this file?
+		process_chars(len, buf);
+		return len;
+	} else if (len<0) {
 		print("couldn't read from shell: %s\n", strerror(errno));
 		sleep_forever(true);
-		break;
-	default:
-		// todo: move this stuff into x.c maybe so we don't need buffer.h in this file
-		process_chars(ret, buf);
-		break;
 	}
-	return ret;
+	return 0;
 }
 
 void tty_printf(const char* format, ...) {
