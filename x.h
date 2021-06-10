@@ -1,21 +1,10 @@
-#include <stdbool.h>
+#pragma once
 
 #include <X11/Xlib.h>
 #include <X11/Xft/Xft.h>
 #include <X11/Xatom.h>
-typedef int Px;
 
-#define Font Font_
-typedef struct {
-	Px width, height;
-	Px ascent, descent;
-	Px lbearing, rbearing;
-	
-	bool badslant, badweight;
-	XftFont* match;
-	FcFontSet* set;
-	FcPattern* pattern;
-} Font;
+#include "common.h"
 
 // globals
 typedef struct Xw {
@@ -40,7 +29,7 @@ typedef struct Xw {
 	Px border;
 	float cwscale, chscale;// todo
 	
-	Font fonts[4]; // normal, bold, italic, bold+italic
+	int font_ascent;
 	
 	struct atoms {
 		Atom xembed;
@@ -52,13 +41,6 @@ typedef struct Xw {
 		Atom clipboard;
 		Atom incr;
 	} atoms;
-	
-	struct {
-		XIM xim;
-		XIC xic;
-		XPoint spot;
-		XVaNestedList spotlist;
-	} ime;
 } Xw;
 
 extern Xw W;

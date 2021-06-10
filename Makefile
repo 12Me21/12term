@@ -1,6 +1,6 @@
 output:= 12term
 
-srcs:= x tty debug buffer ctlseqs keymap csi draw
+srcs:= x tty debug buffer ctlseqs keymap csi draw input font
 
 CFLAGS+= -Wall -Wextra -g -pedantic -std=c11
 

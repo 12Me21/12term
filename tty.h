@@ -1,9 +1,10 @@
 #pragma once
-#include <stdlib.h>
 
-typedef int Px;
+#include "common.h"
 
-int tty_new(void);
+typedef int Fd;
+
+Fd tty_new(void);
 size_t tty_read(void);
 void tty_write(size_t n, const char str[n]);
 void tty_printf(const char* format, ...);

@@ -1,3 +1,4 @@
+#include "common.h"
 #include "ctlseqs2.h"
 
 static int get_arg(int n, int def) {

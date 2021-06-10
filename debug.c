@@ -1,9 +1,10 @@
 #define _POSIX_C_SOURCE 199309L
-
 #include <time.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <stdarg.h>
+
+#include "common.h"
+#include "debug.h"
 
 void die(const char *errstr, ...) {
 	va_list ap;

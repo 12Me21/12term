@@ -1,12 +1,11 @@
-#include <errno.h>
-
 #include <X11/Xlib.h>
 #include <X11/Xft/Xft.h>
 
-#include "x.h"
-#include "debug.h"
-#include "buffer.h"
 #include "common.h"
+#include "x.h"
+#include "buffer.h"
+#include "font.h"
+#include "draw.h"
 
 static Row* drawn_chars = NULL;
 static int drawn_width = -1;
@@ -29,16 +28,6 @@ void draw_resize(int width, int height) {
 		}
 	}
 }
-
-typedef struct {
-	XftFont *font;
-	int flags;
-	Char unicodep;
-} Fontcache;
-
-static Fontcache* frc = NULL;
-static int frclen = 0;
-static int frccap = 0;
 
 static void reset_clip(void) {
 	XftDrawSetClipRectangles(W.draw, W.border, W.border, &(XRectangle){
@@ -78,121 +67,15 @@ static void alloc_color(XRenderColor* col, XftColor* out) {
 	XftColorAllocValue(W.d, W.vis, W.cmap, col, out);
 }
 
-static int same_color(XRenderColor a, XRenderColor b) {
-	return a.red==b.red && a.green==b.green && a.blue==b.blue && a.alpha==b.alpha;
+XftColor make_color(Color c) {
+	XftColor out;
+	XRenderColor r = get_color(c, false);
+	alloc_color(&r, &out);
+	return out;
 }
 
-// todo: we should cache this for all the text onscreen mayb
-static int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], const Cell cells[len], int x, int y) {
-	int winx = W.border+x*W.cw;
-	int winy = W.border+y*W.ch;
-	
-	//unsigned short prevmode = USHRT_MAX;
-	Font* font = &W.fonts[0];
-	int frcflags = 0;
-	int runewidth = W.cw;
-	FcResult fcres;
-	FcPattern *fcpattern, *fontpattern;
-	FcFontSet *fcsets[] = {NULL};
-	FcCharSet *fccharset;
-	int numspecs = 0;
-	
-	int xp = winx, yp = winy+font->ascent;
-	for (int i=0; i<len; i++) {
-		// Fetch rune and mode for current glyph.
-		Char rune = cells[i].chr;
-		Attrs attrs = cells[i].attrs;
-		
-		/* Skip dummy wide-character spacing. */
-		if (cells[i].wide == -1)
-			continue;
-		
-		/* Determine font for glyph if different from previous glyph. */
-		//if (prevmode != mode) {
-		//	prevmode = mode;
-		frcflags = 0;
-		runewidth = W.cw * (cells[i].wide==1 ? 2 : 1);
-		if (attrs.italic && attrs.weight==1) {
-			frcflags = 3;
-		} else if (attrs.italic) {
-			frcflags = 2;
-		} else if (attrs.weight==1) {
-			frcflags = 1;
-		}
-		font = &W.fonts[frcflags];
-		yp = winy + font->ascent; //-1
-		//}
-
-		/* Lookup character index with default font. */
-		FT_UInt glyphidx = XftCharIndex(W.d, font->match, rune);
-		if (glyphidx) {
-			specs[numspecs].font = font->match;
-			specs[numspecs].glyph = glyphidx;
-			specs[numspecs].x = xp;
-			specs[numspecs].y = yp;
-			xp += runewidth;
-			numspecs++;
-			continue;
-		}
-
-		/* Fallback on font cache, search the font cache for match. */
-		int f;
-		for (f=0; f<frclen; f++) {
-			glyphidx = XftCharIndex(W.d, frc[f].font, rune);
-			/* Everything correct. */
-			if (glyphidx && frc[f].flags == frcflags)
-				goto found;
-			/* We got a default font for a not found glyph. */
-			if (!glyphidx && frc[f].flags == frcflags && frc[f].unicodep == rune) {
-				goto found;
-			}
-		}
-		/* Nothing was found. Use fontconfig to find matching font. */
-		if (!font->set)
-			font->set = FcFontSort(0, font->pattern, 1, 0, &fcres);
-		fcsets[0] = font->set;
-		
-		fcpattern = FcPatternDuplicate(font->pattern);
-		fccharset = FcCharSetCreate();
-		
-		FcCharSetAddChar(fccharset, rune);
-		FcPatternAddCharSet(fcpattern, FC_CHARSET, fccharset);
-		FcPatternAddBool(fcpattern, FC_SCALABLE, 1);
-		
-		FcConfigSubstitute(0, fcpattern, FcMatchPattern);
-		FcDefaultSubstitute(fcpattern);
-		
-		fontpattern = FcFontSetMatch(0, fcsets, 1, fcpattern, &fcres);
-		
-		/* Allocate memory for the new cache entry. */
-		if (frclen >= frccap) {
-			frccap += 16;
-			frc = realloc(frc, frccap * sizeof(Fontcache));
-		}
-		
-		frc[frclen].font = XftFontOpenPattern(W.d, fontpattern);
-		if (!frc[frclen].font)
-			die("XftFontOpenPattern failed seeking fallback font: %s\n",
-				strerror(errno));
-		frc[frclen].flags = frcflags;
-		frc[frclen].unicodep = rune;
-		
-		glyphidx = XftCharIndex(W.d, frc[frclen].font, rune);
-		
-		f = frclen;
-		frclen++;
-		
-		FcPatternDestroy(fcpattern);
-		FcCharSetDestroy(fccharset);
-	found:;
-		specs[numspecs].font = frc[f].font;
-		specs[numspecs].glyph = glyphidx;
-		specs[numspecs].x = xp;
-		specs[numspecs].y = yp;
-		xp += runewidth;
-		numspecs++;
-	}
-	return numspecs;
+static int same_color(XRenderColor a, XRenderColor b) {
+	return a.red==b.red && a.green==b.green && a.blue==b.blue && a.alpha==b.alpha;
 }
 
 static void draw_char(int x, int y, Cell* c) {
@@ -210,9 +93,9 @@ static void draw_char(int x, int y, Cell* c) {
 		XftDrawGlyphFontSpec(W.draw, &xcol, &specs, 1);
 	}
 	if (c->attrs.underline)
-		XftDrawRect(W.draw, &xcol, winx, winy+W.fonts[0].ascent+1, width*W.cw, 1);
+		XftDrawRect(W.draw, &xcol, winx, winy+W.font_ascent+1, width*W.cw, 1);
 	if (c->attrs.strikethrough)
-		XftDrawRect(W.draw, &xcol, winx, winy+W.fonts[0].ascent*2/3, width*W.cw, 1);
+		XftDrawRect(W.draw, &xcol, winx, winy+W.font_ascent*2/3, width*W.cw, 1);
 	
 	if (W.cursor_drawn && W.cursor_x==x && W.cursor_y==y)
 		W.cursor_drawn = false;
@@ -361,9 +244,6 @@ void clear_background(void) {
 }
 
 void draw_free(void) {
-	for (int i=0; i<frclen; i++)
-		XftFontClose(W.d, frc[i].font);
-	free(frc);
 }
 
 // todo: display characters CENTERED within the cell rather than aligned to the left side.

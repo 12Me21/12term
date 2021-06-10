@@ -1,19 +1,14 @@
 #define _XOPEN_SOURCE 600
-#include <stdlib.h>
 #include <wchar.h>
 #include <string.h>
-
-#define index index_
 
 #include "common.h"
 #include "buffer.h"
 #include "buffer2.h"
-#include "debug.h"
-#include "render.h"
 
 Term T; // ok there's really no reason to ever need more than one of these anyway.
 
-const RGBColor default_palette[16] = {
+RGBColor default_palette[16] = {
 	//r , g , b 
 	{  0,  0,  0},
 	{170,  0,  0},
@@ -32,9 +27,9 @@ const RGBColor default_palette[16] = {
 	{ 85,255,255},
 	{255,255,255},
 };
-const RGBColor default_cursor = {  0,192,  0};
-const RGBColor default_foreground = {  0,  0,  0};
-const RGBColor default_background = {255,255,255};
+RGBColor default_cursor = {  0,192,  0};
+RGBColor default_foreground = {  0,  0,  0};
+RGBColor default_background = {255,255,255};
 
 static void init_palette(void) {
 	T.foreground = default_foreground;

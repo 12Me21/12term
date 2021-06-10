@@ -1,12 +1,8 @@
 #pragma once
-#include <stdint.h>
-#include <stdbool.h>
-#define index index_
+
+#include "common.h"
 
 //#include "coroutine.h"
-
-// unicode character
-typedef int32_t Char;
 
 typedef struct RGBColor {
 	unsigned char r,g,b;

@@ -1,13 +1,7 @@
-#include <stdbool.h>
 #include <stdio.h>
 
+#include "common.h"
 #include "ctlseqs.h"
-#include "debug.h"
-#include "tty.h" //todo: get rid of this.
-
-#define DEFAULT break; default
-#define CASE(x) break; case(x)
-
 #include "ctlseqs2.h"
 
 ParseState P;

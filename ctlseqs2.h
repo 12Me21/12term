@@ -1,9 +1,11 @@
 #pragma once
 
+#include "common.h"
+
+// things used by files which include this
 #include "buffer.h"
 #include "buffer2.h"
-#include "debug.h"
-#include "tty.h"
+#include "tty.h" //todo: get rid of this?
 
 typedef struct ParseState {
 	char string[1030];

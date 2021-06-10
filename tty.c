@@ -1,20 +1,14 @@
 #define _POSIX_C_SOURCE 200112L
-#include <limits.h>
-#include <sys/ioctl.h>
 #include <sys/select.h>
-#include <sys/types.h>
 #include <signal.h>
 #include <sys/wait.h>
-#include <termios.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
-#include <fcntl.h>
 #include <errno.h>
 #include <pwd.h>
-#include <stdlib.h>
 #include <stdarg.h>
-#include <stdbool.h>
+// more headers might be required here, not sure...
 
 #if defined(__linux)
  #include <pty.h>
@@ -26,16 +20,14 @@
  #error unsupported system
 #endif
 
-#include "debug.h"
-#include "ctlseqs.h"
+#include "common.h"
 #include "tty.h"
-#include "buffer.h"
+void sleep_forever(bool hangup); // nnn where do these decs go...
+void process_chars(int len, const char c[len]); 
 
-void sleep_forever(bool hangup);
+const char* termname = "xterm-24bit"; // todo
 
-const char* termname = "xterm-24bit";
-
-static int cmdfd;
+static Fd cmdfd;
 static pid_t pid;
 
 void sigchld(int a) {
@@ -89,9 +81,9 @@ static void execsh(void) {
 	_exit(1);
 }
 
-int tty_new(void) {
+Fd tty_new(void) {
 	/* seems to work fine on linux, openbsd and freebsd */
-	int m, s;
+	Fd m, s;
 	if (openpty(&m, &s, NULL, NULL, NULL) < 0)
 		die("openpty failed: %s\n", strerror(errno));
 
@@ -100,6 +92,8 @@ int tty_new(void) {
 		die("fork failed: %s\n", strerror(errno));
 		break;
 	case 0:
+		close(m);
+		
 		setsid(); /* create a new process group */
 		dup2(s, 0);
 		dup2(s, 1);
@@ -107,7 +101,7 @@ int tty_new(void) {
 		if (ioctl(s, TIOCSCTTY, NULL) < 0)
 			die("ioctl TIOCSCTTY failed: %s\n", strerror(errno));
 		close(s);
-		close(m);
+		
 #ifdef __OpenBSD__
 		if (pledge("stdio getpw proc exec", NULL) == -1)
 			die("pledge\n");
@@ -120,6 +114,7 @@ int tty_new(void) {
 			die("pledge\n");
 #endif
 		close(s);
+		
 		cmdfd = m;
 		signal(SIGCHLD, sigchld);
 		break;
@@ -212,12 +207,4 @@ void tty_resize(int w, int h, Px pw, Px ph) {
 				.ws_ypixel = ph,
 			}) < 0)
 		print("Couldn't set window size: %s\n", strerror(errno));
-}
-
-void tty_paste_text(int len, const char text[len]) {
-	if (T.bracketed_paste)
-		tty_write(6, "\x1B[200~");
-	tty_write(len, text);
-	if (T.bracketed_paste)
-		tty_write(6, "\x1B[201~");
 }

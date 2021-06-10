@@ -1,4 +1,5 @@
 #pragma once
 
-void process_chars(int len, const char c[len]);
+// what is this ..
+
 void reset_parser(void);
