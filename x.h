@@ -29,6 +29,8 @@ typedef struct Xw {
 	Px border;
 	float cwscale, chscale;// todo
 	
+	bool ligatures;
+	
 	int font_ascent;
 	
 	struct atoms {

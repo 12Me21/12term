@@ -387,6 +387,8 @@ int main(int argc, char* argv[argc+1]) {
 	
 	W.border = 3;
 	
+	W.ligatures = true;
+	
 	W.d = XOpenDisplay(NULL);
 	W.scr = XDefaultScreen(W.d);
 	W.vis = XDefaultVisual(W.d, W.scr);
@@ -397,7 +399,7 @@ int main(int argc, char* argv[argc+1]) {
 	
 	FcInit();
 	// todo: this
-	init_fonts("fira code,cascadia code,monospace:pixelsize=16:antialias=true:autohint=true", 0);
+	init_fonts("cascadia code,fira code,monospace:pixelsize=16:antialias=true:autohint=true", 0);
 	
 	// messy messy
 	W.w = W.cw*w+W.border*2;

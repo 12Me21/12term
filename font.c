@@ -1,7 +1,7 @@
 #include <errno.h>
 #include <math.h>
 #include <X11/Xft/Xft.h>
-#include <hb-ft.h>
+//#include <hb-ft.h>
 
 #include "common.h"
 #include "font.h"
@@ -16,6 +16,7 @@ typedef struct {
 	
 	bool badslant, badweight;
 	XftFont* match;
+	//hb_font_t* hb_font;
 	FcFontSet* set;
 	FcPattern* pattern;
 } Font;
@@ -74,6 +75,9 @@ static int load_font(Font* f, FcPattern* pattern) {
 	f->rbearing = f->match->max_advance_width;
 	f->height = f->ascent + f->descent;
 	f->width = ceildiv(extents.xOff, len);
+	
+	//FT_Face face = XftLockFace(f->match);
+	//f->hb_font = hb_ft_font_create(face, NULL);
 	
 	return 0;
 }
@@ -138,77 +142,57 @@ void init_fonts(const char* fontstr, double fontsize) {
 }
 
 typedef struct {
-	XftFont *font;
+	XftFont* font;
 	int flags;
 	Char unicodep;
+	//hb_font_t* hb_font;
 } Fontcache;
 
 static Fontcache* frc = NULL;
 static int frclen = 0;
 static int frccap = 0;
 
-typedef struct {
-	XftFont* match;
-	hb_font_t* font;
-} HbFontMatch;
-
-static int hbfontslen = 0;
-static HbFontMatch* hbfontcache = NULL;
-
 // todo:
 static bool can_connect(const Cell* a, const Cell* b) {
 	return true;
 }
 
-static hb_font_t* hbfindfont(XftFont* match) {
-	for (int i=0; i<hbfontslen; i++) {
-		if (hbfontcache[i].match==match)
-			return hbfontcache[i].font;
+/*hb_font_t* hbfindfont(XftFont* font) { //temp
+	for (int i=0; i<4; i++) {
+		if (fonts[i].match == font)
+			return fonts[i].hb_font;
 	}
-	
-	/* Font not found in cache, caching it now. */
-	REALLOC(hbfontcache, hbfontslen+1);
-	FT_Face face = XftLockFace(match);
-	hb_font_t* font = hb_ft_font_create(face, NULL);
-	if (font == NULL)
-		die("Failed to load Harfbuzz font.");
-	
-	hbfontcache[hbfontslen].match = match;
-	hbfontcache[hbfontslen].font = font;
-	hbfontslen++;
-	
-	return font;
-}
+	for (int i=0; i<frclen; i++) {
+		if (frc[i].font == font)
+			return frc[i].hb_font;
+	}
+	return NULL;
+	}*/
 
-static void hbtransformsegment(XftFont* xfont, const Cell* string, hb_codepoint_t* codepoints, int start, int length) {
+/*static void hbtransformsegment(XftFont* xfont, const Cell* cells, hb_codepoint_t* codepoints, int start, int length) {
 	hb_font_t* font = hbfindfont(xfont);
 	if (font == NULL)
 		return;
 	
 	hb_buffer_t* buffer = hb_buffer_create();
 	hb_buffer_set_direction(buffer, HB_DIRECTION_LTR);
-
-	/* Fill buffer with codepoints. */
+	
 	for (int i=start; i<start+length; i++) {
-		Char rune = string[i].chr;
-		if (string[i].wide == -1)
-			rune = ' '; // really?
-		hb_buffer_add_codepoints(buffer, (hb_codepoint_t[]){rune}, 1, 0, 1);
+		Char chr = cells[i].chr;
+		if (cells[i].wide==-1 || cells[i].chr==0)
+			chr = ' '; // really?
+		hb_buffer_add_codepoints(buffer, (hb_codepoint_t[]){chr}, 1, 0, 1);
 	}
 	
-	/* Shape the segment. */
 	hb_shape(font, buffer, NULL, 0);
 	
-	/* Get new glyph info. */
 	hb_glyph_info_t* info = hb_buffer_get_glyph_infos(buffer, NULL);
-	
-	/* Write new codepoints. */
+
 	for (int i=0; i<length; i++)
 		codepoints[start+i] = info[i].codepoint;
-	
-	/* Cleanup. */
+
 	hb_buffer_destroy(buffer);
-}
+	}*/
 
 // todo: we should cache this for all the text onscreen mayb
 int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], /*const*/ Cell cells[len], int x, int y) {
@@ -218,7 +202,7 @@ int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], /*const*/ Cell cel
 	//unsigned short prevmode = USHRT_MAX;
 	Font* font = &fonts[0];
 	int frcflags = 0;
-	int runewidth = W.cw;
+	int chrwidth = W.cw;
 	FcResult fcres;
 	FcPattern *fcpattern, *fontpattern;
 	FcFontSet *fcsets[] = {NULL};
@@ -227,22 +211,28 @@ int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], /*const*/ Cell cel
 	
 	int xp = winx, yp = winy+font->ascent;
 	for (int i=0; i<len; i++) {
-		// Fetch rune and mode for current glyph.
-		Char rune = cells[i].chr;
+		// Fetch chr and mode for current glyph.
+		Char chr = cells[i].chr;
 		Attrs attrs = cells[i].attrs;
 		
 		/* Skip dummy wide-character spacing. */
 		if (cells[i].wide == -1)
 			continue;
+		
+		chrwidth = W.cw * (cells[i].wide==1 ? 2 : 1);
+				
 		// empty cells
-		if (rune == 0)
-			rune = ' ';
+		if (chr == 0) {
+			chr = ' ';
+			//xp += chrwidth;
+			//continue;
+		}
 		
 		/* Determine font for glyph if different from previous glyph. */
 		//if (prevmode != mode) {
 		//	prevmode = mode;
 		frcflags = 0;
-		runewidth = W.cw * (cells[i].wide==1 ? 2 : 1);
+
 		if (attrs.italic && attrs.weight==1) {
 			frcflags = 3;
 		} else if (attrs.italic) {
@@ -255,13 +245,13 @@ int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], /*const*/ Cell cel
 		//}
 		
 		/* Lookup character index with default font. */
-		FT_UInt glyphidx = XftCharIndex(W.d, font->match, rune);
+		FT_UInt glyphidx = XftCharIndex(W.d, font->match, chr);
 		if (glyphidx) {
 			specs[numspecs].font = font->match;
 			specs[numspecs].glyph = glyphidx;
 			specs[numspecs].x = xp;
 			specs[numspecs].y = yp;
-			xp += runewidth;
+			xp += chrwidth;
 			numspecs++;
 			continue;
 		}
@@ -269,12 +259,12 @@ int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], /*const*/ Cell cel
 		/* Fallback on font cache, search the font cache for match. */
 		int f;
 		for (f=0; f<frclen; f++) {
-			glyphidx = XftCharIndex(W.d, frc[f].font, rune);
+			glyphidx = XftCharIndex(W.d, frc[f].font, chr);
 			/* Everything correct. */
 			if (glyphidx && frc[f].flags == frcflags)
 				goto found;
 			/* We got a default font for a not found glyph. */
-			if (!glyphidx && frc[f].flags == frcflags && frc[f].unicodep == rune) {
+			if (!glyphidx && frc[f].flags == frcflags && frc[f].unicodep == chr) {
 				goto found;
 			}
 		}
@@ -286,7 +276,7 @@ int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], /*const*/ Cell cel
 		fcpattern = FcPatternDuplicate(font->pattern);
 		fccharset = FcCharSetCreate();
 		
-		FcCharSetAddChar(fccharset, rune);
+		FcCharSetAddChar(fccharset, chr);
 		FcPatternAddCharSet(fcpattern, FC_CHARSET, fccharset);
 		FcPatternAddBool(fcpattern, FC_SCALABLE, 1);
 		
@@ -306,9 +296,12 @@ int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], /*const*/ Cell cel
 			die("XftFontOpenPattern failed seeking fallback font: %s\n",
 				strerror(errno));
 		frc[frclen].flags = frcflags;
-		frc[frclen].unicodep = rune;
+		frc[frclen].unicodep = chr;
 		
-		glyphidx = XftCharIndex(W.d, frc[frclen].font, rune);
+		//FT_Face face = XftLockFace(frc[frclen].font);
+		//frc[frclen].hb_font = hb_ft_font_create(face, NULL);
+		
+		glyphidx = XftCharIndex(W.d, frc[frclen].font, chr);
 		
 		f = frclen;
 		frclen++;
@@ -320,60 +313,55 @@ int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], /*const*/ Cell cel
 		specs[numspecs].glyph = glyphidx;
 		specs[numspecs].x = xp;
 		specs[numspecs].y = yp;
-		xp += runewidth;
+		xp += chrwidth;
 		numspecs++;
 	}
 	
-	int start=0, length=1, gstart=0;
-	hb_codepoint_t codepoints[len];
-	
-	for (int idx=1, specidx=1; idx<len; idx++) {
-		if (cells[idx].wide==-1) {
-			length+=1;
-			continue;
+	/*if (W.ligatures) {
+		
+		int cstart = 0;
+		int sstart = 0;
+		
+		hb_codepoint_t codepoints[len];
+		
+		int s = 0;
+		int i = 0;
+		
+		for (; i<len; i++) {
+			if (cells[i].wide==-1)
+				continue;
+			if (specs[sstart].font==specs[s].font) {
+				
+			} else {
+				hbtransformsegment(specs[sstart].font, cells, codepoints, cstart, i-cstart);
+				cstart = i;
+				sstart = s;
+			}
+			s++;
 		}
 		
-		if (specs[specidx].font==specs[start].font && can_connect(&cells[gstart], &cells[idx])) {
-			length++;
-		} else {
-			hbtransformsegment(specs[start].font, cells, codepoints, gstart, length);
-			length = 1;
-			start = specidx;
-			gstart = idx;
+		if (numspecs)
+			hbtransformsegment(specs[sstart].font, cells, codepoints, cstart, i-cstart);
+		
+		
+		if (numspecs) {
+			for (int i=0, s=0; i < len; i++) {
+				if (cells[i].wide==-1)
+					continue;
+				
+				if (codepoints[i] != specs[s].glyph)
+					cells[i].ligature = true;
+				
+				specs[s++].glyph = codepoints[i];
+			}
 		}
-		
-		specidx++;
-	}
-	
-	// you know, we do a lot of this RLE loop shit, would be nice to maybe have a general function for it.
-	hbtransformsegment(specs[start].font, cells, codepoints, gstart, length);
-	
-	/* Apply the transformation to glyph specs. */
-	for (int i=0, specidx = 0; i < len; i++) {
-		if (cells[i].wide == -1)
-			continue;
-		
-		if (codepoints[i] != specs[specidx].glyph)
-			cells[i].ligature = true;
-		
-		specs[specidx++].glyph = codepoints[i];
-	}
+	 } */
 	
 	return numspecs;
 }
 
 void fonts_free(void) {
-	for (int i=0; i<hbfontslen; i++) {
-		hb_font_destroy(hbfontcache[i].font);
-		XftUnlockFace(hbfontcache[i].match);
-	}
-	
-	if (hbfontcache != NULL) {
-		free(hbfontcache);
-		hbfontcache = NULL;
-	}
-	hbfontslen = 0;
-	
+	// todo: free HB fonts properly
 	for (int i=0; i<4; i++) {
 		FcPatternDestroy(fonts[i].pattern);
 		XftFontClose(W.d, fonts[i].match);
