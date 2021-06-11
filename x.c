@@ -397,7 +397,7 @@ int main(int argc, char* argv[argc+1]) {
 	
 	FcInit();
 	// todo: this
-	init_fonts("cascadia code,monospace:pixelsize=16:antialias=true:autohint=true", 0);
+	init_fonts("fira code,cascadia code,monospace:pixelsize=16:antialias=true:autohint=true", 0);
 	
 	// messy messy
 	W.w = W.cw*w+W.border*2;

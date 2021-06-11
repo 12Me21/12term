@@ -9,7 +9,7 @@ CFLAGS+= -Werror=implicit-function-declaration -Werror=incompatible-pointer-type
 
 libs:= m rt X11 util Xft
 
-pkgs:= fontconfig freetype2
+pkgs:= fontconfig freetype2 harfbuzz
 
 
 

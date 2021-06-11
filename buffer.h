@@ -4,6 +4,8 @@
 
 //#include "coroutine.h"
 
+// todo: maybe make a separate cell.h file or something
+
 typedef struct RGBColor {
 	unsigned char r,g,b;
 } RGBColor;
@@ -38,6 +40,7 @@ typedef struct Cell {
 	Char combining[16]; // null terminated list
 	Attrs attrs;
 	char wide; //0: normal. 1:wide(left). -1:wide(right)
+	bool ligature;
 } Cell;
 
 // compressed version of cells, used for scrollback buffer (todo)

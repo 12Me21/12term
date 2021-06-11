@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <math.h>
 #include <X11/Xft/Xft.h>
+#include <hb-ft.h>
 
 #include "common.h"
 #include "font.h"
@@ -146,8 +147,71 @@ static Fontcache* frc = NULL;
 static int frclen = 0;
 static int frccap = 0;
 
+typedef struct {
+	XftFont* match;
+	hb_font_t* font;
+} HbFontMatch;
+
+static int hbfontslen = 0;
+static HbFontMatch* hbfontcache = NULL;
+
+// todo:
+static bool can_connect(const Cell* a, const Cell* b) {
+	return true;
+}
+
+static hb_font_t* hbfindfont(XftFont* match) {
+	for (int i=0; i<hbfontslen; i++) {
+		if (hbfontcache[i].match==match)
+			return hbfontcache[i].font;
+	}
+	
+	/* Font not found in cache, caching it now. */
+	REALLOC(hbfontcache, hbfontslen+1);
+	FT_Face face = XftLockFace(match);
+	hb_font_t* font = hb_ft_font_create(face, NULL);
+	if (font == NULL)
+		die("Failed to load Harfbuzz font.");
+	
+	hbfontcache[hbfontslen].match = match;
+	hbfontcache[hbfontslen].font = font;
+	hbfontslen++;
+	
+	return font;
+}
+
+static void hbtransformsegment(XftFont* xfont, const Cell* string, hb_codepoint_t* codepoints, int start, int length) {
+	hb_font_t* font = hbfindfont(xfont);
+	if (font == NULL)
+		return;
+	
+	hb_buffer_t* buffer = hb_buffer_create();
+	hb_buffer_set_direction(buffer, HB_DIRECTION_LTR);
+
+	/* Fill buffer with codepoints. */
+	for (int i=start; i<start+length; i++) {
+		Char rune = string[i].chr;
+		if (string[i].wide == -1)
+			rune = ' '; // really?
+		hb_buffer_add_codepoints(buffer, (hb_codepoint_t[]){rune}, 1, 0, 1);
+	}
+	
+	/* Shape the segment. */
+	hb_shape(font, buffer, NULL, 0);
+	
+	/* Get new glyph info. */
+	hb_glyph_info_t* info = hb_buffer_get_glyph_infos(buffer, NULL);
+	
+	/* Write new codepoints. */
+	for (int i=0; i<length; i++)
+		codepoints[start+i] = info[i].codepoint;
+	
+	/* Cleanup. */
+	hb_buffer_destroy(buffer);
+}
+
 // todo: we should cache this for all the text onscreen mayb
-int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], const Cell cells[len], int x, int y) {
+int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], /*const*/ Cell cells[len], int x, int y) {
 	int winx = W.border+x*W.cw;
 	int winy = W.border+y*W.ch;
 	
@@ -170,6 +234,9 @@ int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], const Cell cells[l
 		/* Skip dummy wide-character spacing. */
 		if (cells[i].wide == -1)
 			continue;
+		// empty cells
+		if (rune == 0)
+			rune = ' ';
 		
 		/* Determine font for glyph if different from previous glyph. */
 		//if (prevmode != mode) {
@@ -186,7 +253,7 @@ int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], const Cell cells[l
 		font = &fonts[frcflags];
 		yp = winy + font->ascent; //-1
 		//}
-
+		
 		/* Lookup character index with default font. */
 		FT_UInt glyphidx = XftCharIndex(W.d, font->match, rune);
 		if (glyphidx) {
@@ -198,7 +265,7 @@ int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], const Cell cells[l
 			numspecs++;
 			continue;
 		}
-
+		
 		/* Fallback on font cache, search the font cache for match. */
 		int f;
 		for (f=0; f<frclen; f++) {
@@ -256,10 +323,57 @@ int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], const Cell cells[l
 		xp += runewidth;
 		numspecs++;
 	}
+	
+	int start=0, length=1, gstart=0;
+	hb_codepoint_t codepoints[len];
+	
+	for (int idx=1, specidx=1; idx<len; idx++) {
+		if (cells[idx].wide==-1) {
+			length+=1;
+			continue;
+		}
+		
+		if (specs[specidx].font==specs[start].font && can_connect(&cells[gstart], &cells[idx])) {
+			length++;
+		} else {
+			hbtransformsegment(specs[start].font, cells, codepoints, gstart, length);
+			length = 1;
+			start = specidx;
+			gstart = idx;
+		}
+		
+		specidx++;
+	}
+	
+	// you know, we do a lot of this RLE loop shit, would be nice to maybe have a general function for it.
+	hbtransformsegment(specs[start].font, cells, codepoints, gstart, length);
+	
+	/* Apply the transformation to glyph specs. */
+	for (int i=0, specidx = 0; i < len; i++) {
+		if (cells[i].wide == -1)
+			continue;
+		
+		if (codepoints[i] != specs[specidx].glyph)
+			cells[i].ligature = true;
+		
+		specs[specidx++].glyph = codepoints[i];
+	}
+	
 	return numspecs;
 }
 
 void fonts_free(void) {
+	for (int i=0; i<hbfontslen; i++) {
+		hb_font_destroy(hbfontcache[i].font);
+		XftUnlockFace(hbfontcache[i].match);
+	}
+	
+	if (hbfontcache != NULL) {
+		free(hbfontcache);
+		hbfontcache = NULL;
+	}
+	hbfontslen = 0;
+	
 	for (int i=0; i<4; i++) {
 		FcPatternDestroy(fonts[i].pattern);
 		XftFontClose(W.d, fonts[i].match);

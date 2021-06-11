@@ -31,9 +31,9 @@ void draw_resize(int width, int height) {
 
 static void reset_clip(void) {
 	XftDrawSetClipRectangles(W.draw, W.border, W.border, &(XRectangle){
-			.width = W.w-W.border*2,
-			.height = W.h-W.border*2,
-		}, 1);
+		.width = W.w-W.border*2,
+		.height = W.h-W.border*2,
+	}, 1);
 }
 
 static XRenderColor get_color(Color c, bool bold) {
@@ -51,7 +51,7 @@ static XRenderColor get_color(Color c, bool bold) {
 			rgb = T.foreground;
 		else if (i == -3)
 			rgb = T.cursor_background;
-		else
+		else // -2
 			rgb = T.background;
 	}
 	return (XRenderColor){
@@ -78,24 +78,37 @@ static int same_color(XRenderColor a, XRenderColor b) {
 	return a.red==b.red && a.green==b.green && a.blue==b.blue && a.alpha==b.alpha;
 }
 
-static void draw_char(int x, int y, Cell* c) {
+static void draw_char_spec(int x, int y, Cell* c, XftGlyphFontSpec* spec) {
 	if (c->wide == -1)
 		return;
 	XftColor xcol;
+	if (spec && c->chr!=0) {
+		XRenderColor fg = get_color(c->attrs.color, c->attrs.weight==1);
+		alloc_color(&fg, &xcol);
+		XftDrawGlyphFontSpec(W.draw, &xcol, spec, 1);
+	}
+	
 	int width = c->wide ? 2 : 1;
 	int winx = W.border+x*W.cw;
 	int winy = W.border+y*W.ch;
-	if (c->chr) {
-		XRenderColor fg = get_color(c->attrs.color, c->attrs.weight==1);
-		alloc_color(&fg, &xcol);
-		XftGlyphFontSpec specs;
-		xmakeglyphfontspecs(1, &specs, c, x, y);
-		XftDrawGlyphFontSpec(W.draw, &xcol, &specs, 1);
-	}
+	
 	if (c->attrs.underline)
 		XftDrawRect(W.draw, &xcol, winx, winy+W.font_ascent+1, width*W.cw, 1);
 	if (c->attrs.strikethrough)
 		XftDrawRect(W.draw, &xcol, winx, winy+W.font_ascent*2/3, width*W.cw, 1);
+}
+
+static void draw_char(int x, int y, Cell* c) {
+	if (c->wide == -1)
+		return;
+	
+	if (c->chr) {
+		XftGlyphFontSpec spec;
+		xmakeglyphfontspecs(1, &spec, c, x, y);
+		draw_char_spec(x, y, c, &spec);
+	} else {
+		draw_char_spec(x, y, c, NULL);
+	}
 }
 
 static void erase_cursor(void) {
@@ -110,8 +123,8 @@ static void erase_cursor(void) {
 
 static void draw_cursor(int x, int y) {
 	if (W.cursor_drawn) {
-		//if (W.cursor_x==x && W.cursor_y==y)
-		//	return;
+		if (W.cursor_x==x && W.cursor_y==y)
+			return;
 		erase_cursor();
 	}
 	// todo: adding border each time is a pain. can we specify an origin somehow?
@@ -164,14 +177,16 @@ void shift_lines(int src, int dest, int count) {
 			}*/
 
 static void draw_row(int y) {
+	Row row = T.current->rows[y];
+	XftColor xcol;
+	
+	// set clip region to entire row
 	XftDrawSetClipRectangles(W.draw, W.border, y*W.ch+W.border, &(XRectangle){
 		.width = W.cw*T.width,
 		.height = W.ch,
 	}, 1);
 	
-	Row row = T.current->rows[y];
-	XftColor xcol;
-	
+	// draw background
 	XRenderColor prev_color = get_color(row[0].attrs.background, 0);
 	int prev_start = 0;
 	int x;
@@ -183,21 +198,18 @@ static void draw_row(int y) {
 			prev_start = x;
 			prev_color = bg;
 		}
-		/*drawn_chars[y][x] = (Cell) {
-			.chr = 0,
-			.attrs = {
-				.color = row[x].attrs.background,
-				.background = row[x].attrs.background,
-			},
-			};*/
 	}
 	alloc_color(&prev_color, &xcol);
 	XftDrawRect(W.draw, &xcol, W.border+W.cw*prev_start, W.border+W.ch*y, W.cw*(prev_start-x), W.ch);
 	
-	for (int x=0; x<T.width; x++) {
-		draw_char(x, y, &T.current->rows[y][x]);
+	XftGlyphFontSpec specs[T.width];
+	int num = xmakeglyphfontspecs(T.width, specs, T.current->rows[y], 0, y);
+	// draw text
+	for (int x=0; x<num; x++) {
+		draw_char_spec(x, y, &T.current->rows[y][x], &specs[x]);
 		drawn_chars[y][x] = T.current->rows[y][x];
 	}
+	
 	T.dirty_rows[y] = false;
 	
 	if (W.cursor_y==y)
@@ -251,3 +263,4 @@ void draw_free(void) {
 // compare to that and only render the cells (and nearby b/c italics)
 // which differ.
 // it is worth going through a lot of effort to prevent unneeded renders because these are the slowest parts
+
