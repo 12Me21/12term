@@ -1,6 +1,9 @@
 #pragma once
 
 #include "common.h"
+#include "buffer.h"
+
+// this file has the buffer manipulation commands
 
 void put_char(Char c);
 
@@ -28,3 +31,7 @@ void erase_characters(int n);
 
 void select_charset(int g, Char set);
 void full_reset(void);
+
+void switch_buffer(bool alt);
+
+void set_scroll_region(int y1, int y2);

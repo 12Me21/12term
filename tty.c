@@ -122,8 +122,9 @@ Fd tty_new(void) {
 	return cmdfd;
 }
 
+// read from child process and process the text
 size_t tty_read(void) {
-	char buf[1024];
+	char buf[256];
 	int len = read(cmdfd, buf, sizeof(buf));
 	
 	if (len>0) {
@@ -137,6 +138,7 @@ size_t tty_read(void) {
 	return 0;
 }
 
+// don't use this for anything really long
 void tty_printf(const char* format, ...) {
 	va_list ap;
 	va_start(ap, format);
@@ -146,7 +148,7 @@ void tty_printf(const char* format, ...) {
 	tty_write(len, buf);
 }
 
-	
+// send data to child process
 void tty_write(size_t n, const char str[n]) {
 	const char* s = str;
 	fd_set wfd, rfd;
@@ -195,7 +197,7 @@ void tty_write(size_t n, const char str[n]) {
 }
 
 void tty_hangup(void) {
-	signal(SIGCHLD, SIG_DFL);
+	//signal(SIGCHLD, SIG_DFL);
 	kill(pid, SIGHUP);
 }
 

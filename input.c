@@ -49,6 +49,7 @@ static int utf8_encode(Char c, char* out) {
 }
 
 static bool match_modifiers(int want, int got) {
+	// todo: add bit for application keypad/cursor mode or whatever
 	if (want==-1)
 		return true;
 	if (want==-2)

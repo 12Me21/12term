@@ -41,5 +41,3 @@ enum string_command {
 };
 
 void process_csi_char(Char c);
-void set_private_modes(bool state);
-void process_sgr(void);

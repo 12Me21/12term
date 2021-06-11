@@ -61,12 +61,6 @@ void init_scrollback(void) {
 	T.scrollback.lines = 0;
 }
 
-void dirty_all(void) {
-	for (int y=0; y<T.height; y++) {
-		T.dirty_rows[y] = true;
-	}
-}
-
 void clear_row(Buffer* buffer, int y, int start) {
 	Row row = buffer->rows[y];
 	T.dirty_rows[y] = true;
@@ -103,6 +97,11 @@ static void push_scrollback(int y) {
 	T.scrollback.rows[T.scrollback.lines++] = T.buffers[0].rows[y];
 	// remove the row from the buffer itself so it doesn't get freed later
 	T.buffers[0].rows[y] = NULL;
+}
+
+void dirty_all(void) {
+	for (int y=0; y<T.height; y++)
+		T.dirty_rows[y] = true;
 }
 
 void term_resize(int width, int height) {
@@ -169,94 +168,106 @@ void term_resize(int width, int height) {
 	}
 }
 
+// todo: confirm which things are reset by this
+void full_reset(void) {
+	for (int i=0; i<2; i++) {
+		T.buffers[i].scroll_top = 0;
+		T.buffers[i].scroll_bottom = T.height;
+		T.current = &T.buffers[i];
+		clear_region(0, 0, T.width, T.height);
+	}
+	T.current = &T.buffers[0];
+	
+	T.c = (Cursor){
+		.x = 0, .y = 0,
+		.attrs = {
+			.color = {.i = -1},
+			.background = {.i = -2},
+		},
+	};
+	T.saved_cursor = T.c;
+	T.show_cursor = true;
+	T.blink_cursor = false;
+	
+	init_palette();
+	
+	for (int i=0; i<T.width; i++)
+		T.tabs[i] = i%8==0;
+	
+	T.charsets[0] = 0;
+	
+	T.bracketed_paste = false;
+	T.app_keypad = false;
+	T.app_cursor = false;
+	
+	dirty_all();
+}
+
 void init_term(int width, int height) {
-	T = (Term) {
+	T = (Term){
 		// REMEMBER: this sets all the other fields to 0
 		.current = &T.buffers[0],
-		.show_cursor = true,
 		.c = {
-			.x = 0, .y = 0,
 			.attrs = {
 				.color = {.i = -1},
 				.background = {.i = -2},
 			},
 		},
 	};
-	T.saved_cursor = T.c;
-	
-	init_palette();
-	init_scrollback();
-	
 	term_resize(width, height);
+	full_reset();
+	init_scrollback();
 }
 
-static int char_width(Char c) {
-	int width;
-	if (c<=128) {
-		width = 1;
-	} else {
-		width = wcwidth(c);
-		if (width<0)
-			width = 1;
-	}
-	return width;
+// generic array rotate function
+static void memswap(int size, unsigned char a[size], unsigned char b[size]) {
+	unsigned char temp[size];
+	memcpy(temp, a, size);
+	memcpy(a, b, size);
+	memcpy(b, temp, size);
 }
-
 static void rotate(int count, int itemsize, unsigned char data[count][itemsize], int amount) {
 	while (amount<0)
 		amount += count;
 	amount %= count;
 	int a=0;
 	int b=0;
-	unsigned char temp[itemsize];
+	
 	for (int i=0; i<count; i++) {
 		b = (b+amount) % count;
 		if (b==a)
 			b = ++a;
-		if (b!=a) {
-			memcpy(temp, data[a], itemsize);
-			memcpy(data[a], data[b], itemsize);
-			memcpy(data[b], temp, itemsize);
-		}
+		if (b!=a)
+			memswap(itemsize, data[a], data[b]);
 	}
 }
 
-void save_cursor(void) {
-	T.saved_cursor = T.c;
-}
-
-void restore_cursor(void) {
-	T.c = T.saved_cursor;
-	cursor_to(T.c.x, T.c.y);
-}
-
-static void scroll_down(int amount) {
-	if (amount<=0)
-		return;
-	int y1 = T.current->scroll_top;
-	int y2 = T.current->scroll_bottom;
-	if (y1<0)
-		y1 = 0;
-	if (y2>T.height)
-		y2 = T.height;
-	
+// shift the rows in [`y1`,`y2`) by `amount` (negative = up, positive = down)
+// and clear the "new" lines
+static void shift_rows(int y1, int y2, int amount) {
 	rotate(y2-y1, sizeof(Cell*), (void*)&T.current->rows[y1], amount);
 	for (int y=y1; y<y2; y++)
 		T.dirty_rows[y] = true;
+	if (amount>0) {
+		for (int y=y1; y<y1+amount; y++)
+			clear_row(T.current, y, 0);
+	} else {
+		for (int y=y2+amount; y<y2; y++)
+			clear_row(T.current, y, 0);
+	}
+}
+
+// move text downwards
+static void scroll_down(int amount) {
+	int y1 = T.current->scroll_top;
+	int y2 = T.current->scroll_bottom;
 	
-	for (int y=y1; y<y2; y++)
-		clear_row(T.current, y, 0);
+	shift_rows(y1, y2, amount);
 }
 
 static void scroll_up(int amount) {
-	if (amount<=0)
-		return;
 	int y1 = T.current->scroll_top;
 	int y2 = T.current->scroll_bottom;
-	if (y1<0)
-		y1 = 0;
-	if (y2>T.height)
-		y2 = T.height;
 	
 	for (int y=y1; y<y1+amount; y++) {
 		// if we are on the main screen, and the scroll region starts at the top of the screen, we add the lines to the scrollback list.
@@ -265,12 +276,7 @@ static void scroll_up(int amount) {
 			ALLOC(T.current->rows[y], T.width);
 		}
 	}
-	rotate(y2-y1, sizeof(Cell*), (void*)&T.current->rows[y1], -amount);
-	//shift_lines(y1+amount, y1, y2-y1-amount);
-	for (int y=y1; y<y2; y++)
-		T.dirty_rows[y] = true;
-	for (int y=y2-amount; y<y2; y++)
-		clear_row(T.current, y, 0);
+	shift_rows(y1, y2, -amount);
 }
 
 void reverse_index(int amount) {
@@ -285,6 +291,7 @@ void reverse_index(int amount) {
 	}
 }
 
+// are we sure this can't overflow T.c.y?
 int cursor_down(int amount) {
 	if (amount<=0)
 		return 0;
@@ -354,6 +361,42 @@ static const Char DEC_GRAPHICS_CHARSET[128] = {
 	['`'] = L'◆', L'▒', L'␉', L'␌', L'␍', L'␊', L'°', L'±', L'␤', L'␋', L'┘', L'┐', L'┌', L'└', L'┼', L'⎺', L'⎻', L'─', L'⎼', L'⎽', L'├', L'┤', L'┴', L'┬', L'│', L'≤', L'≥', L'π', L'≠', L'£', L'·',
 };
 
+static int char_width(Char c) {
+	int width;
+	if (c<=128) {
+		width = 1;
+	} else {
+		width = wcwidth(c);
+		if (width<0)
+			width = 1;
+	}
+	return width;
+}
+
+static void erase_wc_left(int x, int y) {
+	if (x+1 < T.width) {
+		Cell* dest = &T.current->rows[y][x+1];
+		if (dest->wide==-1) {
+			*dest = (Cell){
+				.attrs = dest->attrs,
+				// rest are 0
+			};
+		}
+	}
+}
+
+static void erase_wc_right(int x, int y) {
+	if (x-1 >= 0) {
+		Cell* dest = &T.current->rows[y][x-1];
+		if (dest->wide==1) {
+			*dest = (Cell){
+				.attrs = dest->attrs,
+				// rest are 0
+			};
+		}
+	}
+}
+
 void put_char(Char c) {
 	if (T.charsets[0] == '0') {
 		if (c<128 && c>=0 && DEC_GRAPHICS_CHARSET[c])
@@ -374,25 +417,10 @@ void put_char(Char c) {
 	}
 	
 	Cell* dest = &T.current->rows[T.c.y][T.c.x];
-	// if overwriting the first half of a wide character
-	if (dest->wide==1) {
-		if (T.c.x+1 < T.width) {
-			if (dest[1].wide==-1) {
-				dest[1].chr = 0;
-				dest[1].wide = 0;
-				dest[1].combining[0] = 0;
-			}
-		}
-	} else if (dest->wide==-1) {
-		// overwriting the second half of a wide character
-		if (T.c.x-1 >= 0) {
-			if (dest[-1].wide==1) {
-				dest[-1].chr = 0;
-				dest[-1].wide = 0;
-				dest[-1].combining[0] = 0;
-			}
-		}
-	}
+	if (dest->wide==1)
+		erase_wc_left(T.c.x, T.c.y);
+	else if (dest->wide==-1)
+		erase_wc_right(T.c.x, T.c.y);
 	
 	dest->chr = c;
 	dest->combining[0] = 0;
@@ -405,15 +433,10 @@ void put_char(Char c) {
 	if (width==2) {
 		dest->wide = 1;
 		if (T.c.x+1 < T.width) { //should always be true
-			if (dest[1].wide==1) {
-				if (T.c.x+2 < T.width) {
-					if (dest[2].wide==-1) {
-						dest[2].chr = 0;
-						dest[2].wide = 0;
-						dest[2].combining[0] = 0;
-					}
-				}
-			}
+			if (dest[1].wide==1)
+				erase_wc_left(T.c.x+2, T.c.y);
+			// (don't need erase_wc_right because we know the char to the left is new)
+			// insert dummy char
 			dest[1].chr = 0;
 			dest[1].combining[0] = 0;
 			dest[1].attrs = dest->attrs;
@@ -428,7 +451,6 @@ void put_char(Char c) {
 }
 
 void clear_region(int x1, int y1, int x2, int y2) {
-	//print("clearing region (%d %d) (%d %d) with term size %d x %d\n", x1,y1,x2,y2,T.width,T.height);
 	// todo: warn about this
 	if (x1<0)
 		x1 = 0;
@@ -442,7 +464,6 @@ void clear_region(int x1, int y1, int x2, int y2) {
 	
 	for (int y=y1; y<y2; y++) {
 		T.dirty_rows[y] = true;
-		//print("clearing row %d: %p\n", y, T.current->rows[y]);
 		for (int x=x1; x<x2; x++) {
 			T.current->rows[y][x] = (Cell){
 				.chr=0,
@@ -490,6 +511,13 @@ void cursor_right(int amount) {
 		T.c.x = T.width-1;
 }
 
+static void limit(int* x, int min, int max) {
+	if (*x<min)
+		*x = min;
+	else if (*x>max)
+		*x = max;
+}
+
 void cursor_left(int amount) {
 	if (amount<=0)
 		return;
@@ -500,33 +528,26 @@ void cursor_left(int amount) {
 }
 
 void cursor_to(int x, int y) {
-	if (x<0)
-		x=0;
-	if (y<0)
-		y=0;
-	if (x>=T.width)
-		x=T.width-1;
-	if (y>=T.height)
-		y=T.height-1;
+	// but is it ok to move the cursor to the offscreen column?
+	limit(&x, 0, T.width-1);
+	limit(&y, 0, T.height-1);
 	T.c.x = x;
 	T.c.y = y;
 }
 
 void delete_chars(int n) {
-	if (n<0)
+	limit(&n, 0, T.width-T.c.x);
+	if (!n)
 		return;
-	if (n > T.width-T.c.x)
-		n = T.width-T.c.x;
 	Row line = T.current->rows[T.c.y];
 	memmove(&line[T.c.x], &line[T.c.x+n], sizeof(Cell)*(T.width-T.c.x-n));
-	clear_region(T.width-n, T.c.y, T.width, T.c.y+1);
+	clear_row(T.current, T.c.y, T.width-n);
 }
 
 void insert_blank(int n) {
-	if (n<0)
+	limit(&n, 0, T.width-T.c.x);
+	if (!n)
 		return;
-	if (n > T.width-T.c.x)
-		n = T.width-T.c.x;
 	
 	int dst = T.c.x + n;
 	int src = T.c.x;
@@ -541,19 +562,11 @@ void insert_lines(int n) {
 		return;
 	if (T.c.y >= T.current->scroll_bottom)
 		return;
-	int max = T.current->scroll_bottom - T.c.y;
-	if (n > max)
-		n = max;
-	if (n <= 0)
+	limit(&n, 0, T.current->scroll_bottom - T.c.y);
+	if (!n)
 		return;
 	// scroll lines down
-	rotate(T.current->scroll_bottom-T.c.y, sizeof(Cell*), (void*)&T.current->rows[T.c.y], n);
-	// clear rows at top
-	for (int i=0; i<n; i++)
-		clear_row(T.current, T.c.y+i, 0);
-	
-	for (int y=T.c.y; y<T.current->scroll_bottom; y++)
-		T.dirty_rows[y] = true;
+	shift_rows(T.c.y, T.current->scroll_bottom, n);
 }
 	
 void delete_lines(int n) {
@@ -561,19 +574,11 @@ void delete_lines(int n) {
 		return;
 	if (T.c.y >= T.current->scroll_bottom)
 		return;
-	int max = T.current->scroll_bottom - T.c.y;
-	if (n > max)
-		n = max;
-	if (n <= 0)
+	limit(&n, 0, T.current->scroll_bottom - T.c.y);
+	if (!n)
 		return;
 	// scroll lines up
-	rotate(T.current->scroll_bottom-T.c.y, sizeof(Cell*), (void*)&T.current->rows[T.c.y], -n);
-	// clear the rows at the bottom
-	for (int i=0; i<n; i++)
-		clear_row(T.current, T.current->scroll_bottom-i-1, 0);
-	
-	for (int y=T.c.y; y<T.current->scroll_bottom; y++)
-		T.dirty_rows[y] = true;
+	shift_rows(T.c.y, T.current->scroll_bottom, -n);
 }
 
 void back_tab(int n) {
@@ -593,8 +598,7 @@ void forward_tab(int n) {
 }
 
 void erase_characters(int n) {
-	if (n > T.width-T.c.x)
-		n = T.width-T.c.x;
+	limit(&n, 0, T.width-T.c.x);
 	clear_region(T.c.x, T.c.y, T.c.x+n, T.c.y+1);
 }
 
@@ -603,28 +607,27 @@ void select_charset(int g, Char set) {
 		T.charsets[g] = set;
 }
 
-// todo: confirm which things are reset by this
-void full_reset(void) {
-	for (int i=0; i<T.width; i++)
-		T.tabs[i] = i%8==0;
-	for (int i=0; i<2; i++) {
-		T.buffers[i].scroll_top = 0;
-		T.buffers[i].scroll_bottom = T.height;
-		T.current = &T.buffers[i];
-		clear_region(0, 0, T.width, T.height);
-	}
-	T.current = &T.buffers[0];
-	T.c = (Cursor){
-		.x = 0, .y = 0,
-		.attrs = {
-			.color = {.i = -1},
-			.background = {.i = -2},
-		},
-	};
-	save_cursor();
-	T.show_cursor = true;
-	T.blink_cursor = false;
-	
-	T.charsets[0] = 0;
-	init_palette();
+void switch_buffer(bool alt) {
+	T.current = &T.buffers[alt];
+	dirty_all();
+}
+
+void save_cursor(void) {
+	T.saved_cursor = T.c;
+}
+
+void restore_cursor(void) {
+	T.c = T.saved_cursor;
+	cursor_to(T.c.x, T.c.y);
+}
+
+void set_scroll_region(int y1, int y2) {
+	// behavior taken from xterm
+	if (y2 < y1)
+		return;
+	limit(&y1, 0, T.height-1);
+	limit(&y2, 0, T.height-1);
+	T.current->scroll_top = y1;
+	T.current->scroll_bottom = y2;
+	cursor_to(0, 0); // where is this supposed to move the cursor?
 }

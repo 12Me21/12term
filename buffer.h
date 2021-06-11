@@ -71,9 +71,9 @@ typedef struct Term {
 	Buffer* current; // always points to an item in .buffers
 	
 	Cursor c;
+	Cursor saved_cursor;
 	bool show_cursor;
 	bool blink_cursor;
-	Cursor saved_cursor;
 	
 	RGBColor cursor_background;
 	RGBColor background, foreground; // these can maybe be accessed as palette[-1] and [-2] but don't try it lol
@@ -85,8 +85,6 @@ typedef struct Term {
 	// and don't bother checking or resetting these
 	// so honestly idk if even allowing setting them is a good idea...
 	
-	bool bracketed_paste;
-	
 	bool* dirty_rows;
 	//bool** dirty_chars;
 	
@@ -97,6 +95,9 @@ typedef struct Term {
 		int size;
 		int lines;
 	} scrollback;
+	
+	bool app_keypad, app_cursor;
+	bool bracketed_paste;
 } Term;
 
 void init_term(int width, int height);

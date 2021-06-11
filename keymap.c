@@ -5,6 +5,7 @@
 
 #define ESC "\x1B"
 const char* const AUTO_SEQ = ESC"[27;%d;%d~";
+#define GENERAL(n) AUTO_SEQ, 2, (n)
 
 #define F_MODS_ARG 2
 #define F_ARG_MODS 3
@@ -35,8 +36,10 @@ const char* const CSI_c_FMT = ESC"[%c";
 
 static KeyMap KEY_MAP_ARRAY[] = {
 	// backspace is delete. yes yes it's dumb but that's how it is, get over it.
-	{XK_BackSpace, 0, "\x7F"},
 	{XK_BackSpace, M, ESC"\x7F"},
+	//{XK_BackSpace, C, "\b"},
+	//{XK_BackSpace, C|M, ESC"\b"},
+	{XK_BackSpace, -1, "\x7F"},
 	
 	{XK_Delete, 0, CSI_n_T(3)},
 	{XK_Delete, -1, CSI_n_M_T(3)},
@@ -50,6 +53,9 @@ static KeyMap KEY_MAP_ARRAY[] = {
 	{XK_Right, -1, CSI_1_M_c('C')},
 	{XK_Left , -1, CSI_1_M_c('D')},
 	
+	// from windows terminal:
+	// ctrl+enter sends \n
+	// seems like a good idea to make these distinguishable
 	{XK_Return, M  , ESC"\r"},
 	{XK_Return, C  , "\n"},
 	{XK_Return, C|M, ESC"\n"},
@@ -91,14 +97,14 @@ static KeyMap KEY_MAP_ARRAY[] = {
 	
 	// xterm and others allow detection of ctrl+<char> for a few extra chars, using a standard format for responses:
 	// ESC [ 26 ; <modifier mask+1> ; <key code> ~
-	{XK_period, -2, AUTO_SEQ, 2, '.'},
-	{XK_grave, -2, AUTO_SEQ, 2, '`'},
-	{XK_asciitilde, -2, AUTO_SEQ, 2, '`'},
+	{XK_period, -2, GENERAL('.')},
+	{XK_grave, -2, GENERAL('`')},
+	{XK_asciitilde, -2, GENERAL('`')}, //wait why are we assuming these are on the same key
 	
 	// I extend this to make ctrl+i different from tab, and ctrl+m different from enter
 	// you will likely need to configure your editor to accept these
-	{XK_i, -2, AUTO_SEQ, 2, 'i'},
-	{XK_m, -2, AUTO_SEQ, 2, 'm'},
+	{XK_i, -2, GENERAL('i')},
+	{XK_m, -2, GENERAL('m')},
 	
 	{0},
 };

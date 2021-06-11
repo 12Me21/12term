@@ -48,11 +48,11 @@ static void init_pixmap(void) {
 	if (W.pix)
 		XFreePixmap(W.d, W.pix);
 	W.pix = XCreatePixmap(W.d, W.win, W.w, W.h, DefaultDepth(W.d, W.scr));
-	if (W.draw) {
+	if (W.draw)
 		XftDrawChange(W.draw, W.pix);
-	} else {
+	else
 		W.draw = XftDrawCreate(W.d, W.pix, W.vis, W.cmap);
-	}
+	
 	clear_background();
 }
 
@@ -67,6 +67,7 @@ static void update_size(int width, int height) {
 	init_pixmap();
 	term_resize(width, height);
 	draw_resize(width, height); //todo: order?
+	//draw();
 }
 
 // when the size of the character cells changes (i.e. when changing fontsize)
@@ -246,6 +247,31 @@ static int max(int a, int b) {
 	return b;
 }
 
+static bool wait_until(Fd xfd, Fd ttyfd, int timeout) {
+	fd_set rfd;
+	while (1) {
+		FD_ZERO(&rfd);
+		FD_SET(ttyfd, &rfd);
+		FD_SET(xfd, &rfd);
+	
+		if (XPending(W.d))
+			timeout = 0;
+	
+		struct timespec seltv = {
+			.tv_sec = timeout / 1000,
+			.tv_nsec = 1000000 * (timeout % 1000),
+		};
+		struct timespec* tv = timeout>=0 ? &seltv : NULL;
+	
+		if (pselect(max(xfd, ttyfd)+1, &rfd, NULL, NULL, tv, NULL) < 0) {
+			if (errno != EINTR)
+				die("select failed: %s\n", strerror(errno));
+		} else
+			break;
+	}
+	return FD_ISSET(ttyfd, &rfd);
+}
+
 static void run(void) {
 	XEvent ev;
 	do {
@@ -266,7 +292,7 @@ static void run(void) {
 	update_size(w, h); // must be called after tty is created
 	
 	int timeout = -1;
-	struct timespec seltv, *tv, now, trigger;
+	struct timespec now, trigger;
 	bool drawing = false;
 	bool got_text = false;
 	bool got_draw = false;
@@ -275,35 +301,21 @@ static void run(void) {
 	while (1) {
 		Fd xfd = XConnectionNumber(W.d);
 		
-		fd_set rfd;
-		FD_ZERO(&rfd);
-		FD_SET(ttyfd, &rfd);
-		FD_SET(xfd, &rfd);
+		bool text = wait_until(xfd, ttyfd, timeout);
 		
-		if (XPending(W.d))
-			timeout = 0;
-		
-		seltv.tv_sec = timeout / 1000;
-		seltv.tv_nsec = 1000000 * (timeout % 1000);
-		tv = timeout>=0 ? &seltv : NULL;
-		
-		if (pselect(max(xfd, ttyfd)+1, &rfd, NULL, NULL, tv, NULL) < 0) {
-			if (errno == EINTR)
-				continue;
-			die("select failed: %s\n", strerror(errno));
-		}
 		clock_gettime(CLOCK_MONOTONIC, &now);
 		
-		
-		if (FD_ISSET(ttyfd, &rfd)) {
+		// handle text
+		if (text) {
 			if (!got_text) {
 				time_log("first text");
 				got_text = true;
 			}
-			tty_read();
 			readed = true;
+			tty_read();
 		}
 		
+		// handle x events
 		bool xev = false;
 		while (XPending(W.d)) {
 			xev = true;
@@ -317,7 +329,7 @@ static void run(void) {
 		// idea: instead of using just a timeout
 		// we can be more intelligent about this.
 		// detect newlines etc.
-		if (FD_ISSET(ttyfd, &rfd) || xev) {
+		if (text || xev) {
 			if (!drawing) {
 				trigger = now;
 				drawing = true;
@@ -396,10 +408,9 @@ int main(int argc, char* argv[argc+1]) {
 	Window parent = XRootWindow(W.d, W.scr);
 	
 	long unsigned int bg_pixel = make_color((Color){.truecolor=true,.rgb=default_background}).pixel;
+	print("what is this really? %lx\n", bg_pixel);
 	
 	W.attrs = (XSetWindowAttributes){
-		//.background_pixel = TODO,
-		//.border_pixel = TODO,
 		.bit_gravity = NorthWestGravity,
 		.event_mask = FocusChangeMask | KeyPressMask | KeyReleaseMask | ExposureMask | VisibilityChangeMask | StructureNotifyMask | ButtonMotionMask | ButtonPressMask | ButtonReleaseMask,
 		.colormap = W.cmap,

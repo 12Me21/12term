@@ -62,8 +62,8 @@ static XRenderColor get_color(Color c, bool bold) {
 	};
 }
 
-// do we need this??
 static void alloc_color(XRenderColor* col, XftColor* out) {
+	// todo: check if it's faster to just do this manually & assume 24bit color.
 	XftColorAllocValue(W.d, W.vis, W.cmap, col, out);
 }
 
@@ -96,9 +96,6 @@ static void draw_char(int x, int y, Cell* c) {
 		XftDrawRect(W.draw, &xcol, winx, winy+W.font_ascent+1, width*W.cw, 1);
 	if (c->attrs.strikethrough)
 		XftDrawRect(W.draw, &xcol, winx, winy+W.font_ascent*2/3, width*W.cw, 1);
-	
-	if (W.cursor_drawn && W.cursor_x==x && W.cursor_y==y)
-		W.cursor_drawn = false;
 }
 
 static void erase_cursor(void) {
@@ -112,8 +109,11 @@ static void erase_cursor(void) {
 }
 
 static void draw_cursor(int x, int y) {
-	if (W.cursor_drawn)
+	if (W.cursor_drawn) {
+		//if (W.cursor_x==x && W.cursor_y==y)
+		//	return;
 		erase_cursor();
+	}
 	// todo: adding border each time is a pain. can we specify an origin somehow?
 	
 	Cell temp = T.current->rows[y][x];
@@ -128,9 +128,7 @@ static void draw_cursor(int x, int y) {
 		.height = W.ch,
 	}, 1);
 	
-	XftColor xcol;
-	XRenderColor bg = get_color((Color){.i=-3}, 0);
-	alloc_color(&bg, &xcol);
+	XftColor xcol = make_color((Color){.i=-3});
 	XftDrawRect(W.draw, &xcol, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch);
 	
 	temp.attrs.color = temp.attrs.background;
@@ -209,7 +207,8 @@ static void draw_row(int y) {
 }
 
 void repaint(void) {
-	XCopyArea(W.d, W.pix, W.win, W.gc, 0, 0, W.w, W.h, 0, 0);
+	if (W.pix != W.win)
+		XCopyArea(W.d, W.pix, W.win, W.gc, 0, 0, W.w, W.h, 0, 0);
 }
 
 void draw(void) {
@@ -235,9 +234,7 @@ void draw(void) {
 }
 
 void clear_background(void) {
-	XRenderColor bg = get_color((Color){.i=-2}, 0);
-	XftColor xcol;
-	alloc_color(&bg, &xcol);
+	XftColor xcol = make_color((Color){.i=-2});
 	XftDrawSetClip(W.draw, 0);
 	XftDrawRect(W.draw, &xcol, 0, 0, W.w, W.h);
 	reset_clip();
