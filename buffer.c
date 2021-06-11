@@ -626,7 +626,7 @@ void set_scroll_region(int y1, int y2) {
 	if (y2 < y1)
 		return;
 	limit(&y1, 0, T.height-1);
-	limit(&y2, 0, T.height-1);
+	limit(&y2, 0, T.height);
 	T.current->scroll_top = y1;
 	T.current->scroll_bottom = y2;
 	cursor_to(0, 0); // where is this supposed to move the cursor?
