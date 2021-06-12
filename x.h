@@ -21,8 +21,6 @@ typedef struct Xw {
 	// for rendering the cursor
 	Pixmap under_cursor;
 	bool cursor_drawn;
-	int cursor_x, cursor_y;
-	int cursor_width;
 	
 	Px w,h;
 	Px cw,ch;

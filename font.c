@@ -11,7 +11,7 @@
 typedef struct {
 	Px width, height;
 	Px ascent, descent;
-	Px lbearing, rbearing;
+	//Px lbearing, rbearing;
 	
 	bool badslant, badweight;
 	XftFont* match;
@@ -62,29 +62,31 @@ static int load_font(Font* f, FcPattern* pattern) {
 	int wantattr, haveattr;
 	
 	// check slant/weight to see if
-	if (XftPatternGetInteger(pattern, "slant", 0, &wantattr) == XftResultMatch) {
-		if (XftPatternGetInteger(f->match->pattern, "slant", 0, &haveattr)!=XftResultMatch || haveattr<wantattr) {
+	if (FcPatternGetInteger(pattern, "slant", 0, &wantattr) == FcResultMatch) {
+		if (FcPatternGetInteger(f->match->pattern, "slant", 0, &haveattr)!=FcResultMatch || haveattr<wantattr) {
 			f->badslant = true;
 		}
 	}
-	if (XftPatternGetInteger(pattern, "weight", 0, &wantattr) == XftResultMatch) {
-		if (XftPatternGetInteger(f->match->pattern, "weight", 0, &haveattr)!=XftResultMatch || haveattr != wantattr) {
+	if (FcPatternGetInteger(pattern, "weight", 0, &wantattr) == FcResultMatch) {
+		if (FcPatternGetInteger(f->match->pattern, "weight", 0, &haveattr)!=FcResultMatch || haveattr != wantattr) {
 			f->badweight = true;
 		}
 	}
 	
+	// calculate the average char width
 	const char ascii_printable[] = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
 	int len = strlen(ascii_printable);
 	XGlyphInfo extents;
 	XftTextExtentsUtf8(W.d, f->match, (const FcChar8*)ascii_printable, len, &extents);
+	f->width = ceildiv(extents.xOff, len);
+	
 	f->set = NULL;
 	f->pattern = configured;
 	f->ascent = f->match->ascent;
 	f->descent = f->match->descent;
-	f->lbearing = 0;
-	f->rbearing = f->match->max_advance_width;
+	//f->lbearing = 0;
+	//f->rbearing = f->match->max_advance_width;
 	f->height = f->ascent + f->descent;
-	f->width = ceildiv(extents.xOff, len);
 	
 	return 0;
 }
@@ -152,12 +154,12 @@ static void find_fallback_font(Char chr, int fontnum, XftFont** xfont, FT_UInt* 
 	for (int f=0; f<frclen; f++) {
 		*glyph = XftCharIndex(W.d, frc[f].font, chr);
 		/* Everything correct. */
-		if (*glyph && frc[f].flags == fontnum) {
+		if (*glyph && frc[f].flags==fontnum) {
 			*xfont = frc[f].font;
 			return;
 		}
 		/* We got a default font for a not found glyph. */
-		if (!glyph && frc[f].flags == fontnum && frc[f].unicodep == chr) {
+		if (!*glyph && frc[f].flags==fontnum && frc[f].unicodep==chr) {
 			*xfont = frc[f].font;
 			return;
 		}
@@ -188,8 +190,7 @@ static void find_fallback_font(Char chr, int fontnum, XftFont** xfont, FT_UInt* 
 	
 	frc[frclen].font = XftFontOpenPattern(W.d, fontpattern);
 	if (!frc[frclen].font)
-		die("XftFontOpenPattern failed seeking fallback font: %s\n",
-			strerror(errno));
+		die("XftFontOpenPattern failed seeking fallback font: %s\n", strerror(errno));
 	frc[frclen].flags = fontnum;
 	frc[frclen].unicodep = chr;
 	
@@ -202,8 +203,15 @@ static void find_fallback_font(Char chr, int fontnum, XftFont** xfont, FT_UInt* 
 	FcCharSetDestroy(fccharset);
 }
 
+// ok so basically
+// to transform a line into glyphs,
+// first, we need to get the actual unicode chars
+// skip dummy wide char halves, handle combining chars, etc.
+// then once we have that, we can use harfbuzz to get the glyphs from this
+// then, we need to do an additional pass to handle fallbacks with unknown chars
+
 // todo: we should cache this for all the text onscreen mayb
-int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], /*const*/ Cell cells[len], int indexs[len], int x, int y) {
+int make_glyphs(int len, XftGlyphFontSpec specs[len], /*const*/ Cell cells[len], int indexs[len]) {
 	int numspecs = 0;
 	
 	for (int i=0; i<len; i++) {

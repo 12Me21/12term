@@ -34,7 +34,7 @@ void time_log(const char* str) {
 	if (str) {
 		long long ms = timediff(now, prev_time);
 		long long total = timediff(now, first_time);
-		print("@ %lld µs [+%lld µs] %s\n", total/1000, ms/1000, str);
+		print("@ %.2f ms [+%.2f ms] %s\n", total/1000/1000.0, ms/1000/1000.0, str);
 	} else
 		first_time = now;
 	prev_time = now;

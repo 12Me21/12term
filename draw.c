@@ -11,6 +11,9 @@ static Row* drawn_chars = NULL;
 static int drawn_width = -1;
 static int drawn_height = -1;
 
+static int cursor_x, cursor_y;
+static int cursor_width;
+
 void draw_resize(int width, int height) {
 	if (drawn_chars) {
 		for (int i=0; i<drawn_height; i++)
@@ -27,13 +30,6 @@ void draw_resize(int width, int height) {
 			};
 		}
 	}
-}
-
-static void reset_clip(void) {
-	XftDrawSetClipRectangles(W.draw, W.border, W.border, &(XRectangle){
-		.width = W.w-W.border*2,
-		.height = W.h-W.border*2,
-	}, 1);
 }
 
 static XRenderColor get_color(Color c, bool bold) {
@@ -78,22 +74,35 @@ static int same_color(XRenderColor a, XRenderColor b) {
 	return a.red==b.red && a.green==b.green && a.blue==b.blue && a.alpha==b.alpha;
 }
 
-static void draw_char_spec(int x, int y, Cell* c, XftGlyphFontSpec* spec) {
-	if (c->wide == -1)
+// todo: allow drawing multiple at once for efficiency
+static void draw_char_spec(int x, int y, XftGlyphFontSpec* spec, XRenderColor col) {
+	if (!spec)
 		return;
-	XftColor xcol;
-	XRenderColor fg = get_color(c->attrs.color, c->attrs.weight==1);
-	alloc_color(&fg, &xcol);
 	
-	int width = c->wide ? 2 : 1;
-	int winx = W.border+x*W.cw;
-	int winy = W.border+y*W.ch;
+	XftColor xcol;
+	alloc_color(&col, &xcol);
+	
+	Px winx = W.border+x*W.cw;
+	Px winy = W.border+y*W.ch;
 	
 	if (spec) {
 		spec->x += winx;
 		spec->y += winy;
 		XftDrawGlyphFontSpec(W.draw, &xcol, spec, 1);
 	}
+}
+
+static void draw_char_overlays(int x, int y, Cell* c) {
+	if (!(c->attrs.underline || c->attrs.strikethrough))
+		return;
+	int width = c->wide ? 2 : 1;
+ 
+	XftColor xcol;
+	XRenderColor fg = get_color(c->attrs.color, c->attrs.weight==1);
+	alloc_color(&fg, &xcol);
+	
+	Px winx = W.border+x*W.cw;
+	Px winy = W.border+y*W.ch;
 	
 	if (c->attrs.underline)
 		XftDrawRect(W.draw, &xcol, winx, winy+W.font_ascent+1, width*W.cw, 1);
@@ -101,33 +110,18 @@ static void draw_char_spec(int x, int y, Cell* c, XftGlyphFontSpec* spec) {
 		XftDrawRect(W.draw, &xcol, winx, winy+W.font_ascent*2/3, width*W.cw, 1);
 }
 
-static void draw_char(int x, int y, Cell* c) {
-	if (c->wide == -1)
-		return;
-	
-	if (c->chr) {
-		XftGlyphFontSpec spec;
-		int indexs[1];
-		xmakeglyphfontspecs(1, &spec, c, indexs, x, y);
-		draw_char_spec(x, y, c, &spec);
-	} else {
-		draw_char_spec(x, y, c, NULL);
-	}
-}
-
 static void erase_cursor(void) {
 	if (!W.cursor_drawn)
 		return;
-	int x = W.cursor_x;
-	int y = W.cursor_y;
-	int w = W.cursor_width;
-	XCopyArea(W.d, W.under_cursor, W.pix, W.gc, 0, 0, W.cw*w, W.ch, W.border+W.cw*x, W.border+W.ch*y);
+	XCopyArea(W.d, W.under_cursor, W.pix, W.gc,
+		0, 0, W.cw*cursor_width, W.ch, // source area
+		W.border+W.cw*cursor_x, W.border+W.ch*cursor_y); // dest pos
 	W.cursor_drawn = false;
 }
 
 static void draw_cursor(int x, int y) {
 	if (W.cursor_drawn) {
-		if (W.cursor_x==x && W.cursor_y==y)
+		if (cursor_x==x && cursor_y==y)
 			return;
 		erase_cursor();
 	}
@@ -137,6 +131,7 @@ static void draw_cursor(int x, int y) {
 	
 	int width = temp.wide==1 ? 2 : 1;
 	
+	// save the area underneath the cursor so we can redraw it later
 	XCopyArea(W.d, W.pix, W.under_cursor, W.gc, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch, 0, 0);
 	
 	// this time we do NOT want it to overflow ever
@@ -145,17 +140,25 @@ static void draw_cursor(int x, int y) {
 		.height = W.ch,
 	}, 1);
 	
+	// draw background
 	XftColor xcol = make_color((Color){.i=-3});
 	XftDrawRect(W.draw, &xcol, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch);
 	
-	temp.attrs.color = temp.attrs.background;
-	draw_char(x, y, &temp);
+	// draw char
+	if (temp.chr) {
+		XRenderColor fg = get_color(temp.attrs.background, false);
+		XftGlyphFontSpec spec;
+		int indexs[1];
+		int num = make_glyphs(1, &spec, &temp, indexs);
+		if (num)
+			draw_char_spec(x, y, &spec, fg);
+	}
 	
-	reset_clip();
+	draw_char_overlays(x, y, &temp);
 	
-	W.cursor_x = x;
-	W.cursor_y = y;
-	W.cursor_width = width;
+	cursor_x = x;
+	cursor_y = y;
+	cursor_width = width;
 	W.cursor_drawn = true;
 }
 
@@ -168,18 +171,7 @@ void shift_lines(int src, int dest, int count) {
 		draw_cursor(T.c.x, T.c.y);
 }
 
-/*static bool cell_needs_redraw(int x, int y) {
-	Cell* current = &drawn_chars[y][x];
-	Cell* new = T.current->rows[y][x];
-	if (current->attrs.all != new->attrs.all)
-		return true;
-	if (new->attrs.color.truecolor) {
-		if (current->attrs.color.truecolor) 
-			} else {
-				
-			}
-			}*/
-
+// draw cell backgrounds
 static void draw_row_bg(int y) {
 	Row row = T.current->rows[y];
 	XftColor xcol;
@@ -200,6 +192,13 @@ static void draw_row_bg(int y) {
 	XftDrawRect(W.draw, &xcol, W.border+W.cw*prev_start, W.border+W.ch*y, W.cw*(prev_start-x), W.ch);
 }
 
+// draw strikethrough and underlines
+static void draw_row_overlays(int y) {
+	Row row = T.current->rows[y];
+	for (int x=0; x<T.width; x++)
+		draw_char_overlays(x, y, &row[x]);
+}
+
 static void draw_row(int y) {
 	// set clip region to entire row
 	XftDrawSetClipRectangles(W.draw, W.border, y*W.ch+W.border, &(XRectangle){
@@ -212,18 +211,21 @@ static void draw_row(int y) {
 	Row row = T.current->rows[y];
 	XftGlyphFontSpec specs[T.width];
 	int indexs[T.width];
-	int num = xmakeglyphfontspecs(T.width, specs, row, indexs, 0, y);
+	int num = make_glyphs(T.width, specs, row, indexs);
 	
 	for (int x=0; x<num; x++) {
-		draw_char_spec(indexs[x], y, &row[indexs[x]], &specs[x]);
+		Cell* c = &row[indexs[x]];
+		XRenderColor fg = get_color(c->attrs.color, c->attrs.weight==1);
+		draw_char_spec(indexs[x], y, &specs[x], fg);
 		//drawn_chars[y][x] = T.current->rows[y][x];
 	}
+	
+	draw_row_overlays(y);
+	
 	T.dirty_rows[y] = false;
 	
-	if (W.cursor_y==y)
+	if (cursor_y==y)
 		W.cursor_drawn = false;
-	
-	reset_clip();
 }
 
 void repaint(void) {
@@ -256,10 +258,10 @@ void clear_background(void) {
 	XftColor xcol = make_color((Color){.i=-2});
 	XftDrawSetClip(W.draw, 0);
 	XftDrawRect(W.draw, &xcol, 0, 0, W.w, W.h);
-	reset_clip();
 }
 
 void draw_free(void) {
+	draw_resize(0,0);
 }
 
 // todo: display characters CENTERED within the cell rather than aligned to the left side.

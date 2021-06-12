@@ -410,7 +410,6 @@ int main(int argc, char* argv[argc+1]) {
 	Window parent = XRootWindow(W.d, W.scr);
 	
 	long unsigned int bg_pixel = make_color((Color){.truecolor=true,.rgb=default_background}).pixel;
-	print("what is this really? %lx\n", bg_pixel);
 	
 	W.attrs = (XSetWindowAttributes){
 		.bit_gravity = NorthWestGravity,
