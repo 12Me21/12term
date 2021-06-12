@@ -82,15 +82,18 @@ static void draw_char_spec(int x, int y, Cell* c, XftGlyphFontSpec* spec) {
 	if (c->wide == -1)
 		return;
 	XftColor xcol;
-	if (spec) {
-		XRenderColor fg = get_color(c->attrs.color, c->attrs.weight==1);
-		alloc_color(&fg, &xcol);
-		XftDrawGlyphFontSpec(W.draw, &xcol, spec, 1);
-	}
+	XRenderColor fg = get_color(c->attrs.color, c->attrs.weight==1);
+	alloc_color(&fg, &xcol);
 	
 	int width = c->wide ? 2 : 1;
 	int winx = W.border+x*W.cw;
 	int winy = W.border+y*W.ch;
+	
+	if (spec) {
+		spec->x += winx;
+		spec->y += winy;
+		XftDrawGlyphFontSpec(W.draw, &xcol, spec, 1);
+	}
 	
 	if (c->attrs.underline)
 		XftDrawRect(W.draw, &xcol, winx, winy+W.font_ascent+1, width*W.cw, 1);
@@ -104,7 +107,8 @@ static void draw_char(int x, int y, Cell* c) {
 	
 	if (c->chr) {
 		XftGlyphFontSpec spec;
-		xmakeglyphfontspecs(1, &spec, c, x, y);
+		int indexs[1];
+		xmakeglyphfontspecs(1, &spec, c, indexs, x, y);
 		draw_char_spec(x, y, c, &spec);
 	} else {
 		draw_char_spec(x, y, c, NULL);
@@ -207,11 +211,11 @@ static void draw_row(int y) {
 	
 	Row row = T.current->rows[y];
 	XftGlyphFontSpec specs[T.width];
-	int num = xmakeglyphfontspecs(T.width, specs, row, 0, y);
-	// draw text
+	int indexs[T.width];
+	int num = xmakeglyphfontspecs(T.width, specs, row, indexs, 0, y);
 	
 	for (int x=0; x<num; x++) {
-		draw_char_spec(x, y, &row[x], &specs[x]);
+		draw_char_spec(indexs[x], y, &row[indexs[x]], &specs[x]);
 		//drawn_chars[y][x] = T.current->rows[y][x];
 	}
 	T.dirty_rows[y] = false;

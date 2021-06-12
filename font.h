@@ -5,5 +5,5 @@
 #include "buffer.h" //nn
 
 void init_fonts(const char* fontstr, double fontsize);
-int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], Cell cells[len], int x, int y);
+int xmakeglyphfontspecs(int len, XftGlyphFontSpec specs[len], Cell cells[len], int indexs[len], int x, int y);
 void fonts_free(void);
