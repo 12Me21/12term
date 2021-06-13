@@ -2,7 +2,7 @@ output:= 12term
 
 srcs:= x tty debug buffer ctlseqs keymap csi draw input font
 
-CFLAGS+= -Wall -Wextra -g -pedantic -std=c11 -O1
+CFLAGS+= -Wall -Wextra -g -pedantic -std=c11 -O2
 
 CFLAGS+= -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -Wno-parentheses
 CFLAGS+= -Werror=implicit-function-declaration -Werror=incompatible-pointer-types

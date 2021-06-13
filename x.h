@@ -20,7 +20,6 @@ typedef struct Xw {
 	
 	// for rendering the cursor
 	Pixmap under_cursor;
-	bool cursor_drawn;
 	
 	Px w,h;
 	Px cw,ch;
@@ -46,3 +45,4 @@ typedef struct Xw {
 extern Xw W;
 
 void sleep_forever(bool hangup);
+void clippaste(void);

@@ -71,6 +71,7 @@ static void update_size(int width, int height) {
 }
 
 // when the size of the character cells changes (i.e. when changing fontsize)
+// we don't actually use this yet except during init
 static void update_charsize(Px w, Px h) {
 	W.cw = w;
 	W.ch = h;
@@ -125,6 +126,7 @@ void sleep_forever(bool hangup) {
 
 static void on_clientmessage(XEvent* e) {
 	if (e->xclient.message_type == W.atoms.xembed && e->xclient.format == 32) {
+		// do we need to do this anymore?
 		if (e->xclient.data.l[1] == XEMBED_FOCUS_IN) {
 			//win.mode |= MODE_FOCUSED;
 			//xseturgency(0);
@@ -356,8 +358,6 @@ static void run(void) {
 		XFlush(W.d);
 	}
 }
-
-
 
 static void init_atoms(void) {
 	W.atoms.xembed = XInternAtom(W.d, "_XEMBED", False);

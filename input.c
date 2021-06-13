@@ -5,6 +5,7 @@
 #include "x.h"
 #include "tty.h"
 #include "input.h"
+#include "buffer.h"
 
 struct Ime {
 	XIM xim;
@@ -48,13 +49,21 @@ static int utf8_encode(Char c, char* out) {
 	return len;
 }
 
-static bool match_modifiers(int want, int got) {
-	// todo: add bit for application keypad/cursor mode or whatever
-	if (want==-1)
+static bool match_modifiers(KeyMap* want, int got) {
+	if (want->app_keypad && T.app_keypad != (want->app_keypad==1))
+		return false;
+	if (want->app_cursor && T.app_cursor != (want->app_cursor==1))
+		return false;
+	
+	if (want->modifiers==-1)
 		return true;
-	if (want==-2)
+	if (want->modifiers==-2)
 		return (got & ControlMask);
-	return want==got;
+	
+	if (want->modifiers!=(got&(ControlMask|ShiftMask|Mod1Mask)))
+		return false;
+	
+	return true;
 }
 
 void on_keypress(XEvent *ev) {
@@ -76,11 +85,14 @@ void on_keypress(XEvent *ev) {
 	}
 	
 	if (status==XLookupKeySym || status==XLookupBoth) {
+		print("got keysym: %lu\n", ksym);
 		// look up keysym in the key mapping
-		for (KeyMap* map=KEY_MAP; map->output; map++) {
-			if (map->k==ksym && match_modifiers(map->modifiers, e->state)) {
-				if (map->special==0) {
+		for (KeyMap* map=KEY_MAP; map->k; map++) {
+			if (map->k==ksym && match_modifiers(map, e->state)) {
+				if (map->mode==0) {
 					tty_write(strlen(map->output), map->output);
+				} else if (map->mode==10) {
+					map->func();
 				} else {
 					int mods = 0;
 					if (e->state & ShiftMask)
@@ -89,11 +101,11 @@ void on_keypress(XEvent *ev) {
 						mods |= 2;
 					if (e->state & ControlMask)
 						mods |= 4;
-					if (map->special==1)
+					if (map->mode==1)
 						tty_printf(map->output, mods+1);
-					else if (map->special==2)
+					else if (map->mode==2)
 						tty_printf(map->output, mods+1, map->arg);
-					else if (map->special==3)
+					else if (map->mode==3)
 						tty_printf(map->output, map->arg, mods+1);
 				}
 				goto finish;

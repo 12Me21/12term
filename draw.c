@@ -7,10 +7,13 @@
 #include "font.h"
 #include "draw.h"
 
-static Row* drawn_chars = NULL;
+// atm it doesnt actually matter if this data is correct, it's basically just treated as a cache (so it WILL be used if correct)
+static DrawnCell** drawn_chars = NULL;
 static int drawn_width = -1;
 static int drawn_height = -1;
 
+// cursor
+static bool cursor_drawn = false;
 static int cursor_x, cursor_y;
 static int cursor_width;
 
@@ -24,14 +27,13 @@ void draw_resize(int width, int height) {
 	REALLOC(drawn_chars, drawn_height);
 	for (int y=0; y<drawn_height; y++) {
 		ALLOC(drawn_chars[y], drawn_width);
-		for (int x=0; x<drawn_width; x++) {
-			drawn_chars[y][x] = (Cell){
-				.chr = -1,
-			};
-		}
+		for (int x=0; x<drawn_width; x++)
+			drawn_chars[y][x] = (DrawnCell){0}; // mreh
 	}
 }
 
+// todo: cache the palette colors?
+// or perhaps store them as xrendercolor internally
 static XRenderColor get_color(Color c, bool bold) {
 	RGBColor rgb;
 	if (c.truecolor)
@@ -60,6 +62,10 @@ static XRenderColor get_color(Color c, bool bold) {
 
 static void alloc_color(XRenderColor* col, XftColor* out) {
 	// todo: check if it's faster to just do this manually & assume 24bit color.
+	//yeah it totally is gosh
+	//out->color = *col;
+	// ok is it really though
+	
 	XftColorAllocValue(W.d, W.vis, W.cmap, col, out);
 }
 
@@ -111,16 +117,16 @@ static void draw_char_overlays(int x, int y, Cell* c) {
 }
 
 static void erase_cursor(void) {
-	if (!W.cursor_drawn)
+	if (!cursor_drawn)
 		return;
 	XCopyArea(W.d, W.under_cursor, W.pix, W.gc,
 		0, 0, W.cw*cursor_width, W.ch, // source area
 		W.border+W.cw*cursor_x, W.border+W.ch*cursor_y); // dest pos
-	W.cursor_drawn = false;
+	cursor_drawn = false;
 }
 
 static void draw_cursor(int x, int y) {
-	if (W.cursor_drawn) {
+	if (cursor_drawn) {
 		if (cursor_x==x && cursor_y==y)
 			return;
 		erase_cursor();
@@ -149,7 +155,7 @@ static void draw_cursor(int x, int y) {
 		XRenderColor fg = get_color(temp.attrs.background, false);
 		XftGlyphFontSpec spec;
 		int indexs[1];
-		int num = make_glyphs(1, &spec, &temp, indexs);
+		int num = make_glyphs(1, &spec, &temp, indexs, NULL);
 		if (num)
 			draw_char_spec(x, y, &spec, fg);
 	}
@@ -159,7 +165,7 @@ static void draw_cursor(int x, int y) {
 	cursor_x = x;
 	cursor_y = y;
 	cursor_width = width;
-	W.cursor_drawn = true;
+	cursor_drawn = true;
 }
 
 // todo: instead of calling this immediately,
@@ -211,13 +217,13 @@ static void draw_row(int y) {
 	Row row = T.current->rows[y];
 	XftGlyphFontSpec specs[T.width];
 	int indexs[T.width];
-	int num = make_glyphs(T.width, specs, row, indexs);
+	int num = make_glyphs(T.width, specs, row, indexs, drawn_chars[y]);
 	
-	for (int x=0; x<num; x++) {
-		Cell* c = &row[indexs[x]];
+	for (int i=0; i<num; i++) {
+		int x = indexs[i];
+		Cell* c = &row[x];
 		XRenderColor fg = get_color(c->attrs.color, c->attrs.weight==1);
-		draw_char_spec(indexs[x], y, &specs[x], fg);
-		//drawn_chars[y][x] = T.current->rows[y][x];
+		draw_char_spec(x, y, &specs[i], fg);
 	}
 	
 	draw_row_overlays(y);
@@ -225,7 +231,7 @@ static void draw_row(int y) {
 	T.dirty_rows[y] = false;
 	
 	if (cursor_y==y)
-		W.cursor_drawn = false;
+		cursor_drawn = false;
 }
 
 void repaint(void) {

@@ -25,13 +25,12 @@ static Font fonts[4]; // normal, bold, italic, bold+italic
 // todo: unify these structures to simplify things
 typedef struct {
 	XftFont* font;
-	int flags;
+	int style;
 	Char unicodep;
 } Fontcache;
 
-static Fontcache* frc = NULL;
+static Fontcache frc[100];
 static int frclen = 0;
-static int frccap = 0;
 
 static int ceildiv(int a, int b) {
 	return (a+b-1)/b;
@@ -149,23 +148,24 @@ void init_fonts(const char* fontstr, double fontsize) {
 	FcPatternDestroy(pattern);
 }
 
-static void find_fallback_font(Char chr, int fontnum, XftFont** xfont, FT_UInt* glyph) {
-	/* Fallback on font cache, search the font cache for match. */
+// this is gross and I don't fully understand how it works
+static void find_fallback_font(Char chr, int style, XftFont** xfont, FT_UInt* glyph) {
+	// Fallback on font cache, search the font cache for match.
 	for (int f=0; f<frclen; f++) {
 		*glyph = XftCharIndex(W.d, frc[f].font, chr);
-		/* Everything correct. */
-		if (*glyph && frc[f].flags==fontnum) {
+		
+		if (*glyph && frc[f].style==style) {
 			*xfont = frc[f].font;
 			return;
 		}
-		/* We got a default font for a not found glyph. */
-		if (!*glyph && frc[f].flags==fontnum && frc[f].unicodep==chr) {
+		// We got a default font for a not found glyph.
+		if (!*glyph && frc[f].style==style && frc[f].unicodep==chr) {
 			*xfont = frc[f].font;
 			return;
 		}
 	}
-	Font* font = &fonts[fontnum];
-	/* Nothing was found. Use fontconfig to find matching font. */
+	Font* font = &fonts[style];
+	// Nothing was found. Use fontconfig to find matching font.
 	FcResult fcres;
 	if (!font->set)
 		font->set = FcFontSort(NULL, font->pattern, true, NULL, &fcres);
@@ -181,17 +181,14 @@ static void find_fallback_font(Char chr, int fontnum, XftFont** xfont, FT_UInt* 
 	FcDefaultSubstitute(fcpattern);
 		
 	FcPattern* fontpattern = FcFontSetMatch(NULL, (FcFontSet*[]){font->set}, 1, fcpattern, &fcres);
-		
-	/* Allocate memory for the new cache entry. */
-	if (frclen >= frccap) {
-		frccap += 16;
-		REALLOC(frc, frccap);
-	}
+	
+	if (frclen >= 100)
+		die("too many fallback fonts aaaaaaa\n");
 	
 	frc[frclen].font = XftFontOpenPattern(W.d, fontpattern);
 	if (!frc[frclen].font)
 		die("XftFontOpenPattern failed seeking fallback font: %s\n", strerror(errno));
-	frc[frclen].flags = fontnum;
+	frc[frclen].style = style;
 	frc[frclen].unicodep = chr;
 	
 	*glyph = XftCharIndex(W.d, frc[frclen].font, chr);
@@ -203,46 +200,59 @@ static void find_fallback_font(Char chr, int fontnum, XftFont** xfont, FT_UInt* 
 	FcCharSetDestroy(fccharset);
 }
 
-// ok so basically
-// to transform a line into glyphs,
-// first, we need to get the actual unicode chars
-// skip dummy wide char halves, handle combining chars, etc.
-// then once we have that, we can use harfbuzz to get the glyphs from this
-// then, we need to do an additional pass to handle fallbacks with unknown chars
+static int cell_fontstyle(const Cell* c) {
+	return (c->attrs.weight==1) | (c->attrs.italic)<<1;
+}
 
-// todo: we should cache this for all the text onscreen mayb
-int make_glyphs(int len, XftGlyphFontSpec specs[len], /*const*/ Cell cells[len], int indexs[len]) {
+// todo: maybe cache the results for all ascii chars or something
+
+// this converts a row of cells into a row of glyphs+fonts
+// todo: the output is kinda messy. maybe just output into our own struct of .x, .glyph, .font instead (where .x is a cell coordinate)
+int make_glyphs(int len, XftGlyphFontSpec specs[len], /*const*/ Cell cells[len], int indexs[len], DrawnCell old[len]) {
 	int numspecs = 0;
 	
 	for (int i=0; i<len; i++) {
-		// Fetch chr and mode for current glyph.
 		Char chr = cells[i].chr;
-		Attrs attrs = cells[i].attrs;
 		
-		/* Skip dummy wide-character spacing. */
-		if (cells[i].wide == -1)
+		// skip blank cells
+		if (cells[i].wide==-1 || chr==0 || chr==' ') {
+			if (old) {
+				old[i].chr = chr;
+				old[i].fontnum = -1;
+				old[i].font = NULL;
+				old[i].glyph = 0;
+			}
 			continue;
+		}
 		
-		// empty cells
-		if (chr == 0)
-			continue;
+		int style = cell_fontstyle(&cells[i]);
 		
-		int fontnum = (attrs.weight==1) | (attrs.italic)<<1;
-		
-		Font* font = &fonts[fontnum];
-		
-		FT_UInt glyph = XftCharIndex(W.d, font->match, chr);
 		XftFont* xfont;
-		if (glyph)
-			xfont = font->match;
-		else
-			find_fallback_font(chr, fontnum, &xfont, &glyph);
+		FT_UInt glyph;
+		
+		if (old && chr==old[i].chr && style==old[i].fontnum) {
+			xfont = old[i].font;
+			glyph = old[i].glyph;
+		} else {
+			Font* font = &fonts[style];
+			glyph = XftCharIndex(W.d, font->match, chr);
+			if (glyph)
+				xfont = font->match;
+			else
+				find_fallback_font(chr, style, &xfont, &glyph);
+			if (old) {
+				old[i].font = xfont;
+				old[i].glyph = glyph;
+				old[i].chr = chr;
+				old[i].fontnum = style;
+			}
+		}
 		
 		specs[numspecs] = (XftGlyphFontSpec){
 			.font = xfont,
 			.glyph = glyph,
 			.x = 0,
-			.y = font->ascent,
+			.y = W.font_ascent,//font->ascent,
 		};
 		indexs[numspecs] = i;
 		numspecs++;
@@ -258,5 +268,4 @@ void fonts_free(void) {
 	}
 	for (int i=0; i<frclen; i++)
 		XftFontClose(W.d, frc[i].font);
-	free(frc);
 }
