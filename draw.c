@@ -17,7 +17,32 @@ static bool cursor_drawn = false;
 static int cursor_x, cursor_y;
 static int cursor_width;
 
+static Pixmap pix;
+static XftDraw* xft_draw;
+
+static GC gc;
+
+static void clear_background(void) {
+	XftColor xcol = make_color((Color){.i=-2});
+	XftDrawSetClip(xft_draw, 0);
+	XftDrawRect(xft_draw, &xcol, 0, 0, W.w, W.h);
+}
+
+static void init_pixmap(void) {
+	if (pix)
+		XFreePixmap(W.d, pix);
+	pix = XCreatePixmap(W.d, W.win, W.w, W.h, DefaultDepth(W.d, W.scr));
+	if (xft_draw)
+		XftDrawChange(xft_draw, pix);
+	else
+		xft_draw = XftDrawCreate(W.d, pix, W.vis, W.cmap);
+	
+	clear_background();
+}
+
 void draw_resize(int width, int height) {
+	init_pixmap();
+	
 	if (drawn_chars) {
 		for (int i=0; i<drawn_height; i++)
 			free(drawn_chars[i]);
@@ -94,7 +119,7 @@ static void draw_char_spec(int x, int y, XftGlyphFontSpec* spec, XRenderColor co
 	if (spec) {
 		spec->x += winx;
 		spec->y += winy;
-		XftDrawGlyphFontSpec(W.draw, &xcol, spec, 1);
+		XftDrawGlyphFontSpec(xft_draw, &xcol, spec, 1);
 	}
 }
 
@@ -111,15 +136,15 @@ static void draw_char_overlays(int x, int y, Cell* c) {
 	Px winy = W.border+y*W.ch;
 	
 	if (c->attrs.underline)
-		XftDrawRect(W.draw, &xcol, winx, winy+W.font_ascent+1, width*W.cw, 1);
+		XftDrawRect(xft_draw, &xcol, winx, winy+W.font_ascent+1, width*W.cw, 1);
 	if (c->attrs.strikethrough)
-		XftDrawRect(W.draw, &xcol, winx, winy+W.font_ascent*2/3, width*W.cw, 1);
+		XftDrawRect(xft_draw, &xcol, winx, winy+W.font_ascent*2/3, width*W.cw, 1);
 }
 
 static void erase_cursor(void) {
 	if (!cursor_drawn)
 		return;
-	XCopyArea(W.d, W.under_cursor, W.pix, W.gc,
+	XCopyArea(W.d, W.under_cursor, pix, gc,
 		0, 0, W.cw*cursor_width, W.ch, // source area
 		W.border+W.cw*cursor_x, W.border+W.ch*cursor_y); // dest pos
 	cursor_drawn = false;
@@ -138,17 +163,17 @@ static void draw_cursor(int x, int y) {
 	int width = temp.wide==1 ? 2 : 1;
 	
 	// save the area underneath the cursor so we can redraw it later
-	XCopyArea(W.d, W.pix, W.under_cursor, W.gc, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch, 0, 0);
+	XCopyArea(W.d, pix, W.under_cursor, gc, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch, 0, 0);
 	
 	// this time we do NOT want it to overflow ever
-	XftDrawSetClipRectangles(W.draw, x*W.cw+W.border, y*W.ch+W.border, &(XRectangle){
+	XftDrawSetClipRectangles(xft_draw, x*W.cw+W.border, y*W.ch+W.border, &(XRectangle){
 		.width = W.cw*width,
 		.height = W.ch,
 	}, 1);
 	
 	// draw background
 	XftColor xcol = make_color((Color){.i=-3});
-	XftDrawRect(W.draw, &xcol, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch);
+	XftDrawRect(xft_draw, &xcol, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch);
 	
 	// draw char
 	if (temp.chr) {
@@ -168,14 +193,16 @@ static void draw_cursor(int x, int y) {
 	cursor_drawn = true;
 }
 
-// todo: instead of calling this immediately,
-// keep track of this region until the next redraw
-void shift_lines(int src, int dest, int count) {
+// todo: what we should do is,
+// when a scroll command is issued, keep track of that, and 
+// when a redraw happens, shift everything to the final scroll position and then redraw what needs to be done
+
+/*void shift_lines(int src, int dest, int count) {
 	erase_cursor();
-	XCopyArea(W.d, W.pix, W.pix, W.gc, W.border, W.border+W.ch*src, W.cw*T.width, W.ch*count, W.border, W.border+W.ch*dest);
+	XCopyArea(W.d, pix, pix, gc, W.border, W.border+W.ch*src, W.cw*T.width, W.ch*count, W.border, W.border+W.ch*dest);
 	if (T.show_cursor)
 		draw_cursor(T.c.x, T.c.y);
-}
+		}*/
 
 // draw cell backgrounds
 static void draw_row_bg(int y) {
@@ -189,13 +216,13 @@ static void draw_row_bg(int y) {
 		XRenderColor bg = get_color(row[x].attrs.background, 0);
 		if (!same_color(bg, prev_color)) {
 			alloc_color(&prev_color, &xcol);
-			XftDrawRect(W.draw, &xcol, W.border+W.cw*prev_start, W.border+W.ch*y, W.cw*(prev_start-x), W.ch);
+			XftDrawRect(xft_draw, &xcol, W.border+W.cw*prev_start, W.border+W.ch*y, W.cw*(prev_start-x), W.ch);
 			prev_start = x;
 			prev_color = bg;
 		}
 	}
 	alloc_color(&prev_color, &xcol);
-	XftDrawRect(W.draw, &xcol, W.border+W.cw*prev_start, W.border+W.ch*y, W.cw*(prev_start-x), W.ch);
+	XftDrawRect(xft_draw, &xcol, W.border+W.cw*prev_start, W.border+W.ch*y, W.cw*(prev_start-x), W.ch);
 }
 
 // draw strikethrough and underlines
@@ -207,7 +234,7 @@ static void draw_row_overlays(int y) {
 
 static void draw_row(int y) {
 	// set clip region to entire row
-	XftDrawSetClipRectangles(W.draw, W.border, y*W.ch+W.border, &(XRectangle){
+	XftDrawSetClipRectangles(xft_draw, W.border, y*W.ch+W.border, &(XRectangle){
 		.width = W.cw*T.width,
 		.height = W.ch,
 	}, 1);
@@ -235,8 +262,8 @@ static void draw_row(int y) {
 }
 
 void repaint(void) {
-	if (W.pix != W.win)
-		XCopyArea(W.d, W.pix, W.win, W.gc, 0, 0, W.w, W.h, 0, 0);
+	if (pix != W.win)
+		XCopyArea(W.d, pix, W.win, gc, 0, 0, W.w, W.h, 0, 0);
 }
 
 void draw(void) {
@@ -260,10 +287,10 @@ void draw(void) {
 	time_log("redraw");
 }
 
-void clear_background(void) {
-	XftColor xcol = make_color((Color){.i=-2});
-	XftDrawSetClip(W.draw, 0);
-	XftDrawRect(W.draw, &xcol, 0, 0, W.w, W.h);
+void init_draw(void) {
+	gc = XCreateGC(W.d, W.win, GCGraphicsExposures, &(XGCValues){
+		.graphics_exposures = False,	
+	});
 }
 
 void draw_free(void) {
@@ -278,4 +305,3 @@ void draw_free(void) {
 // compare to that and only render the cells (and nearby b/c italics)
 // which differ.
 // it is worth going through a lot of effort to prevent unneeded renders because these are the slowest parts
-

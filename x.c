@@ -31,7 +31,7 @@ void clippaste(void) {
 }
 
 void on_visibilitynotify(XEvent *ev) {
-	XVisibilityEvent* e = &ev->xvisibility;
+	//XVisibilityEvent* e = &ev->xvisibility;
 	print("visibility\n");
 	//MODBIT(win.mode, e->state != VisibilityFullyObscured, MODE_VISIBLE);
 }
@@ -44,18 +44,6 @@ static void on_expose(XEvent* e) {
 	//repaint();
 }
 
-static void init_pixmap(void) {
-	if (W.pix)
-		XFreePixmap(W.d, W.pix);
-	W.pix = XCreatePixmap(W.d, W.win, W.w, W.h, DefaultDepth(W.d, W.scr));
-	if (W.draw)
-		XftDrawChange(W.draw, W.pix);
-	else
-		W.draw = XftDrawCreate(W.d, W.pix, W.vis, W.cmap);
-	
-	clear_background();
-}
-
 // when the size of the terminal (in character cells) changes
 // (also called to initialize size)
 // todo: what if the size (in pixels) changes but not the size in char cells?
@@ -64,7 +52,6 @@ static void update_size(int width, int height) {
 	W.w = W.border*2+width*W.cw;
 	W.h = W.border*2+height*W.ch;
 	tty_resize(width, height, width*W.cw, height*W.ch);
-	init_pixmap();
 	term_resize(width, height);
 	draw_resize(width, height); //todo: order?
 	//draw();
@@ -112,9 +99,6 @@ void sleep_forever(bool hangup) {
 	tty_hangup();
 	
 	fonts_free();
-	
-	//if (W.draw)
-		//	XftDrawDestroy(W.draw);
 	
 	draw_free();
 	//FcFini(); // aaa
@@ -274,6 +258,7 @@ static bool wait_until(Fd xfd, Fd ttyfd, int timeout) {
 	return FD_ISSET(ttyfd, &rfd);
 }
 
+// todo: clean this up
 static void run(void) {
 	XEvent ev;
 	do {
@@ -293,8 +278,8 @@ static void run(void) {
 	
 	update_size(w, h); // must be called after tty is created
 	
-	int timeout = -1;
-	struct timespec now, trigger;
+	float timeout = -1;
+	struct timespec trigger = {0};
 	bool drawing = false;
 	bool got_text = false;
 	bool got_draw = false;
@@ -305,6 +290,7 @@ static void run(void) {
 		
 		bool text = wait_until(xfd, ttyfd, timeout);
 		
+		struct timespec now;
 		clock_gettime(CLOCK_MONOTONIC, &now);
 		
 		// handle text
@@ -336,9 +322,9 @@ static void run(void) {
 				trigger = now;
 				drawing = true;
 			}
-			timeout = (maxlatency - timediff(now, trigger)) / maxlatency * minlatency;
+			timeout = (float)(maxlatency - timediff(now, trigger)) / maxlatency * minlatency;
 			if (timeout > 0)
-				continue; /* we have time, try to find idle */
+				continue;
 		}
 		
 		timeout = -1;
@@ -427,9 +413,8 @@ int main(int argc, char* argv[argc+1]) {
 		CWBackPixel | CWBorderPixel | CWBitGravity | CWEventMask | CWColormap, // value mask
 		&W.attrs
 	);
-	W.gc = XCreateGC(W.d, parent, GCGraphicsExposures, &(XGCValues){
-		.graphics_exposures = False,	
-	});
+	
+	init_draw();
 	
 	init_input();
 	

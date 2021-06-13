@@ -25,6 +25,7 @@ void xim_spot(int x, int y) {
 	XSetICValues(ime.xic, XNPreeditAttributes, ime.spotlist, NULL);
 }
 
+// this will be useful someday, perhaps
 static int utf8_encode(Char c, char* out) {
 	if (c<0)
 		return 0;
@@ -66,8 +67,8 @@ static bool match_modifiers(KeyMap* want, int got) {
 	return true;
 }
 
-void on_keypress(XEvent *ev) {
-	XKeyEvent *e = &ev->xkey;
+void on_keypress(XEvent* ev) {
+	XKeyEvent* e = &ev->xkey;
 	
 	//if (IS_SET(MODE_KBDLOCK))
 	//	return;
@@ -78,14 +79,14 @@ void on_keypress(XEvent *ev) {
 	
 	Status status;
 	if (ime.xic)
-		len = XmbLookupString(ime.xic, e, buf, sizeof buf, &ksym, &status);
+		len = XmbLookupString(ime.xic, e, buf, sizeof(buf)-1, &ksym, &status);
 	else {
-		len = XLookupString(e, buf, sizeof buf, &ksym, NULL); //can't we just use the last argument of this instead of xmb?
+		len = XLookupString(e, buf, sizeof(buf)-1, &ksym, NULL); //can't we just use the last argument of this instead of xmb?
 		status = XLookupBoth;
 	}
 	
 	if (status==XLookupKeySym || status==XLookupBoth) {
-		print("got keysym: %lu\n", ksym);
+		//print("got key: %s. mods: %d\n", XKeysymToString(ksym), e->state);
 		// look up keysym in the key mapping
 		for (KeyMap* map=KEY_MAP; map->k; map++) {
 			if (map->k==ksym && match_modifiers(map, e->state)) {
@@ -108,27 +109,25 @@ void on_keypress(XEvent *ev) {
 					else if (map->mode==3)
 						tty_printf(map->output, map->arg, mods+1);
 				}
-				goto finish;
+				return;
 			}
 		}
 	}
 	// otherwise, the input is normal text
 	if ((status==XLookupChars || status==XLookupBoth) && len>0) {
-		// idk how good this is...
-		if (len == 1 && e->state & Mod1Mask) {
+		if (e->state & Mod1Mask) {
 			//if (IS_SET(MODE_8BIT)) {
 			//	if (*buf < 0177) {
 			//		Rune c = *buf | 0x80;
 			//		len = utf8encode(c, buf);
 			//	}
 			//} else {
-			buf[1] = buf[0];
-			buf[0] = '\033';
-			len = 2;
+			memmove(&buf[1], buf, len);
+			len++;
+			buf[0] = '\x1B';
 		}
 		tty_write(len, buf);
 	}
- finish:;
 }
 
 void on_focusin(XEvent* e) {

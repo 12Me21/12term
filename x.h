@@ -13,22 +13,18 @@ typedef struct Xw {
 	Visual* vis;
 	Colormap cmap;
 	Window win;
-	Pixmap pix;
-	GC gc;
-	XftDraw* draw;
 	XSetWindowAttributes attrs;
 	
-	// for rendering the cursor
-	Pixmap under_cursor;
+	Pixmap under_cursor; //wish this wasn't here
 	
-	Px w,h;
-	Px cw,ch;
-	Px border;
+	Px w,h; // size in pixels (including border)
+	Px cw,ch; // size of each character cell
+	Px border; // width of border
 	float cwscale, chscale;// todo
 	
-	bool ligatures;
+	bool ligatures; // unused
 	
-	int font_ascent;
+	int font_ascent; // n
 	
 	struct atoms {
 		Atom xembed;
