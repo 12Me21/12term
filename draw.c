@@ -73,7 +73,7 @@ static XRenderColor get_color(Color c, bool bold) {
 		else if (i == -1)
 			rgb = T.foreground;
 		else if (i == -3)
-			rgb = T.cursor_background;
+			rgb = T.cursor_color;
 		else // -2
 			rgb = T.background;
 	}

@@ -35,3 +35,8 @@ void full_reset(void);
 void switch_buffer(bool alt);
 
 void set_scroll_region(int y1, int y2);
+
+void set_cursor_style(int n);
+
+void scroll_down(int amount);
+void scroll_up(int amount);

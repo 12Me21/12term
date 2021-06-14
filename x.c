@@ -301,7 +301,8 @@ static void run(void) {
 			}
 			
 			draw();
-			xim_spot(T.c.x, T.c.y);
+			if (T.show_cursor)
+				xim_spot(T.c.x, T.c.y);
 			readed = false;
 			drawing = false;
 		}

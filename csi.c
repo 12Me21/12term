@@ -176,7 +176,7 @@ static void set_private_modes(bool state) {
 			//case 7: // wrap?
 			//break;
 		case 12: // enable/disable cursor blink
-			T.blink_cursor = state;
+			T.cursor_blink = state;
 			break;
 		case 25: // show/hide cursor
 			T.show_cursor = state;
@@ -234,9 +234,9 @@ void process_csi_command_2(Char c) {
 		switch (P.csi_char) {
 		case ' ':
 			switch (c) {
-				//case 'q':
-				// set cursor shape
-				//break;
+			case 'q':
+				set_cursor_style(P.argv[0]);
+				break;
 			default:
 				dump(c);
 				break;
@@ -297,6 +297,13 @@ static void process_csi_command(Char c) {
 			break;
 		case 'G': // cursor column absolute =hpa=
 			cursor_to(get_arg01()-1, T.c.y);
+			break;
+		case 'g': // tab clear
+			if (arg==0)
+				T.tabs[T.c.x] = false;
+			else if (arg==3)
+				for (int i=0; i<T.width+1; i++)
+					T.tabs[i] = false;
 			break;
 		case 'H': // move cursor =clear= =cup= =home=
 		case 'f':
@@ -361,8 +368,13 @@ static void process_csi_command(Char c) {
 				get_arg(1, T.height) // note that we don't subtract 1 here
 			);
 			break;
-		//case 'S': // scroll text up =indn=
-			//	break; // too tired for this right now
+			//case 'S': // scroll text up =indn=
+			// todo: i think these are supposed to move the cursor
+			//			scroll_up(get_arg01());
+			//			break;
+			//		case 'T': // scroll text down
+			//			scroll_down(get_arg01());
+			//			break;
 		case 't': //window ops
 			// TODO
 			break;

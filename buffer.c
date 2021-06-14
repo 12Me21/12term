@@ -30,11 +30,19 @@ RGBColor default_palette[16] = {
 RGBColor default_cursor = {  0,192,  0};
 RGBColor default_foreground = {  0,  0,  0};
 RGBColor default_background = {255,255,255};
+int default_cursor_style = 2;
+
+static void limit(int* x, int min, int max) {
+	if (*x<min)
+		*x = min;
+	else if (*x>max)
+		*x = max;
+}
 
 static void init_palette(void) {
 	T.foreground = default_foreground;
 	T.background = default_background;
-	T.cursor_background = default_cursor;
+	T.cursor_color = default_cursor;
 	// normal 16 indexed colors
 	int p = 0;
 	for (int i=0; i<16; i++)
@@ -118,7 +126,7 @@ void term_resize(int width, int height) {
 			}
 		}
 		// update tab stops
-		REALLOC(T.tabs, T.width); //todo: init this
+		REALLOC(T.tabs, T.width+1);
 		for (int x=0; x<T.width; x++) {
 			T.tabs[x] = (x%8 == 0);
 		}
@@ -187,11 +195,11 @@ void full_reset(void) {
 	};
 	T.saved_cursor = T.c;
 	T.show_cursor = true;
-	T.blink_cursor = false;
+	set_cursor_style(0);
 	
 	init_palette();
 	
-	for (int i=0; i<T.width; i++)
+	for (int i=0; i<T.width+1; i++)
 		T.tabs[i] = i%8==0;
 	
 	T.charsets[0] = 0;
@@ -258,24 +266,23 @@ static void shift_rows(int y1, int y2, int amount) {
 }
 
 // move text downwards
-static void scroll_down(int amount) {
+void scroll_down(int amount) {
 	int y1 = T.current->scroll_top;
 	int y2 = T.current->scroll_bottom;
-	
+	limit(&amount, 0, y2-y1);
 	shift_rows(y1, y2, amount);
 }
 
-static void scroll_up(int amount) {
+void scroll_up(int amount) {
 	int y1 = T.current->scroll_top;
 	int y2 = T.current->scroll_bottom;
-	
-	for (int y=y1; y<y1+amount; y++) {
+	limit(&amount, 0, y2-y1);
+	if (y1==0 && T.current==&T.buffers[0])
+		for (int y=y1; y<y1+amount; y++) {
 		// if we are on the main screen, and the scroll region starts at the top of the screen, we add the lines to the scrollback list.
-		if (y1==0 && T.current==&T.buffers[0]) {
 			push_scrollback(y);
 			ALLOC(T.current->rows[y], T.width);
 		}
-	}
 	shift_rows(y1, y2, -amount);
 }
 
@@ -511,13 +518,6 @@ void cursor_right(int amount) {
 		T.c.x = T.width-1;
 }
 
-static void limit(int* x, int min, int max) {
-	if (*x<min)
-		*x = min;
-	else if (*x>max)
-		*x = max;
-}
-
 void cursor_left(int amount) {
 	if (amount<=0)
 		return;
@@ -630,4 +630,15 @@ void set_scroll_region(int y1, int y2) {
 	T.current->scroll_top = y1;
 	T.current->scroll_bottom = y2;
 	cursor_to(0, 0); // where is this supposed to move the cursor?
+}
+
+// todo: actually use this
+void set_cursor_style(int n) {
+	if (n==0)
+		n = default_cursor_style;
+	
+	if (n>0 && n<=6) {
+		T.cursor_shape = (n-1)/2;
+		T.cursor_blink = (n-1)%2==0;
+	}
 }
