@@ -6,7 +6,7 @@
 #include "common.h"
 #include "debug.h"
 
-void die(const char *errstr, ...) {
+__attribute__((noreturn)) void die(const char *errstr, ...) {
 	va_list ap;
 	va_start(ap, errstr);
 	vfprintf(stderr, errstr, ap);

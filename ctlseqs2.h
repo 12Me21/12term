@@ -13,9 +13,10 @@ typedef struct ParseState {
 	int string_length;
 	int state;
 	int argv[100];
-	bool arg_colon[100]; //todo
+	bool arg_colon[100];
 	int argc;
 	char csi_private;
+	char csi_char;
 	int charset;
 } ParseState;
 
@@ -26,6 +27,7 @@ enum parse_state {
 	ESC,
 	CSI_START,
 	CSI,
+	CSI_2,
 	ESC_TEST,
 	UTF8,
 	ALTCHARSET,
@@ -41,3 +43,4 @@ enum string_command {
 };
 
 void process_csi_char(Char c);
+void process_csi_command_2(Char c);

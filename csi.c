@@ -1,6 +1,28 @@
 #include "common.h"
 #include "ctlseqs2.h"
 
+// csi sequence:
+// CSI [private] [arguments...] char [char2]
+
+static void dump(Char last) {
+	print("CSI ");
+	if (P.csi_private)
+		print("%c ", P.csi_private);
+	for (int i=0; i<P.argc; i++) {
+		print("%d ", P.argv[i]);
+		if (i<P.argc-1) {
+			if (P.arg_colon[i])
+				print(": ");
+			else
+				print("; ");
+		}
+	}
+	if (P.csi_char)
+		print("'%c' ", P.csi_char);
+	print("'%c' ", last);
+	print("\n");
+}
+
 static int limit(int x, int min, int max) {
 	if (x<min)
 		return min;
@@ -203,7 +225,33 @@ static int get_arg01(void) {
 	return P.argv[0] ? P.argv[0] : 1;
 }
 
-static void process_csi_command(Char c) {	
+void process_csi_command_2(Char c) {
+	switch (P.csi_private) {
+	default: 
+		print("oh heck\n");
+		break;
+	case 0:
+		switch (P.csi_char) {
+		case ' ':
+			switch (c) {
+				//case 'q':
+				// set cursor shape
+				//break;
+			default:
+				dump(c);
+				break;
+			}
+			break;
+		default:
+			print("oh heck\n");
+			break;
+		}
+		break;
+	}
+	P.state = NORMAL;
+}
+
+static void process_csi_command(Char c) {
 	int arg = P.argv[0]; //will be 0 if no args were passed. this is intentional.
 	
 	switch (P.csi_private) {
@@ -222,12 +270,10 @@ static void process_csi_command(Char c) {
 		default:
 			print("unknown CSI private terminator: %c\n", (char)c);
 		}
-		P.state = NORMAL;
 		break;
 	case '>':
 		//whatever;
 		print("CSI > private mode with char: %c\n", c);
-		P.state = NORMAL;
 		break;
 	case 0:
 		switch (c) {
@@ -326,16 +372,21 @@ static void process_csi_command(Char c) {
 		case 'Z': // back tab =cbt=
 			back_tab(get_arg01());
 			break;
+		case ' ': case '$': case '#': case '"':
+			P.csi_char = c;
+			P.state = CSI_2;
+			return;
 		default:
-			print("unknown CSI terminator: %c\n", (char)c);
+			print("unknown CSI terminator: %d\n", (char)c);
 		}
-		P.state = NORMAL;
 	}
+	P.state = NORMAL;
 	return;
  invalid:
 	//todo
 	print("unknown command args for %c\n", (char)c);
-	return;
+	dump(c);
+	P.state = NORMAL;
 }
 
 void process_csi_char(Char c) {
@@ -353,6 +404,5 @@ void process_csi_char(Char c) {
 		// finished
 		P.arg_colon[P.argc-1] = false;
 		process_csi_command(c);
-		P.state = NORMAL;
 	}
 }

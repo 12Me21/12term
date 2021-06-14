@@ -45,6 +45,8 @@ void process_escape_char(Char c) {
 	case '[': // CSI
 		P.argc = 1;
 		P.argv[0] = 0;
+		P.csi_private = 0;
+		P.csi_char = 0;
 		P.state = CSI_START;
 		return;
 		
@@ -145,6 +147,9 @@ static void process_char(Char c) {
 		break;
 	case CSI:
 		process_csi_char(c);
+		break;
+	case CSI_2:
+		process_csi_command_2(c);
 		break;
 	case ALTCHARSET:
 		if (c=='0' || c=='B')

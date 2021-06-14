@@ -44,8 +44,6 @@ void sigchld(int a) {
 		print("child exited with status %d\n", WEXITSTATUS(stat));
 	else if (WIFSIGNALED(stat))
 		print("child terminated due to signal %d\n", WTERMSIG(stat));	
-	
-	//	sleep_forever(false); // this causes problems. it's not necessary since the term will exit when reading fails anyway
 }
 
 static void execsh(void) {
@@ -69,7 +67,7 @@ static void execsh(void) {
 	setenv("SHELL", sh, 1);
 	setenv("HOME", pw->pw_dir, 1);
 	setenv("TERM", termname, 1);
-
+	
 	signal(SIGCHLD, SIG_DFL);
 	signal(SIGHUP, SIG_DFL);
 	signal(SIGINT, SIG_DFL);
@@ -78,61 +76,45 @@ static void execsh(void) {
 	signal(SIGALRM, SIG_DFL);
 	
 	execvp(sh, (char*[]){sh, NULL});
-	_exit(1);
 }
 
-Fd tty_new(void) {
-	/* seems to work fine on linux, openbsd and freebsd */
-	Fd m, s;
-	if (openpty(&m, &s, NULL, NULL, NULL) < 0)
-		die("openpty failed: %s\n", strerror(errno));
+// I don't use openbsd so I can't confirm whether these pledge calls are correct.
+// but they were taken from st, so, probably
+#ifdef __OpenBSD__
+static void openbsd_pledge(const char* a, void* b) {
+	if (pledge(a, b) == -1)
+		die("pledge\n");
+}
+#else
+#define openbsd_pledge(a,b) ;
+#endif
 
-	switch (pid = fork()) {
-	case -1:
-		die("fork failed: %s\n", strerror(errno));
-		break;
-	case 0:
-		close(m);
-		
-		setsid(); /* create a new process group */
-		dup2(s, 0);
-		dup2(s, 1);
-		dup2(s, 2);
-		if (ioctl(s, TIOCSCTTY, NULL) < 0)
-			die("ioctl TIOCSCTTY failed: %s\n", strerror(errno));
-		close(s);
-		
-#ifdef __OpenBSD__
-		if (pledge("stdio getpw proc exec", NULL) == -1)
-			die("pledge\n");
-#endif
+void tty_init(void) {
+	pid = forkpty(&cmdfd, NULL, NULL, NULL);
+	if (pid<0) { // ERROR
+		die("forkpty failed: %s\n", strerror(errno));
+	} else if (pid==0) { // CHILD
+		openbsd_pledge("stdio getpw proc exec", NULL); 
 		execsh();
-		break;
-	default:
-#ifdef __OpenBSD__
-		if (pledge("stdio rpath tty proc", NULL) == -1)
-			die("pledge\n");
-#endif
-		close(s);
-		
-		cmdfd = m;
+		_exit(0);
+	} else { // PARENT
+		openbsd_pledge("stdio rpath tty proc", NULL); 
 		signal(SIGCHLD, sigchld);
-		break;
 	}
-	return cmdfd;
 }
 
 // read from child process and process the text
 size_t tty_read(void) {
-	char buf[256];
-	int len = read(cmdfd, buf, sizeof(buf));
-	
+	char buf[1024*100];
+	ssize_t len = read(cmdfd, buf, sizeof(buf));
+	//print("read %ld bytes\n", len);
 	if (len>0) {
 		// todo: move this stuff into x.c maybe so we don't need buffer.h in this file?
 		process_chars(len, buf);
 		return len;
 	} else if (len<0) {
 		print("couldn't read from shell: %s\n", strerror(errno));
+		// this is the normal exit condition.
 		sleep_forever(true);
 	}
 	return 0;
@@ -148,52 +130,50 @@ void tty_printf(const char* format, ...) {
 	tty_write(len, buf);
 }
 
-// send data to child process
-void tty_write(size_t n, const char str[n]) {
-	const char* s = str;
-	fd_set wfd, rfd;
+static int min(int a, int b) {
+	return a<b ? a : b;
+}
+
+// send data to child process (i.e. keypresses)
+void tty_write(size_t len, const char str[len]) {
+	const char* pos = str;
+	fd_set write_fds, read_fds;
 	size_t lim = 256;
-	while (n > 0) {
-		FD_ZERO(&wfd);
-		FD_ZERO(&rfd);
-		FD_SET(cmdfd, &wfd);
-		FD_SET(cmdfd, &rfd);
-		if (pselect(cmdfd+1, &rfd, &wfd, NULL, NULL, NULL) < 0) {
-			if (errno == EINTR)
+	while (len > 0) {
+		// wait for uhhhh
+		FD_ZERO(&write_fds);
+		FD_ZERO(&read_fds);
+		FD_SET(cmdfd, &write_fds);
+		FD_SET(cmdfd, &read_fds);
+		if (pselect(cmdfd+1, &read_fds, &write_fds, NULL, NULL, NULL) < 0) {
+			if (errno==EINTR || errno==EAGAIN)
 				continue;
 			die("select failed: %s\n", strerror(errno));
 		}
-		if (FD_ISSET(cmdfd, &wfd)) {
-			/*
-			 * Only write the bytes written by ttywrite() or the
-			 * default of 256. This seems to be a reasonable value
-			 * for a serial line. Bigger values might clog the I/O.
-			 */
-			ssize_t written = write(cmdfd, s, (n < lim)? n : lim);
-			if (written < 0)
-				goto write_error;
-			if (written < n) {
-				/*
-				 * We weren't able to write out everything.
-				 * This means the buffer is getting full
-				 * again. Empty it.
-				 */
-				if (n < lim)
-					lim = tty_read();
-				n -= written;
-				s += written;
-			} else {
-				/* All bytes have been written. */
+		
+		if (FD_ISSET(cmdfd, &write_fds)) {
+			// Only write the bytes written by ttywrite() or the
+			// default of 256. This seems to be a reasonable value
+			// for a serial line. Bigger values might clog the I/O.
+			ssize_t written = write(cmdfd, pos, min(len, lim));
+			if (written < 0) {
+				die("write error on tty: %s\n", strerror(errno));
+			} else if (written >= len) {
+				// finished
 				break;
+			} else {
+				// We weren't able to write out everything.
+				// This means the buffer is getting full
+				// again. Empty it.
+				if (len < lim)
+					lim = tty_read();
+				len -= written;
+				pos += written;
 			}
 		}
-		if (FD_ISSET(cmdfd, &rfd))
+		if (FD_ISSET(cmdfd, &read_fds))
 			lim = tty_read();
 	}
-	return;
-
- write_error:
-	die("write error on tty: %s\n", strerror(errno));
 }
 
 void tty_hangup(void) {
@@ -209,4 +189,33 @@ void tty_resize(int w, int h, Px pw, Px ph) {
 				.ws_ypixel = ph,
 			}) < 0)
 		print("Couldn't set window size: %s\n", strerror(errno));
+}
+
+static int max(int a, int b) {
+	if (a>b)
+		return a;
+	return b;
+}
+
+//wait until data is recieved on either cmdfd (the fd used to communicate with the child) OR xfd (notifies when x events are recieved)
+bool tty_wait(Fd xfd, int timeout) {
+	fd_set rfd;
+	while (1) {
+		FD_ZERO(&rfd);
+		FD_SET(cmdfd, &rfd);
+		FD_SET(xfd, &rfd);
+		
+		struct timespec seltv = {
+			.tv_sec = timeout / 1000,
+			.tv_nsec = 1000000 * (timeout % 1000),
+		};
+		struct timespec* tv = timeout>=0 ? &seltv : NULL;
+	
+		if (pselect(max(xfd, cmdfd)+1, &rfd, NULL, NULL, tv, NULL) < 0) {
+			if (errno != EINTR)
+				die("select failed: %s\n", strerror(errno));
+		} else
+			break;
+	}
+	return FD_ISSET(cmdfd, &rfd);
 }

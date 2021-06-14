@@ -1,8 +1,6 @@
 #define _POSIX_C_SOURCE 200112L
 #include <math.h>
-#include <sys/types.h>
 #include <unistd.h>
-#include <sys/select.h>
 #include <locale.h>
 #include <errno.h>
 #include <time.h>
@@ -30,7 +28,7 @@ void clippaste(void) {
 	XConvertSelection(W.d, W.atoms.clipboard, W.atoms.utf8_string, W.atoms.clipboard, W.win, CurrentTime);
 }
 
-void on_visibilitynotify(XEvent *ev) {
+void on_visibilitynotify(XEvent* ev) {
 	//XVisibilityEvent* e = &ev->xvisibility;
 	print("visibility\n");
 	//MODBIT(win.mode, e->state != VisibilityFullyObscured, MODE_VISIBLE);
@@ -92,7 +90,7 @@ static void on_configurenotify(XEvent* e) {
 	update_size((width-W.border*2)/W.cw, (height-W.border*2)/W.ch);
 }
 
-void sleep_forever(bool hangup) {
+__attribute__((noreturn)) void sleep_forever(bool hangup) {
 	print("goodnight...\n");
 	
 	//if (hangup)
@@ -161,8 +159,8 @@ void on_selectionnotify(XEvent* e) {
 			 * data has been transferred. We won't need to receive
 			 * PropertyNotify events anymore.
 			 */
-			W.attrs.event_mask &= ~PropertyChangeMask;
-			XChangeWindowAttributes(W.d, W.win, CWEventMask, &W.attrs);
+			W.event_mask &= ~PropertyChangeMask;
+			XChangeWindowAttributes(W.d, W.win, CWEventMask, &(XSetWindowAttributes){.event_mask = W.event_mask});
 		}
 		
 		if (type == W.atoms.incr) {
@@ -171,8 +169,8 @@ void on_selectionnotify(XEvent* e) {
 			 * when the selection owner does send us the next
 			 * chunk of data.
 			 */
-			W.attrs.event_mask |= PropertyChangeMask;
-			XChangeWindowAttributes(W.d, W.win, CWEventMask, &W.attrs);
+			W.event_mask |= PropertyChangeMask;
+			XChangeWindowAttributes(W.d, W.win, CWEventMask, &(XSetWindowAttributes){.event_mask = W.event_mask});
 			
 			/*
 			 * Deleting the property is the transfer start signal.
@@ -225,39 +223,6 @@ static int timediff(struct timespec t1, struct timespec t2) {
 static double minlatency = 8;
 static double maxlatency = 33;
 
-Fd ttyfd = 0;
-
-static int max(int a, int b) {
-	if (a>b)
-		return a;
-	return b;
-}
-
-static bool wait_until(Fd xfd, Fd ttyfd, int timeout) {
-	fd_set rfd;
-	while (1) {
-		FD_ZERO(&rfd);
-		FD_SET(ttyfd, &rfd);
-		FD_SET(xfd, &rfd);
-	
-		if (XPending(W.d))
-			timeout = 0;
-	
-		struct timespec seltv = {
-			.tv_sec = timeout / 1000,
-			.tv_nsec = 1000000 * (timeout % 1000),
-		};
-		struct timespec* tv = timeout>=0 ? &seltv : NULL;
-	
-		if (pselect(max(xfd, ttyfd)+1, &rfd, NULL, NULL, tv, NULL) < 0) {
-			if (errno != EINTR)
-				die("select failed: %s\n", strerror(errno));
-		} else
-			break;
-	}
-	return FD_ISSET(ttyfd, &rfd);
-}
-
 // todo: clean this up
 static void run(void) {
 	XEvent ev;
@@ -281,14 +246,16 @@ static void run(void) {
 	float timeout = -1;
 	struct timespec trigger = {0};
 	bool drawing = false;
-	bool got_text = false;
-	bool got_draw = false;
+	bool got_text = false, got_draw = false; //just for logging
 	bool readed = false;
 	
 	while (1) {
 		Fd xfd = XConnectionNumber(W.d);
 		
-		bool text = wait_until(xfd, ttyfd, timeout);
+		if (XPending(W.d))
+			timeout = 0;
+		
+		bool text = tty_wait(xfd, timeout);
 		
 		struct timespec now;
 		clock_gettime(CLOCK_MONOTONIC, &now);
@@ -314,9 +281,8 @@ static void run(void) {
 				(HANDLERS[ev.type])(&ev);
 		}
 		
-		// idea: instead of using just a timeout
-		// we can be more intelligent about this.
-		// detect newlines etc.
+		// I don't exactly understand how this timeout delay system works.
+		// needs to be rewritten maybe
 		if (text || xev) {
 			if (!drawing) {
 				trigger = now;
@@ -326,7 +292,6 @@ static void run(void) {
 			if (timeout > 0)
 				continue;
 		}
-		
 		timeout = -1;
 		
 		if (readed) {
@@ -346,19 +311,25 @@ static void run(void) {
 }
 
 static void init_atoms(void) {
-	W.atoms.xembed = XInternAtom(W.d, "_XEMBED", False);
-	W.atoms.wm_delete_window = XInternAtom(W.d, "WM_DELETE_WINDOW", False);
-	W.atoms.net_wm_name = XInternAtom(W.d, "_NET_WM_NAME", False);
-	W.atoms.net_wm_icon_name = XInternAtom(W.d, "_NET_WM_ICON_NAME", False);
-	W.atoms.net_wm_pid = XInternAtom(W.d, "_NET_WM_PID", False);
-	W.atoms.utf8_string = XInternAtom(W.d, "UTF8_STRING", False);
-	if (W.atoms.utf8_string == None)
+	XInternAtoms(W.d, (char*[]){
+			"_XEMBED", "WM_DELETE_WINDOW", "_NET_WM_NAME", "_NET_WM_ICON_NAME", "_NET_WM_PID", "UTF8_STRING", "CLIPBOARD", "INCR"
+		}, 8, False, W.atoms_array);
+	if (!W.atoms.utf8_string)
 		W.atoms.utf8_string = XA_STRING;
-	W.atoms.clipboard = XInternAtom(W.d, "CLIPBOARD", False);
-	W.atoms.incr = XInternAtom(W.d, "INCR", False);
 }
 
 extern RGBColor default_background; //messy messy messy
+
+// TODO: clean up startup process
+// 1: set locale
+// 2: start the shell process (so we can let the shell start up while the term is initializing
+// 3: open x connection
+// 4: load fonts - now we know the character cell size
+// 5: create and set up the window
+// 6: do everything that doesn't depend on window size
+// 6: wait for window mapping event - now we know the window size
+// 7: initialize everything else
+// 8: start main loop
 
 int main(int argc, char* argv[argc+1]) {
 	time_log(NULL);
@@ -373,7 +344,7 @@ int main(int argc, char* argv[argc+1]) {
 	
 	W.border = 3;
 	
-	W.ligatures = true;
+	//W.ligatures = true;
 	
 	W.d = XOpenDisplay(NULL);
 	W.scr = XDefaultScreen(W.d);
@@ -381,7 +352,9 @@ int main(int argc, char* argv[argc+1]) {
 	
 	time_log("x stuff 1");
 	
-	ttyfd = tty_new(); // todo: maybe try to pass the window size here if we can guess it?
+	tty_init(); // todo: maybe try to pass the window size here if we can guess it?
+	
+	init_atoms();
 	
 	FcInit();
 	// todo: this
@@ -393,36 +366,35 @@ int main(int argc, char* argv[argc+1]) {
 	
 	W.cmap = XDefaultColormap(W.d, W.scr);
 	
-	Window parent = XRootWindow(W.d, W.scr);
+	unsigned long bg_pixel = make_color((Color){.truecolor=true,.rgb=default_background}).pixel;
 	
-	long unsigned int bg_pixel = make_color((Color){.truecolor=true,.rgb=default_background}).pixel;
+	W.event_mask = FocusChangeMask | KeyPressMask | KeyReleaseMask | ExposureMask | VisibilityChangeMask | StructureNotifyMask | ButtonMotionMask | ButtonPressMask | ButtonReleaseMask;
 	
-	W.attrs = (XSetWindowAttributes){
-		.bit_gravity = NorthWestGravity,
-		.event_mask = FocusChangeMask | KeyPressMask | KeyReleaseMask | ExposureMask | VisibilityChangeMask | StructureNotifyMask | ButtonMotionMask | ButtonPressMask | ButtonReleaseMask,
-		.colormap = W.cmap,
-		.background_pixel = bg_pixel,
-		.border_pixel = bg_pixel,
-	};
-	W.win = XCreateWindow(W.d, parent,
+	W.win = XCreateWindow(W.d, XRootWindow(W.d, W.scr),
 		0, 0, W.w, W.h, // geometry
 		0, // border width
 		XDefaultDepth(W.d, W.scr), // depth
 		InputOutput, // class
 		W.vis, // visual
-		CWBackPixel | CWBorderPixel | CWBitGravity | CWEventMask | CWColormap, // value mask
-		&W.attrs
+		// attributes:
+		CWBackPixel | CWBorderPixel | CWBitGravity | CWEventMask | CWColormap,
+		&(XSetWindowAttributes){
+			.background_pixel = bg_pixel,
+			.border_pixel = bg_pixel,
+			.bit_gravity = NorthWestGravity,
+			.event_mask = W.event_mask,
+			.colormap = W.cmap,
+		}
 	);
 	
 	init_draw();
 	
 	init_input();
 	
-	init_atoms();
-	
+	// allow listening for window close event
 	XSetWMProtocols(W.d, W.win, &W.atoms.wm_delete_window, 1);
-	pid_t thispid = getpid();
-	XChangeProperty(W.d, W.win, W.atoms.net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (unsigned char*)&thispid, 1);
+	// set _NET_WM_PID property
+	XChangeProperty(W.d, W.win, W.atoms.net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (unsigned char*)&(pid_t){getpid()}, 1);
 	
 	update_charsize(W.cw, W.ch);
 	

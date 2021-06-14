@@ -8,6 +8,8 @@ CFLAGS+= -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
 CFLAGS+= -Werror=implicit-function-declaration -Werror=incompatible-pointer-types
 
 libs:= m rt X11 util Xft
+# rt: wait what is this again
+# util: pty stuff
 
 pkgs:= fontconfig freetype2 #harfbuzz
 
