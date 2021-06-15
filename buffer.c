@@ -5,6 +5,7 @@
 #include "common.h"
 #include "buffer.h"
 #include "buffer2.h"
+#include "ctlseqs.h"
 
 Term T; // ok there's really no reason to ever need more than one of these anyway.
 
@@ -209,6 +210,8 @@ void full_reset(void) {
 	T.app_cursor = false;
 	
 	dirty_all();
+	
+	reset_parser();
 }
 
 void init_term(int width, int height) {
@@ -287,12 +290,15 @@ void scroll_up(int amount) {
 }
 
 void reverse_index(int amount) {
+	print("reverse index %d\n", amount);
 	if (amount<=0)
 		return;
-	if (T.c.y < T.current->scroll_top)
+	if (T.c.y < T.current->scroll_top) {
+		print("- did cursor up\n");
 		cursor_up(amount);
-	else {
+	} else {
 		int push = cursor_up(amount);
+		print("- did cursor up, pushed by %d\n", push);
 		if (push>0)
 			scroll_down(push);
 	}
@@ -498,7 +504,7 @@ int cursor_up(int amount) {
 		// and hit the margin
 		if (next < mar) {
 			T.c.y = mar;
-			return next - mar;
+			return mar - next;
 		}
 	} else //otherwise
 		// if cursor hit top
@@ -623,6 +629,7 @@ void restore_cursor(void) {
 
 void set_scroll_region(int y1, int y2) {
 	// behavior taken from xterm
+	print("setting scroll region to [%d,%d)\n",y1,y2);
 	if (y2 < y1)
 		return;
 	limit(&y1, 0, T.height-1);

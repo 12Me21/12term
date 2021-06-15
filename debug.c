@@ -21,6 +21,21 @@ static long long timediff(struct timespec t1, struct timespec t2) {
 	return (t1.tv_sec-t2.tv_sec)*1000L*1000*1000 + (t1.tv_nsec-t2.tv_nsec);
 }
 
+// returns a string containing a readable name for a character
+const char* char_name(Char c) {
+	static char buf[20];
+	if (c>' ' && c<'~') {
+		sprintf(buf, "'%c'", c);
+		return buf;
+	}
+	if (c>=0 && c<=' ')
+		return (char*[]){"NUL","SOH","STX","ETX","EOT","ENQ","ACK","BEL","BS","TAB","LF","VT","FF","CR","SO","SI","DLE","DC1","DC2","DC3","DC4","NAK","SYN","ETB","CAN","EM","SUB","ESC","FS","GS","RS","US","SP"}[c];
+	if (c==0x7F)
+		return "DEL";
+	sprintf(buf, "U+%X", c);
+	return buf;
+}
+
 void print(const char* str, ...) {
 	va_list ap;
 	va_start(ap, str);

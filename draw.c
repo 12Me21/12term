@@ -69,8 +69,7 @@ static XRenderColor get_color(Color c, bool bold) {
 			if (bold && i<8)
 				i+=8;
 			rgb = T.palette[i];
-		}
-		else if (i == -1)
+		} else if (i == -1)
 			rgb = T.foreground;
 		else if (i == -3)
 			rgb = T.cursor_color;
@@ -159,7 +158,8 @@ static void draw_cursor(int x, int y) {
 	// todo: adding border each time is a pain. can we specify an origin somehow?
 	
 	Cell temp = T.current->rows[y][x];
-	
+	temp.attrs.color = temp.attrs.background;
+		
 	int width = temp.wide==1 ? 2 : 1;
 	
 	// save the area underneath the cursor so we can redraw it later
@@ -177,7 +177,7 @@ static void draw_cursor(int x, int y) {
 	
 	// draw char
 	if (temp.chr) {
-		XRenderColor fg = get_color(temp.attrs.background, false);
+		XRenderColor fg = get_color(temp.attrs.color, false);
 		XftGlyphFontSpec spec;
 		int indexs[1];
 		int num = make_glyphs(1, &spec, &temp, indexs, NULL);

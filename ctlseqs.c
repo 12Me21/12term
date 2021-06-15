@@ -93,7 +93,7 @@ void process_escape_char(Char c) {
 		break;
 		
 	default:
-		print("unknown ESC char: %d\n", c);
+		print("unknown control sequence: ESC %s\n", char_name(c));
 	}
 	P.state = NORMAL;
 }
@@ -155,7 +155,7 @@ static void process_char(Char c) {
 		if (c=='0' || c=='B')
 			select_charset(P.charset, c);
 		else
-			print("unknown charset: %c\n", c);
+			print("unknown charset: %s\n", char_name(c));
 		P.state = NORMAL;
 		break;
 		// ???
@@ -195,7 +195,7 @@ void process_chars(int len, const char cs[len]) {
 			process_char(c);
 			utf8_state = 0;
 			break;
-		case 3<<3 | 1:
+		case 3*1+0<<3 | 1: //1,0 2,1 3,2
 		case 3*2+1<<3 | 1:
 		case 3*3+2<<3 | 1:
 			utf8_buffer |= c;
@@ -204,19 +204,20 @@ void process_chars(int len, const char cs[len]) {
 			utf8_state = 0;
 			break;
 		// second to last byte
-		case 3*2<<3 | 1:
+		case 3*2+0<<3 | 1: //2,0 3,1
 		case 3*3+1<<3 | 1:
 			utf8_buffer |= c<<6;
 			utf8_state++;
 			break;
 		// 3rd to last byte
-		case 3*3<<3 | 1:
+		case 3*3+0<<3 | 1: //3,0
 			utf8_buffer |= c<<6*2;
 			utf8_state++;
 			break;
 		//invalid!
 		default:
 			print("Invalid utf8! [%d]\n", cs[i]);
+			process_char(0xFFFD);
 			utf8_buffer = 0;
 			utf8_state = 0;
 			break;

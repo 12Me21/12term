@@ -7,7 +7,7 @@
 static void dump(Char last) {
 	print("CSI ");
 	if (P.csi_private)
-		print("%c ", P.csi_private);
+		print("%s ", char_name(P.csi_private));
 	for (int i=0; i<P.argc; i++) {
 		print("%d ", P.argv[i]);
 		if (i<P.argc-1) {
@@ -18,8 +18,8 @@ static void dump(Char last) {
 		}
 	}
 	if (P.csi_char)
-		print("'%c' ", P.csi_char);
-	print("'%c' ", last);
+		print("%s ", char_name(P.csi_char));
+	print("%s ", char_name(last));
 	print("\n");
 }
 
@@ -228,7 +228,7 @@ static int get_arg01(void) {
 void process_csi_command_2(Char c) {
 	switch (P.csi_private) {
 	default: 
-		print("oh heck\n");
+		dump(c);
 		break;
 	case 0:
 		switch (P.csi_char) {
@@ -243,7 +243,7 @@ void process_csi_command_2(Char c) {
 			}
 			break;
 		default:
-			print("oh heck\n");
+			dump(c);
 			break;
 		}
 		break;
@@ -268,12 +268,13 @@ static void process_csi_command(Char c) {
 			set_private_modes(false);
 			break;
 		default:
-			print("unknown CSI private terminator: %c\n", (char)c);
+			dump(c);
+			break;
 		}
 		break;
 	case '>':
 		//whatever;
-		print("CSI > private mode with char: %c\n", c);
+		dump(c);
 		break;
 	case 0:
 		switch (c) {
@@ -389,7 +390,8 @@ static void process_csi_command(Char c) {
 			P.state = CSI_2;
 			return;
 		default:
-			print("unknown CSI terminator: %d\n", (char)c);
+			print("UNKNOWN: ");
+			dump(c);
 		}
 	}
 	P.state = NORMAL;
