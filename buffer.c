@@ -269,14 +269,14 @@ static void shift_rows(int y1, int y2, int amount) {
 }
 
 // move text downwards
-void scroll_down(int amount) {
+static void scroll_down_internal(int amount) {
 	int y1 = T.current->scroll_top;
 	int y2 = T.current->scroll_bottom;
 	limit(&amount, 0, y2-y1);
 	shift_rows(y1, y2, amount);
 }
 
-void scroll_up(int amount) {
+static void scroll_up_internal(int amount) {
 	int y1 = T.current->scroll_top;
 	int y2 = T.current->scroll_bottom;
 	limit(&amount, 0, y2-y1);
@@ -289,18 +289,33 @@ void scroll_up(int amount) {
 	shift_rows(y1, y2, -amount);
 }
 
+// these scroll + move the cursor with the scrolled text
+// todo: confirm the cases where these are supposed to move the cursor
+void scroll_up(int amount) {
+	scroll_up_internal(amount);
+	if (T.c.y>=T.current->scroll_top && T.c.y<T.current->scroll_bottom) {
+		limit(&amount, 0, T.c.y-T.current->scroll_top);
+		cursor_to(T.c.x, T.c.y-amount);
+	}
+}
+
+void scroll_down(int amount) {
+	scroll_down_internal(amount);
+	if (T.c.y>=T.current->scroll_top && T.c.y<T.current->scroll_bottom) {
+		limit(&amount, 0, T.current->scroll_bottom-1-T.c.y);
+		cursor_to(T.c.x, T.c.y+amount);
+	}
+}
+
 void reverse_index(int amount) {
-	print("reverse index %d\n", amount);
 	if (amount<=0)
 		return;
 	if (T.c.y < T.current->scroll_top) {
-		print("- did cursor up\n");
 		cursor_up(amount);
 	} else {
 		int push = cursor_up(amount);
-		print("- did cursor up, pushed by %d\n", push);
 		if (push>0)
-			scroll_down(push);
+			scroll_down_internal(push);
 	}
 }
 
@@ -336,7 +351,7 @@ void index(int amount) {
 		int push = cursor_down(amount);
 		// check if the cursor tried to pass through the margin
 		if (push > 0)
-			scroll_up(push);
+			scroll_up_internal(push);
 	}
 }
 
@@ -629,7 +644,6 @@ void restore_cursor(void) {
 
 void set_scroll_region(int y1, int y2) {
 	// behavior taken from xterm
-	print("setting scroll region to [%d,%d)\n",y1,y2);
 	if (y2 < y1)
 		return;
 	limit(&y1, 0, T.height-1);

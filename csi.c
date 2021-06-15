@@ -160,6 +160,16 @@ static void process_sgr(void) {
 	}
 }
 
+static void set_modes(bool state) {
+	for (int i=0; i<P.argc; i++) {
+		int a = P.argv[i];
+		switch (a) {
+		default:
+			print("unknown mode: %d\n", a);
+		}
+	}
+}
+
 static void set_private_modes(bool state) {
 	for (int i=0; i<P.argc; i++) {
 		int a = P.argv[i];
@@ -347,6 +357,12 @@ static void process_csi_command(Char c) {
 		case 'L': // insert lines =il= =il1=
 			insert_lines(get_arg01());
 			break;
+		case 'h':
+			set_modes(true);
+			break;
+		case 'l':
+			set_modes(false);
+			break;
 		case 'M': // delete lines =dl= =dl1=
 			delete_lines(get_arg01());
 			break;
@@ -369,13 +385,12 @@ static void process_csi_command(Char c) {
 				get_arg(1, T.height) // note that we don't subtract 1 here
 			);
 			break;
-			//case 'S': // scroll text up =indn=
-			// todo: i think these are supposed to move the cursor
-			//			scroll_up(get_arg01());
-			//			break;
-			//		case 'T': // scroll text down
-			//			scroll_down(get_arg01());
-			//			break;
+		case 'S': // scroll text up =indn=
+			scroll_up(get_arg01());
+			break;
+		case 'T': // scroll text down
+			scroll_down(get_arg01());
+			break;
 		case 't': //window ops
 			// TODO
 			break;
