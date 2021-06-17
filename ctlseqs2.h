@@ -5,7 +5,7 @@
 // things used by files which include this
 #include "buffer.h"
 #include "buffer2.h"
-#include "tty.h" //todo: get rid of this?
+#include "tty.h"
 
 typedef struct ParseState {
 	char string[1030];

@@ -117,13 +117,13 @@ static void process_sgr(void) {
 			// disable blink
 			break;
 		case 27:
-			T.c.attrs.reverse = true;
+			T.c.attrs.reverse = false;
 			break;
 		case 28:
-			T.c.attrs.invisible = true;
+			T.c.attrs.invisible = false;
 			break;
 		case 29:
-			T.c.attrs.strikethrough = true;
+			T.c.attrs.strikethrough = false;
 			break;
 		case SEVEN(30):
 			T.c.attrs.color = (Color){.i = a-30};
@@ -179,8 +179,8 @@ static void set_private_modes(bool state) {
 		case 1: // application cursor mode
 			T.app_cursor = state;
 			break;
-		case 5: // reverse video eye bleeding mode
-			break;
+			//case 5: // reverse video eye bleeding mode
+			//break;
 			//case 6: // cursor origin mode??
 			//break;
 			//case 7: // wrap?
@@ -231,7 +231,7 @@ static int get_arg(int n, int def) {
 }
 
 // get first arg; defaults to 1 if not set. (very commonly used)
-static int get_arg01(void) {
+static int arg01(void) {
 	return P.argv[0] ? P.argv[0] : 1;
 }
 
@@ -289,25 +289,26 @@ static void process_csi_command(Char c) {
 	case 0:
 		switch (c) {
 		case '@': // insert blank =ich=
-			insert_blank(get_arg01());
+			insert_blank(arg01());
 			break;
 		case 'A': // cursor up =cuu= =cuu1=
-			cursor_up(get_arg01());
+			cursor_up(arg01());
 			break;
 		case 'B': // cursor down =cud=
-			cursor_down(get_arg01());
+			cursor_down(arg01());
 			break;
 		case 'C': // cursor right =cuf= =cuf1=
-			cursor_right(get_arg01());
+			cursor_right(arg01());
 			break;
 		case 'D': // cursor left =cub=
-			cursor_left(get_arg01());
+			cursor_left(arg01());
 			break;
 		case 'd':
-			cursor_to(T.c.x, get_arg01()-1);
+			cursor_to(T.c.x, arg01()-1);
 			break;
 		case 'G': // cursor column absolute =hpa=
-			cursor_to(get_arg01()-1, T.c.y);
+		case '`': // (confirmed: xterm treats these the same)
+			cursor_to(arg01()-1, T.c.y);
 			break;
 		case 'g': // tab clear
 			if (arg==0)
@@ -317,8 +318,8 @@ static void process_csi_command(Char c) {
 					T.tabs[i] = false;
 			break;
 		case 'H': // move cursor =clear= =cup= =home=
-		case 'f':
-			cursor_to(get_arg(1, 1)-1,	get_arg(0, 1)-1);
+		case 'f': // (confirmed: eqv. in xterm)
+			cursor_to(get_arg(1, 1)-1,	arg01()-1);
 			break;
 		case 'J': // erase lines =ed=
 			switch (arg) {
@@ -334,7 +335,7 @@ static void process_csi_command(Char c) {
 				clear_region(0, 0, T.width, T.height);
 				break;
 			case 3: // scollback
-				// ehhh
+				// ehhh todo
 				T.scrollback.lines = 0;
 				break;
 			}
@@ -355,7 +356,7 @@ static void process_csi_command(Char c) {
 			}
 			break;
 		case 'L': // insert lines =il= =il1=
-			insert_lines(get_arg01());
+			insert_lines(arg01());
 			break;
 		case 'h':
 			set_modes(true);
@@ -364,7 +365,7 @@ static void process_csi_command(Char c) {
 			set_modes(false);
 			break;
 		case 'M': // delete lines =dl= =dl1=
-			delete_lines(get_arg01());
+			delete_lines(arg01());
 			break;
 		case 'm': // set graphics modes =blink= =bold= =dim= =invis= =memu= =op= =rev= =ritm= =rmso= =rmul= =setab= =setaf= =sgr= =sgr0= =sitm= =smso= =smul= =rmxx= =setb24= =setf24= =smxx=
 			process_sgr();
@@ -373,32 +374,32 @@ static void process_csi_command(Char c) {
 			if (arg == 6) {
 				tty_printf("\x1B[%d;%dR", T.c.y+1, T.c.x+1);
 			} else {
-				print("unknown device status report: %d\n", arg);
+				goto invalid;
 			}
 			break;
 		case 'P': // delete characters =dch= =dch1=
-			delete_chars(get_arg01());
+			delete_chars(arg01());
 			break;
 		case 'r': // set scroll region =csr=
 			set_scroll_region(
-				get_arg01()-1,
+				arg01()-1,
 				get_arg(1, T.height) // note that we don't subtract 1 here
 			);
 			break;
 		case 'S': // scroll text up =indn=
-			scroll_up(get_arg01());
+			scroll_up(arg01());
 			break;
 		case 'T': // scroll text down
-			scroll_down(get_arg01());
+			scroll_down(arg01());
 			break;
-		case 't': //window ops
+			//case 't': //window ops
 			// TODO
-			break;
+			//break;
 		case 'X': // erase characters =ech=
-			erase_characters(get_arg01());
+			erase_characters(arg01());
 			break;
 		case 'Z': // back tab =cbt=
-			back_tab(get_arg01());
+			back_tab(arg01());
 			break;
 		case ' ': case '$': case '#': case '"':
 			P.csi_char = c;
@@ -412,8 +413,7 @@ static void process_csi_command(Char c) {
 	P.state = NORMAL;
 	return;
  invalid:
-	//todo
-	print("unknown command args for %c\n", (char)c);
+	print("unknown command args: ");
 	dump(c);
 	P.state = NORMAL;
 }
@@ -426,6 +426,7 @@ void process_csi_char(Char c) {
 		// the purpose of the colons is to allow for argument grouping.
 		// because all the other codes are a single number, so if they are not supported, it's nbd
 		// but multi-number codes can cause frame shift issues, if they aren't supported, then the terminal will interpret the later values as individual args which is wrong.
+		// so the colons allow you to know how many values to skip in this case
 		P.arg_colon[P.argc-1] = c==':';
 		P.argc++;
 		P.argv[P.argc-1] = 0;

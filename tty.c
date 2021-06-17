@@ -22,10 +22,10 @@
 
 #include "common.h"
 #include "tty.h"
+#include "ctlseqs.h"
 void sleep_forever(bool hangup); // nnn where do these decs go...
-void process_chars(int len, const char c[len]); 
 
-const char* termname = "xterm-24bit"; // todo
+const char* termname = "xterm-256color"; // todo
 
 static Fd cmdfd;
 static pid_t pid;
@@ -82,7 +82,7 @@ static void execsh(void) {
 // but they were taken from st, so, probably
 #ifdef __OpenBSD__
 static void openbsd_pledge(const char* a, void* b) {
-	if (pledge(a, b) == -1)
+	if (pledge(a, b)==-1)
 		die("pledge\n");
 }
 #else
@@ -183,11 +183,11 @@ void tty_hangup(void) {
 
 void tty_resize(int w, int h, Px pw, Px ph) {
 	if (ioctl(cmdfd, TIOCSWINSZ, &(struct winsize){
-				.ws_col = w,
-				.ws_row = h,
-				.ws_xpixel = pw,
-				.ws_ypixel = ph,
-			}) < 0)
+		.ws_col = w,
+		.ws_row = h,
+		.ws_xpixel = pw,
+		.ws_ypixel = ph,
+	}) < 0)
 		print("Couldn't set window size: %s\n", strerror(errno));
 }
 
@@ -198,6 +198,7 @@ static int max(int a, int b) {
 }
 
 //wait until data is recieved on either cmdfd (the fd used to communicate with the child) OR xfd (notifies when x events are recieved)
+// returns true if data was recvd on cmdfd
 bool tty_wait(Fd xfd, int timeout) {
 	fd_set rfd;
 	while (1) {
@@ -210,9 +211,9 @@ bool tty_wait(Fd xfd, int timeout) {
 			.tv_nsec = 1000000 * (timeout % 1000),
 		};
 		struct timespec* tv = timeout>=0 ? &seltv : NULL;
-	
+		
 		if (pselect(max(xfd, cmdfd)+1, &rfd, NULL, NULL, tv, NULL) < 0) {
-			if (errno != EINTR)
+			if (!(errno==EINTR || errno==EAGAIN))
 				die("select failed: %s\n", strerror(errno));
 		} else
 			break;

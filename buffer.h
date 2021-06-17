@@ -62,8 +62,6 @@ typedef struct Cursor {
 // the main or alternate buffer.
 typedef struct Buffer {
 	Row* rows;
-	int scroll_top; // inclusive
-	int scroll_bottom; // exclusive
 } Buffer;
 
 // all terminal properties
@@ -72,6 +70,9 @@ typedef struct Term {
 	
 	Buffer buffers[2]; // main, alt
 	Buffer* current; // always points to an item in .buffers
+	
+	int scroll_top; // inclusive
+	int scroll_bottom; // exclusive
 	
 	Cursor c;
 	Cursor saved_cursor;

@@ -171,20 +171,18 @@ void term_resize(int width, int height) {
 	
 	dirty_all(); // whatever
 	// todo: how do we handle the scrolling regions?
-	for (int i=0; i<2; i++) {
-		T.buffers[i].scroll_top = 0;
-		T.buffers[i].scroll_bottom = T.height;
-	}
+	T.scroll_top = 0;
+	T.scroll_bottom = T.height;
 }
 
 // todo: confirm which things are reset by this
 void full_reset(void) {
 	for (int i=0; i<2; i++) {
-		T.buffers[i].scroll_top = 0;
-		T.buffers[i].scroll_bottom = T.height;
 		T.current = &T.buffers[i];
 		clear_region(0, 0, T.width, T.height);
 	}
+	T.scroll_top = 0;
+	T.scroll_bottom = T.height;
 	T.current = &T.buffers[0];
 	
 	T.c = (Cursor){
@@ -270,15 +268,15 @@ static void shift_rows(int y1, int y2, int amount) {
 
 // move text downwards
 static void scroll_down_internal(int amount) {
-	int y1 = T.current->scroll_top;
-	int y2 = T.current->scroll_bottom;
+	int y1 = T.scroll_top;
+	int y2 = T.scroll_bottom;
 	limit(&amount, 0, y2-y1);
 	shift_rows(y1, y2, amount);
 }
 
 static void scroll_up_internal(int amount) {
-	int y1 = T.current->scroll_top;
-	int y2 = T.current->scroll_bottom;
+	int y1 = T.scroll_top;
+	int y2 = T.scroll_bottom;
 	limit(&amount, 0, y2-y1);
 	if (y1==0 && T.current==&T.buffers[0])
 		for (int y=y1; y<y1+amount; y++) {
@@ -293,16 +291,16 @@ static void scroll_up_internal(int amount) {
 // todo: confirm the cases where these are supposed to move the cursor
 void scroll_up(int amount) {
 	scroll_up_internal(amount);
-	if (T.c.y>=T.current->scroll_top && T.c.y<T.current->scroll_bottom) {
-		limit(&amount, 0, T.c.y-T.current->scroll_top);
+	if (T.c.y>=T.scroll_top && T.c.y<T.scroll_bottom) {
+		limit(&amount, 0, T.c.y-T.scroll_top);
 		cursor_to(T.c.x, T.c.y-amount);
 	}
 }
 
 void scroll_down(int amount) {
 	scroll_down_internal(amount);
-	if (T.c.y>=T.current->scroll_top && T.c.y<T.current->scroll_bottom) {
-		limit(&amount, 0, T.current->scroll_bottom-1-T.c.y);
+	if (T.c.y>=T.scroll_top && T.c.y<T.scroll_bottom) {
+		limit(&amount, 0, T.scroll_bottom-1-T.c.y);
 		cursor_to(T.c.x, T.c.y+amount);
 	}
 }
@@ -310,7 +308,7 @@ void scroll_down(int amount) {
 void reverse_index(int amount) {
 	if (amount<=0)
 		return;
-	if (T.c.y < T.current->scroll_top) {
+	if (T.c.y < T.scroll_top) {
 		cursor_up(amount);
 	} else {
 		int push = cursor_up(amount);
@@ -324,7 +322,7 @@ int cursor_down(int amount) {
 	if (amount<=0)
 		return 0;
 	int next = T.c.y + amount;
-	int m = T.current->scroll_bottom;
+	int m = T.scroll_bottom;
 	// cursor started above bottom margin,
 	if (T.c.y < m) {
 		// and hit the margin
@@ -345,7 +343,7 @@ void index(int amount) {
 	if (amount<=0)
 		return;
 	// cursor is below scrolling region already, so we just move it down
-	if (T.c.y >= T.current->scroll_bottom) {
+	if (T.c.y >= T.scroll_bottom) {
 		cursor_down(amount);
 	} else { //when the cursor starts out above the scrolling region
 		int push = cursor_down(amount);
@@ -513,7 +511,7 @@ int cursor_up(int amount) {
 	if (amount<=0)
 		return 0;
 	int next = T.c.y - amount;
-	int mar = T.current->scroll_top;
+	int mar = T.scroll_top;
 	// cursor started below top margin,
 	if (T.c.y >= mar) {
 		// and hit the margin
@@ -579,27 +577,27 @@ void insert_blank(int n) {
 }
 
 void insert_lines(int n) {
-	if (T.c.y < T.current->scroll_top)
+	if (T.c.y < T.scroll_top)
 		return;
-	if (T.c.y >= T.current->scroll_bottom)
+	if (T.c.y >= T.scroll_bottom)
 		return;
-	limit(&n, 0, T.current->scroll_bottom - T.c.y);
+	limit(&n, 0, T.scroll_bottom - T.c.y);
 	if (!n)
 		return;
 	// scroll lines down
-	shift_rows(T.c.y, T.current->scroll_bottom, n);
+	shift_rows(T.c.y, T.scroll_bottom, n);
 }
 	
 void delete_lines(int n) {
-	if (T.c.y < T.current->scroll_top)
+	if (T.c.y < T.scroll_top)
 		return;
-	if (T.c.y >= T.current->scroll_bottom)
+	if (T.c.y >= T.scroll_bottom)
 		return;
-	limit(&n, 0, T.current->scroll_bottom - T.c.y);
+	limit(&n, 0, T.scroll_bottom - T.c.y);
 	if (!n)
 		return;
 	// scroll lines up
-	shift_rows(T.c.y, T.current->scroll_bottom, -n);
+	shift_rows(T.c.y, T.scroll_bottom, -n);
 }
 
 void back_tab(int n) {
@@ -648,8 +646,8 @@ void set_scroll_region(int y1, int y2) {
 		return;
 	limit(&y1, 0, T.height-1);
 	limit(&y2, 0, T.height);
-	T.current->scroll_top = y1;
-	T.current->scroll_bottom = y2;
+	T.scroll_top = y1;
+	T.scroll_bottom = y2;
 	cursor_to(0, 0); // where is this supposed to move the cursor?
 }
 
