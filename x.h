@@ -17,6 +17,7 @@ typedef struct Xw {
 	int event_mask;
 	
 	Pixmap under_cursor; //wish this wasn't here
+	Pixmap icon_pixmap;
 	
 	Px w,h; // size in pixels (including border)
 	Px cw,ch; // size of each character cell

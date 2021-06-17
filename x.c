@@ -8,6 +8,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xft/Xft.h>
 #include <X11/Xatom.h>
+#include <X11/xpm.h>
 
 #include "common.h"
 #include "tty.h"
@@ -16,6 +17,8 @@
 #include "buffer.h"
 #include "input.h"
 #include "font.h"
+
+extern char* ICON_XPM[];
 
 Xw W = {0};
 
@@ -76,7 +79,9 @@ static void update_charsize(Px w, Px h) {
 		.min_width = base + W.cw*2,
 		.min_height = base + W.ch*2,
 	}, &(XWMHints){
-		.flags = InputHint, .input = 1
+		.flags = InputHint | IconPixmapHint,
+		.input = 1,
+		.icon_pixmap = W.icon_pixmap,
 	}, NULL); //todo: class hint?
 	
 }
@@ -397,9 +402,13 @@ int main(int argc, char* argv[argc+1]) {
 	// set _NET_WM_PID property
 	XChangeProperty(W.d, W.win, W.atoms.net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (unsigned char*)&(pid_t){getpid()}, 1);
 	
+	Pixmap mask = 0;
+	XpmCreatePixmapFromData(W.d, W.win, ICON_XPM, &W.icon_pixmap, &mask, 0);
+	
 	update_charsize(W.cw, W.ch);
 	
 	XMapWindow(W.d, W.win);
+	
 	//XSync(W.d, False); //do we need this?
 	
 	time_log("created window");
