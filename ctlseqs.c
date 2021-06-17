@@ -24,7 +24,7 @@ bool process_control_char(unsigned char c) {
 	case '\n':
 	case '\v':
 	case '\f':
-		index(1);
+		forward_index(1);
 		break;
 	default:
 		return false;
@@ -82,7 +82,7 @@ void process_escape_char(Char c) {
 		T.app_keypad = false;
 		break;
 	case 'E': // Next Line
-		index(1);
+		forward_index(1);
 		T.c.x = 0;
 		break;
 	case 'M': // Reverse Index

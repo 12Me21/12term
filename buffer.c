@@ -1,10 +1,11 @@
+// functions for controlling the text in the screen buffer
+
 #define _XOPEN_SOURCE 600
 #include <wchar.h>
 #include <string.h>
 
 #include "common.h"
 #include "buffer.h"
-#include "buffer2.h"
 #include "ctlseqs.h"
 
 Term T; // ok there's really no reason to ever need more than one of these anyway.
@@ -175,6 +176,43 @@ void term_resize(int width, int height) {
 	T.scroll_bottom = T.height;
 }
 
+// todo: actually use this
+void set_cursor_style(int n) {
+	if (n==0)
+		n = default_cursor_style;
+	
+	if (n>0 && n<=6) {
+		T.cursor_shape = (n-1)/2;
+		T.cursor_blink = (n-1)%2==0;
+	}
+}
+
+void clear_region(int x1, int y1, int x2, int y2) {
+	// todo: warn about this
+	if (x1<0)
+		x1 = 0;
+	if (y1<0)
+		y1 = 0;
+	if (x2>T.width)
+		x2 = T.width;
+	if (y2>T.height)
+		y2 = T.height;
+	// todo: handle wide chars
+	
+	for (int y=y1; y<y2; y++) {
+		T.dirty_rows[y] = true;
+		for (int x=x1; x<x2; x++) {
+			T.current->rows[y][x] = (Cell){
+				.chr=0,
+				.attrs = {
+					.color = T.c.attrs.color,
+					.background = T.c.attrs.background,
+				},
+			};
+		}
+	}
+}
+
 // todo: confirm which things are reset by this
 void full_reset(void) {
 	for (int i=0; i<2; i++) {
@@ -287,6 +325,14 @@ static void scroll_up_internal(int amount) {
 	shift_rows(y1, y2, -amount);
 }
 
+void cursor_to(int x, int y) {
+	// but is it ok to move the cursor to the offscreen column?
+	limit(&x, 0, T.width-1);
+	limit(&y, 0, T.height-1);
+	T.c.x = x;
+	T.c.y = y;
+}
+
 // these scroll + move the cursor with the scrolled text
 // todo: confirm the cases where these are supposed to move the cursor
 void scroll_up(int amount) {
@@ -303,6 +349,27 @@ void scroll_down(int amount) {
 		limit(&amount, 0, T.scroll_bottom-1-T.c.y);
 		cursor_to(T.c.x, T.c.y+amount);
 	}
+}
+
+int cursor_up(int amount) {
+	if (amount<=0)
+		return 0;
+	int next = T.c.y - amount;
+	int mar = T.scroll_top;
+	// cursor started below top margin,
+	if (T.c.y >= mar) {
+		// and hit the margin
+		if (next < mar) {
+			T.c.y = mar;
+			return mar - next;
+		}
+	} else //otherwise
+		// if cursor hit top
+		if (next < 0)
+			next = 0;
+	// move cursor
+	T.c.y = next;
+	return 0;
 }
 
 void reverse_index(int amount) {
@@ -337,20 +404,6 @@ int cursor_down(int amount) {
 	// move cursor
 	T.c.y = next;
 	return 0;
-}
-
-void index(int amount) {
-	if (amount<=0)
-		return;
-	// cursor is below scrolling region already, so we just move it down
-	if (T.c.y >= T.scroll_bottom) {
-		cursor_down(amount);
-	} else { //when the cursor starts out above the scrolling region
-		int push = cursor_down(amount);
-		// check if the cursor tried to pass through the margin
-		if (push > 0)
-			scroll_up_internal(push);
-	}
 }
 
 static int add_combining_char(int x, int y, Char c) {
@@ -423,6 +476,20 @@ static void erase_wc_right(int x, int y) {
 	}
 }
 
+void forward_index(int amount) {
+	if (amount<=0)
+		return;
+	// cursor is below scrolling region already, so we just move it down
+	if (T.c.y >= T.scroll_bottom) {
+		cursor_down(amount);
+	} else { //when the cursor starts out above the scrolling region
+		int push = cursor_down(amount);
+		// check if the cursor tried to pass through the margin
+		if (push > 0)
+			scroll_up_internal(push);
+	}
+}
+
 void put_char(Char c) {
 	if (T.charsets[0] == '0') {
 		if (c<128 && c>=0 && DEC_GRAPHICS_CHARSET[c])
@@ -438,7 +505,7 @@ void put_char(Char c) {
 	}
 	
 	if (T.c.x+width > T.width) {
-		index(1);
+		forward_index(1);
 		T.c.x = 0;
 	}
 	
@@ -476,56 +543,9 @@ void put_char(Char c) {
 	T.dirty_rows[T.c.y] = true;
 }
 
-void clear_region(int x1, int y1, int x2, int y2) {
-	// todo: warn about this
-	if (x1<0)
-		x1 = 0;
-	if (y1<0)
-		y1 = 0;
-	if (x2>T.width)
-		x2 = T.width;
-	if (y2>T.height)
-		y2 = T.height;
-	// todo: handle wide chars
-	
-	for (int y=y1; y<y2; y++) {
-		T.dirty_rows[y] = true;
-		for (int x=x1; x<x2; x++) {
-			T.current->rows[y][x] = (Cell){
-				.chr=0,
-				.attrs = {
-					.color = T.c.attrs.color,
-					.background = T.c.attrs.background,
-				},
-			};
-		}
-	}
-}
-
 void backspace(void) {
 	if (T.c.x>0)
 		T.c.x--;
-}
-
-int cursor_up(int amount) {
-	if (amount<=0)
-		return 0;
-	int next = T.c.y - amount;
-	int mar = T.scroll_top;
-	// cursor started below top margin,
-	if (T.c.y >= mar) {
-		// and hit the margin
-		if (next < mar) {
-			T.c.y = mar;
-			return mar - next;
-		}
-	} else //otherwise
-		// if cursor hit top
-		if (next < 0)
-			next = 0;
-	// move cursor
-	T.c.y = next;
-	return 0;
 }
 
 void cursor_right(int amount) {
@@ -544,14 +564,6 @@ void cursor_left(int amount) {
 	T.c.x -= amount;
 	if (T.c.x < 0)
 		T.c.x = 0;
-}
-
-void cursor_to(int x, int y) {
-	// but is it ok to move the cursor to the offscreen column?
-	limit(&x, 0, T.width-1);
-	limit(&y, 0, T.height-1);
-	T.c.x = x;
-	T.c.y = y;
 }
 
 void delete_chars(int n) {
@@ -649,15 +661,4 @@ void set_scroll_region(int y1, int y2) {
 	T.scroll_top = y1;
 	T.scroll_bottom = y2;
 	cursor_to(0, 0); // where is this supposed to move the cursor?
-}
-
-// todo: actually use this
-void set_cursor_style(int n) {
-	if (n==0)
-		n = default_cursor_style;
-	
-	if (n>0 && n<=6) {
-		T.cursor_shape = (n-1)/2;
-		T.cursor_blink = (n-1)%2==0;
-	}
 }

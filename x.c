@@ -1,3 +1,5 @@
+// this file deals with general interfacing with X and contains the main function and main loop
+
 #define _POSIX_C_SOURCE 200112L
 #include <math.h>
 #include <unistd.h>
@@ -14,42 +16,23 @@
 #include "tty.h"
 #include "draw.h"
 #include "x.h"
-#include "buffer.h"
-#include "input.h"
 #include "font.h"
+#include "buffer.h"
+#include "event.h"
 
 extern char* ICON_XPM[];
 
 Xw W = {0};
 
-typedef void (*HandlerFunc)(XEvent*);
-
-#define XEMBED_FOCUS_IN  4
-#define XEMBED_FOCUS_OUT 5
-
 void clippaste(void) {
 	XConvertSelection(W.d, W.atoms.clipboard, W.atoms.utf8_string, W.atoms.clipboard, W.win, CurrentTime);
-}
-
-void on_visibilitynotify(XEvent* ev) {
-	//XVisibilityEvent* e = &ev->xvisibility;
-	print("visibility\n");
-	//MODBIT(win.mode, e->state != VisibilityFullyObscured, MODE_VISIBLE);
-}
-
-static void on_expose(XEvent* e) {
-	(void)e;
-	print("expose\n");
-	dirty_all();
-	draw(); // maybe this helps
-	//repaint();
 }
 
 // when the size of the terminal (in character cells) changes
 // (also called to initialize size)
 // todo: what if the size (in pixels) changes but not the size in char cells?
 // like, if someone resizes the window by 1px, OR if the font size changes?
-static void update_size(int width, int height) {
+void update_size(int width, int height) {
 	W.w = W.border*2+width*W.cw;
 	W.h = W.border*2+height*W.ch;
 	tty_resize(width, height, width*W.cw, height*W.ch);
@@ -68,7 +51,7 @@ static void update_charsize(Px w, Px h) {
 	W.under_cursor = XCreatePixmap(W.d, W.win, W.cw*2, W.ch, DefaultDepth(W.d, W.scr));
 	
 	Px base = W.border*2;
-	XSetWMProperties(W.d, W.win, NULL, NULL, NULL, 0, &(XSizeHints){
+	XSetWMNormalHints(W.d, W.win, &(XSizeHints){
 		.flags = PSize | PResizeInc | PBaseSize | PMinSize,
 		.width = W.w,
 		.height = W.h,
@@ -78,21 +61,7 @@ static void update_charsize(Px w, Px h) {
 		.base_height = base,
 		.min_width = base + W.cw*2,
 		.min_height = base + W.ch*2,
-	}, &(XWMHints){
-		.flags = InputHint | IconPixmapHint,
-		.input = 1,
-		.icon_pixmap = W.icon_pixmap,
-	}, NULL); //todo: class hint?
-	
-}
-
-static void on_configurenotify(XEvent* e) {
-	Px width = e->xconfigure.width;
-	Px height = e->xconfigure.height;
-	if (width==W.w && height==W.h)
-		return;
-	
-	update_size((width-W.border*2)/W.cw, (height-W.border*2)/W.ch);
+	});
 }
 
 __attribute__((noreturn)) void sleep_forever(bool hangup) {
@@ -111,21 +80,6 @@ __attribute__((noreturn)) void sleep_forever(bool hangup) {
 	_exit(0); //is this right?
 }
 
-static void on_clientmessage(XEvent* e) {
-	if (e->xclient.message_type == W.atoms.xembed && e->xclient.format == 32) {
-		// do we need to do this anymore?
-		if (e->xclient.data.l[1] == XEMBED_FOCUS_IN) {
-			//win.mode |= MODE_FOCUSED;
-			//xseturgency(0);
-		} else if (e->xclient.data.l[1] == XEMBED_FOCUS_OUT) {
-			//win.mode &= ~MODE_FOCUSED;
-		}
-	} else if (e->xclient.data.l[0] == W.atoms.wm_delete_window) {
-		print("window closing\n");
-		sleep_forever(true);
-	}
-}
-
 // where does this go
 void tty_paste_text(int len, const char text[len]) {
 	if (T.bracketed_paste)
@@ -134,88 +88,6 @@ void tty_paste_text(int len, const char text[len]) {
 	if (T.bracketed_paste)
 		tty_write(6, "\x1B[201~");
 }
-
-void on_selectionnotify(XEvent* e) {
-	Atom property = None;
-	if (e->type == SelectionNotify)
-		property = e->xselection.property;
-	else if (e->type == PropertyNotify)
-		property = e->xproperty.atom;
-	
-	if (property == None)
-		return;
-	
-	unsigned long ofs = 0;
-	unsigned long rem;
-	do {
-		unsigned long nitems;
-		int format;
-		unsigned char* data;
-		Atom type;
-		if (XGetWindowProperty(W.d, W.win, property, ofs, BUFSIZ/4, False, AnyPropertyType, &type, &format, &nitems, &rem, &data)) {
-			print("Clipboard allocation failed\n");
-			return;
-		}
-		
-		if (e->type == PropertyNotify && nitems == 0 && rem == 0) {
-			/*
-			 * If there is some PropertyNotify with no data, then
-			 * this is the signal of the selection owner that all
-			 * data has been transferred. We won't need to receive
-			 * PropertyNotify events anymore.
-			 */
-			W.event_mask &= ~PropertyChangeMask;
-			XChangeWindowAttributes(W.d, W.win, CWEventMask, &(XSetWindowAttributes){.event_mask = W.event_mask});
-		}
-		
-		if (type == W.atoms.incr) {
-			/*
-			 * Activate the PropertyNotify events so we receive
-			 * when the selection owner does send us the next
-			 * chunk of data.
-			 */
-			W.event_mask |= PropertyChangeMask;
-			XChangeWindowAttributes(W.d, W.win, CWEventMask, &(XSetWindowAttributes){.event_mask = W.event_mask});
-			
-			/*
-			 * Deleting the property is the transfer start signal.
-			 */
-			XDeleteProperty(W.d, W.win, property);
-			continue;
-		}
-		
-		// replace \n with \r
-		unsigned char* repl = data;
-		unsigned char* last = data + nitems*format/8;
-		while ((repl = memchr(repl, '\n', last - repl))) {
-			*repl++ = '\r';
-		}
-		
-		tty_paste_text(nitems*format/8, (char*)data);
-		
-		XFree(data);
-		/* number of 32-bit chunks returned */
-		ofs += nitems * format/32;
-	} while (rem > 0);
-	
-	/*
-	 * Deleting the property again tells the selection owner to send the
-	 * next data chunk in the property.
-	 */
-	XDeleteProperty(W.d, W.win, property);
-}
-
-static const HandlerFunc HANDLERS[LASTEvent] = {
-	[ClientMessage] = on_clientmessage,
-	[Expose] = on_expose,
-	//[VisibilityNotify] = on_visibilitynotify,
-	[ConfigureNotify] = on_configurenotify,
-	[SelectionNotify] = on_selectionnotify,
-	// in input.c:
-	[KeyPress] = on_keypress,
-	[FocusIn] = on_focusin,
-	[FocusOut] = on_focusout,
-};
 
 void clipboard_copy() {
 	
@@ -372,6 +244,8 @@ int main(int argc, char* argv[argc+1]) {
 	
 	W.cmap = XDefaultColormap(W.d, W.scr);
 	
+	// create the window
+	
 	unsigned long bg_pixel = make_color((Color){.truecolor=true,.rgb=default_background}).pixel;
 	
 	W.event_mask = FocusChangeMask | KeyPressMask | KeyReleaseMask | ExposureMask | VisibilityChangeMask | StructureNotifyMask | ButtonMotionMask | ButtonPressMask | ButtonReleaseMask;
@@ -393,10 +267,6 @@ int main(int argc, char* argv[argc+1]) {
 		}
 	);
 	
-	init_draw();
-	
-	init_input();
-	
 	// allow listening for window close event
 	XSetWMProtocols(W.d, W.win, &W.atoms.wm_delete_window, 1);
 	// set _NET_WM_PID property
@@ -405,7 +275,21 @@ int main(int argc, char* argv[argc+1]) {
 	Pixmap mask = 0;
 	XpmCreatePixmapFromData(W.d, W.win, ICON_XPM, &W.icon_pixmap, &mask, 0);
 	
+	XSetWMHints(W.d, W.win, &(XWMHints){
+		.flags = InputHint | IconPixmapHint,
+		.input = true, // which input focus model
+		.icon_pixmap = W.icon_pixmap,
+	});
+	XSetClassHint(W.d, W.win, &(XClassHint){
+		.res_name = "12term",
+		.res_class = "12term",
+	});
+	
 	update_charsize(W.cw, W.ch);
+	
+	init_draw();
+	
+	init_input();
 	
 	XMapWindow(W.d, W.win);
 	

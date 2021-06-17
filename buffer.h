@@ -1,8 +1,7 @@
 #pragma once
+// Definitions for structures related to the screen buffer
 
 #include "common.h"
-
-//#include "coroutine.h"
 
 // todo: maybe make a separate cell.h file or something
 
@@ -107,7 +106,7 @@ typedef struct Term {
 
 void init_term(int width, int height);
 void term_resize(int width, int height);
-
 void dirty_all(void);
 
 extern Term T;
+

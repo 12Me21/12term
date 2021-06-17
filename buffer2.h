@@ -1,9 +1,8 @@
 #pragma once
+// Functions for manipulating the buffer contents
 
 #include "common.h"
 #include "buffer.h"
-
-// this file has the buffer manipulation commands
 
 void put_char(Char c);
 
@@ -14,8 +13,7 @@ int cursor_down(int amount);
 void cursor_right(int amount);
 void cursor_left(int amount);
 void cursor_to(int x, int y);
-#define index index_
-void index(int amount);
+void forward_index(int amount);
 void reverse_index(int amount);
 void backspace(void);
 void save_cursor(void);

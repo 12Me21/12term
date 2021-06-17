@@ -1,6 +1,6 @@
 output:= 12term
 
-srcs:= x tty debug buffer ctlseqs keymap csi draw input font icon.xpm
+srcs:= x tty debug buffer ctlseqs keymap csi draw font icon.xpm event
 
 libs:= m rt X11 util Xft Xpm
 # m: math

@@ -3,9 +3,9 @@
 #include "common.h"
 
 // things used by files which include this
+#include "tty.h"
 #include "buffer.h"
 #include "buffer2.h"
-#include "tty.h"
 
 typedef struct ParseState {
 	char string[1030];

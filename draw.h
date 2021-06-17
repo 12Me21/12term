@@ -8,5 +8,5 @@ void draw(void);
 void repaint(void);
 void draw_free(void);
 void draw_resize(int width, int height);
-XftColor make_color(Color c);
+XftColor make_color(Color c); // ugh
 void init_draw(void);

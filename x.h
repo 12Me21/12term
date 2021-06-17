@@ -47,3 +47,4 @@ extern Xw W;
 
 __attribute__((noreturn)) void sleep_forever(bool hangup);
 void clippaste(void);
+void update_size(int width, int height);
