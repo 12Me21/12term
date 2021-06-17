@@ -1,4 +1,5 @@
 #pragma once
+// This is for things which are shared between ctlseqs.c and csi.c
 
 #include "common.h"
 
@@ -8,15 +9,18 @@
 #include "buffer2.h"
 
 typedef struct ParseState {
+	int state;
+	
 	char string[1030];
 	int string_command;
 	int string_length;
-	int state;
+	
 	int argv[100];
 	bool arg_colon[100];
 	int argc;
 	char csi_private;
 	char csi_char;
+	
 	int charset;
 } ParseState;
 

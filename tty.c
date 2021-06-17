@@ -1,3 +1,5 @@
+// Interfacing with the pseudoterminal
+
 #define _POSIX_C_SOURCE 200112L
 #include <sys/select.h>
 #include <signal.h>

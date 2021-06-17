@@ -1,3 +1,5 @@
+// x event handler functions and related
+
 #include <X11/Xlib.h>
 
 #include "common.h"
@@ -324,3 +326,7 @@ const HandlerFunc HANDLERS[LASTEvent] = {
 	[FocusIn] = on_focusin,
 	[FocusOut] = on_focusout,
 };
+
+void clippaste(void) {
+	XConvertSelection(W.d, W.atoms.clipboard, W.atoms.utf8_string, W.atoms.clipboard, W.win, CurrentTime);
+}

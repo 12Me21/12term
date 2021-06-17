@@ -1,5 +1,7 @@
+// Defines the behavior of keys
+
 #include "keymap.h"
-#include "x.h"
+#include "event.h"
 
 // modes
 #define F_MODS_ARG 2
@@ -49,7 +51,7 @@ const char* const CSI_c_FMT = ESC"[%c";
 
 // todo: maybe make the modifiers list a 3 digit ternary value
 
-static KeyMap KEY_MAP_ARRAY[] = {
+KeyMap KEY_MAP[] = {
 	// backspace is delete. yes yes it's dumb but that's how it is, get over it.
 	{XK_BackSpace, M, ESC"\x7F"},
 	//{XK_BackSpace, C, "\b"},
@@ -139,5 +141,3 @@ static KeyMap KEY_MAP_ARRAY[] = {
 	// end
 	{0},
 };
-
-KeyMap* KEY_MAP = &KEY_MAP_ARRAY[0];

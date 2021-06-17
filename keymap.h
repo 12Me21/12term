@@ -19,4 +19,4 @@ typedef struct KeyMap {
 	char app_keypad;
 } KeyMap;
 
-extern KeyMap* KEY_MAP;
+extern KeyMap KEY_MAP[];

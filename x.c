@@ -24,10 +24,6 @@ extern char* ICON_XPM[];
 
 Xw W = {0};
 
-void clippaste(void) {
-	XConvertSelection(W.d, W.atoms.clipboard, W.atoms.utf8_string, W.atoms.clipboard, W.win, CurrentTime);
-}
-
 // when the size of the terminal (in character cells) changes
 // (also called to initialize size)
 // todo: what if the size (in pixels) changes but not the size in char cells?
@@ -118,7 +114,7 @@ static void run(void) {
 	bool readed = false;
 	
 	while (1) {
-		Fd xfd = XConnectionNumber(W.d);
+		Fd xfd = XConnectionNumber(W.d); // do we need to check this every time?
 		
 		if (XPending(W.d))
 			timeout = 0;
@@ -174,8 +170,6 @@ static void run(void) {
 			readed = false;
 			drawing = false;
 		}
-		
-		XFlush(W.d);
 	}
 }
 

@@ -1,3 +1,5 @@
+// Drawing graphics
+
 #include <X11/Xlib.h>
 #include <X11/Xft/Xft.h>
 

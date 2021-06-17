@@ -1,3 +1,5 @@
+// Parsing control sequences starting with CSI (`ESC [`)
+
 #include "common.h"
 #include "ctlseqs2.h"
 

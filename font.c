@@ -1,3 +1,5 @@
+// Loading fonts and looking up glyphs
+
 #include <errno.h>
 #include <math.h>
 #include <X11/Xft/Xft.h>

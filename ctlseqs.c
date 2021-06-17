@@ -1,3 +1,5 @@
+// Parsing control sequences
+
 #include <stdio.h>
 
 #include "common.h"
