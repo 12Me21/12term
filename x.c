@@ -80,15 +80,6 @@ __attribute__((noreturn)) void sleep_forever(bool hangup) {
 	_exit(0); //is this right?
 }
 
-// where does this go
-void tty_paste_text(int len, const char text[len]) {
-	if (T.bracketed_paste)
-		tty_write(6, "\x1B[200~");
-	tty_write(len, text);
-	if (T.bracketed_paste)
-		tty_write(6, "\x1B[201~");
-}
-
 void clipboard_copy() {
 	
 }

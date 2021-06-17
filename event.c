@@ -49,6 +49,14 @@ static void on_clientmessage(XEvent* e) {
 	}
 }
 
+void tty_paste_text(int len, const char text[len]) {
+	if (T.bracketed_paste)
+		tty_write(6, "\x1B[200~");
+	tty_write(len, text);
+	if (T.bracketed_paste)
+		tty_write(6, "\x1B[201~");
+}
+
 void on_selectionnotify(XEvent* e) {
 	Atom property = None;
 	if (e->type == SelectionNotify)
@@ -138,7 +146,7 @@ void xim_spot(int x, int y) {
 }
 
 // this will be useful someday, perhaps
-static int utf8_encode(Char c, char* out) {
+int utf8_encode(Char c, char* out) {
 	if (c<0)
 		return 0;
 	int len=0;
@@ -309,7 +317,7 @@ void init_input(void) {
 const HandlerFunc HANDLERS[LASTEvent] = {
 	[ClientMessage] = on_clientmessage,
 	[Expose] = on_expose,
-	//[VisibilityNotify] = on_visibilitynotify,
+	[VisibilityNotify] = on_visibilitynotify,
 	[ConfigureNotify] = on_configurenotify,
 	[SelectionNotify] = on_selectionnotify,
 	[KeyPress] = on_keypress,
