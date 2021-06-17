@@ -25,7 +25,7 @@
 #include "ctlseqs.h"
 void sleep_forever(bool hangup); // nnn where do these decs go...
 
-const char* termname = "xterm-256color"; // todo
+const char* termname = "xterm-12term"; // todo
 
 static Fd cmdfd;
 static pid_t pid;

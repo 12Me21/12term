@@ -2,20 +2,37 @@ output:= 12term
 
 srcs:= x tty debug buffer ctlseqs keymap csi draw input font icon.xpm
 
-CFLAGS+= -Wall -Wextra -g -pedantic -std=c11 -O2
-
-CFLAGS+= -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -Wno-parentheses
-CFLAGS+= -Werror=implicit-function-declaration -Werror=incompatible-pointer-types
-
 libs:= m rt X11 util Xft Xpm
 # m: math
 # rt: realtime extensions (do i need this?)
 # X11: X
 # util: pty stuff
 # Xft: X FreeType interface
+# Xpm: reading xpm image data (for icon)
 
 pkgs:= fontconfig freetype2 #harfbuzz
+
+CFLAGS+= -g
+
+CFLAGS+= -Wall -Wextra -pedantic -std=c11
+CFLAGS+= -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -Wno-parentheses
+CFLAGS+= -Werror=implicit-function-declaration -Werror=incompatible-pointer-types
+
+all: $(output) terminfo
 
 
 
 include .Nice.mk
+
+
+
+# call `tic -D` to figure out the location of terminfo files
+terminfo!= tic -D 2>/dev/null | head -n1
+terminfo:= $(terminfo)/x/xterm-12term
+# create a rule with a consistent name so you can type `make terminfo` instead of `make ~/.terminfo/x/xterm-12term` or whatever
+.PHONY: terminfo
+terminfo: $(terminfo)
+# actual terminfo rule
+$(terminfo): 12term.term
+	@$(call print,$@,,$^,)
+	@tic -x $<

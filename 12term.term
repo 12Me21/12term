@@ -1,0 +1,18 @@
+#!/usr/bin/tic -x
+xterm-12term|my terminal owo,
+# nonstandard sequences
+# note:
+#  there is an xterm-direct terminfo, which has the "official" way to get 24 bit color on xterm.
+#  however, this uses the same capabilities for rgb colors and indexed colors,
+#  and puts the indexed colors into the same range as the first 8 or 256 rgb colors (corresponding to dark shades of blue).
+#  I think this is a bad solution, and advocate for the usage of emacs's setf24/setb24 instead.
+  setf24=\E[38:2:%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm,
+  setb24=\E[48:2:%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm,
+# cursor shapes/colors, clipboard
+  use=xterm+tmux,
+# allow setting window title
+  use=xterm+sl,
+# base xterm
+  use=xterm-256color,
+
+#todo: finish this 
