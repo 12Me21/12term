@@ -187,14 +187,23 @@ extern RGBColor default_background; //messy messy messy
 // 1: set locale
 // 2: start the shell process (so we can let the shell start up while the term is initializing
 // 3: open x connection
-// 4: load fonts - now we know the character cell size
+
+// 4: load fonts
+// -- now we know the character cell size --
+
 // 5: create and set up the window
 // 6: do everything that doesn't depend on window size
-// 6: wait for window mapping event - now we know the window size
+
+// 6: wait for window mapping event
+// -- now we know the window size --
+// ok but really we knew it before hh
+
 // 7: initialize everything else
 // 8: start main loop
 
 int main(int argc, char* argv[argc+1]) {
+	print("sizeof cell: %d\n", (int)sizeof(Cell));
+	print("sizeof color: %d\n", (int)sizeof(Color));
 	time_log(NULL);
 	
 	// hecking locale
@@ -268,6 +277,9 @@ int main(int argc, char* argv[argc+1]) {
 	XSetClassHint(W.d, W.win, &(XClassHint){
 		.res_name = "12term",
 		.res_class = "12term",
+	});
+	XSetWMName(W.d, W.win, &(XTextProperty){
+		(unsigned char*)"12term", W.atoms.utf8_string, 8, 6
 	});
 	
 	update_charsize(W.cw, W.ch);

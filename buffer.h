@@ -17,29 +17,29 @@ typedef struct Color {
 		short i;
 	};
 	bool truecolor;
-} Color;
+} __attribute__((packed)) Color;
 
 // display attributes for characters
 typedef struct Attrs {
-	Color color, background;
+	Color color, background, underline_color;
 	
 	char weight: 2; // 1 = bold, -1 = faint
 	bool italic: 1;
-	bool underline: 1;
+	unsigned char underline: 2; // 0 = none, 1 = single, 2 = double
+	bool colored_underline: 1; // whether to use special underline color
 	bool blink: 1;
 	bool reverse: 1; //the renderer doesn't actually read this flag: when writing chars to the screen, the color and background are swapped if this attrib is set.
-	
-	bool invisible: 1;
 	bool strikethrough: 1;
+	
+	bool invisible: 1; // todo
 } Attrs;
 
 // single character cell
 typedef struct Cell {
 	Char chr;
-	Char combining[16]; // null terminated list
+	Char combining[1]; //todo: (and make this like, 4 or something)
 	Attrs attrs;
-	char wide; //0: normal. 1:wide(left). -1:wide(right)
-	bool ligature;
+	char wide: 2; //0 = normal, 1 = left half of wide char, -1 = right half (chr=0)
 } Cell;
 
 // compressed version of cells, used for scrollback buffer (todo)

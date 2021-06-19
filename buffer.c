@@ -3,6 +3,8 @@
 #define _XOPEN_SOURCE 600
 #include <wchar.h>
 #include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "common.h"
 #include "buffer.h"
@@ -264,6 +266,18 @@ void init_term(int width, int height) {
 	term_resize(width, height);
 	full_reset();
 	init_scrollback();
+	int f = open("init", O_RDONLY);
+	print("init\n");
+	if (f) {
+		char buf[1024*100];
+		while (1) {
+			ssize_t len = read(f, buf, sizeof(buf));
+			if (len<=0)
+				break;
+			process_chars(len, buf);
+		}
+		close(f);
+	}
 }
 
 // generic array rotate function
@@ -416,7 +430,7 @@ static int add_combining_char(int x, int y, Char c) {
 		dest--;
 		x--;
 	}
-	for (int i=0; i<15; i++) {
+	for (int i=0; i<LEN(dest->combining); i++) {
 		if (dest->combining[i]==0) {
 			dest->combining[i] = c;
 			dest->combining[i+1] = 0;

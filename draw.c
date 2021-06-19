@@ -129,17 +129,24 @@ static void draw_char_overlays(int x, int y, Cell* c) {
 		return;
 	int width = c->wide ? 2 : 1;
  
-	XftColor xcol;
-	XRenderColor fg = get_color(c->attrs.color, c->attrs.weight==1);
-	alloc_color(&fg, &xcol);
-	
 	Px winx = W.border+x*W.cw;
 	Px winy = W.border+y*W.ch;
 	
-	if (c->attrs.underline)
-		XftDrawRect(xft_draw, &xcol, winx, winy+W.font_ascent+1, width*W.cw, 1);
-	if (c->attrs.strikethrough)
+	XftColor xcol;
+	if (c->attrs.underline) {
+		XRenderColor fg;
+		if (c->attrs.colored_underline)
+			fg = get_color(c->attrs.underline_color, false);
+		else
+			fg = get_color(c->attrs.color, c->attrs.weight==1);
+		alloc_color(&fg, &xcol);
+		XftDrawRect(xft_draw, &xcol, winx, winy+W.font_ascent+1, width*W.cw, c->attrs.underline);
+	}
+	if (c->attrs.strikethrough) {
+		XRenderColor fg = get_color(c->attrs.color, c->attrs.weight==1);
+		alloc_color(&fg, &xcol);
 		XftDrawRect(xft_draw, &xcol, winx, winy+W.font_ascent*2/3, width*W.cw, 1);
+	}
 }
 
 static void erase_cursor(void) {
@@ -158,6 +165,15 @@ static void draw_cursor(int x, int y) {
 		erase_cursor();
 	}
 	// todo: adding border each time is a pain. can we specify an origin somehow?
+	
+	if (x<0)
+		x = 0;
+	if (x>T.width-1) // this is the only one of these which is expected to happen under normal circumstances
+		x = T.width-1;
+	if (y<0)
+		y = 0;
+	if (y>T.height-1)
+		y = T.height-1;
 	
 	Cell temp = T.current->rows[y][x];
 	temp.attrs.color = temp.attrs.background;

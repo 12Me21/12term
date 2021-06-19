@@ -74,6 +74,10 @@ KeyMap KEY_MAP[] = {
 	{XK_Right, ANY, CSI_1_M_c('C')},
 	{XK_Left , ANY, CSI_1_M_c('D')},
 	
+	// shift+tab. for me this sends iso_left_tab but I'll put both just in case
+	{XK_Tab, S  , CSI_c('Z')}, 
+	{XK_ISO_Left_Tab, S  , CSI_c('Z')},
+	
 	// from windows terminal:
 	// ctrl+enter sends \n
 	// seems like a good idea to make these distinguishable

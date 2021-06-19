@@ -33,13 +33,20 @@ static int limit(int x, int min, int max) {
 	return x;
 }
 
-static void process_sgr_color(int* i, Color* out) {
+static bool process_sgr_color(int* i, Color* out) {
 	int type = P.argv[*i+1];
+	// TODO: check to make sure there are enough args left
 	switch (type) {
-	case 2:;
+	default:
+		print("unknown SGR color type: %d\n", type);
+		(*i) ++;
+		break;
+		// and then here we should skip the rest of the colon parameters
+	case 2:; // 2;<red>;<green>;<blue>
 		int r = P.argv[*i+2];
 		int g = P.argv[*i+3];
 		int b = P.argv[*i+4];
+		(*i) += 4;
 		*out = (Color){
 			.truecolor = true,
 			.rgb = (RGBColor){
@@ -48,21 +55,20 @@ static void process_sgr_color(int* i, Color* out) {
 				limit(b, 0, 255),
 			},
 		};
-		*i += 4;
+		return true;
 		break;
-	case 5:;
+	case 5:; // 5;<palette index>
 		int c = P.argv[*i+2];
+		(*i) += 2;
 		if (c<0 || c>=256) {
 			print("invalid color index in SGR: %d\n", c);
 		} else {
 			*out = (Color){.i = c};
+			return true;
 		}
-		*i += 2;
 		break;
-	default:
-		print("unknown SGR color type: %d\n", type);
-		// and then here we should skip the rest of the colon parameters
 	}
+	return false;
 }
 
 // CSI [ ... m
@@ -72,87 +78,99 @@ static void process_sgr(void) {
 	for (int i=0; i<c; i++) {
 		int a = P.argv[i];
 		switch (a) {
-		case 0:
+		default:
+			print("unknown sgr: %d\n", a);
+			break;
+		case 0: // reset
 			T.c.attrs = (Attrs){
 				.color = {.i=-1},
 				.background = {.i=-2},
 				// rest are set to 0
 			};
 			break;
-		case 1:
+		case 1: // bold
 			T.c.attrs.weight = 1;
 			break;
-		case 2:
+		case 2: // faint
 			T.c.attrs.weight = -1; //this should blend fg with bg color maybe. but no one uses faint anyway so whatever
 			break;
-		case 3:
+		case 3: // italic
 			T.c.attrs.italic = true;
 			break;
-		case 4:
-			T.c.attrs.underline = true;
+		case 4: // underline
+			T.c.attrs.underline = 1;
 			break;
-		case 5:
-			//slow blink
+		case 5: //slow blink
+		case 6: //fast blink
 			break;
-		case 6:
-			//fast blink
+		case 7: // reverse colors
+			T.c.attrs.reverse = true;
 			break;
-		case 7:
-			T.c.attrs.reverse = true; //todo: how to implement this nicely
-			break;
-		case 8:
+		case 8: // invisible (todo)
 			T.c.attrs.invisible = true;
 			break;
-		case 9:
+		case 9: // strikethrough
 			T.c.attrs.strikethrough = true;
 			break;
-		case 22:
+		// (10-20 are fonts)
+		case 21: // double underline
+			T.c.attrs.underline = 2;
+			break;
+		case 22: // bold/faint OFF
 			T.c.attrs.weight = 0;
 			break;
-		case 23:
+		case 23: // italic OFF
 			T.c.attrs.italic = false;
 			break;
-		case 24:
-			T.c.attrs.underline = false;
+		case 24: // underline OFF
+			T.c.attrs.underline = 0;
 			break;
-		case 25:
-			// disable blink
+		case 25: // blink OFF
 			break;
-		case 27:
+		case 27: // reverse OFF
 			T.c.attrs.reverse = false;
 			break;
-		case 28:
+		case 28: // invisible OFF
 			T.c.attrs.invisible = false;
 			break;
-		case 29:
+		case 29: // strikethrough OFF
 			T.c.attrs.strikethrough = false;
 			break;
-		case SEVEN(30):
+		case SEVEN(30): // set text color (0-7)
 			T.c.attrs.color = (Color){.i = a-30};
 			break;
-		case 38:
+		case 38: // set text color
 			process_sgr_color(&i, &T.c.attrs.color);
 			break;
-		case 39:
+		case 39: // reset text color
 			T.c.attrs.color = (Color){.i = -1};
 			break;
-		case SEVEN(40):
+		case SEVEN(40): // set background color (0-7)
 			T.c.attrs.background = (Color){.i = a-40};
 			break;
-		case 48:
+		case 48: // set background color
 			process_sgr_color(&i, &T.c.attrs.background);
 			break;
-		case 49:
+		case 49: // reset background color
 			T.c.attrs.background = (Color){.i = -2};
 			break;
-		case SEVEN(90):
+		// (50-55 are not widely used)
+		case 58: // set underline color
+			if (process_sgr_color(&i, &T.c.attrs.underline_color))
+				T.c.attrs.colored_underline = true;
+			break;
+		case 59: // reset underline color (this means to match the text color I assume)
+			T.c.attrs.colored_underline = false;
+			T.c.attrs.underline_color = (Color){0}; // just zero this because why not
+			break;
+		// (60-75 not widely used)
+		// (76-89 unused)
+		case SEVEN(90): // set text color (8-15)
 			T.c.attrs.color = (Color){.i = a-90+8};
 			break;
-		case SEVEN(100):
+		case SEVEN(100): // set background color (8-15)
 			T.c.attrs.background = (Color){.i = a-100+8};
 			break;
-		default:
-			print("unknown sgr: %d\n", a);
 		}
 		if (P.arg_colon[i]) {
 			print("extra colon args to SGR command %d\n", a);
@@ -172,57 +190,55 @@ static void set_modes(bool state) {
 	}
 }
 
-static void set_private_modes(bool state) {
-	for (int i=0; i<P.argc; i++) {
-		int a = P.argv[i];
-		switch (a) {
-		case 0: // ignore
-			break;
-		case 1: // application cursor mode
-			T.app_cursor = state;
-			break;
-			//case 5: // reverse video eye bleeding mode
-			//break;
-			//case 6: // cursor origin mode??
-			//break;
-			//case 7: // wrap?
-			//break;
-		case 12: // enable/disable cursor blink
-			T.cursor_blink = state;
-			break;
-		case 25: // show/hide cursor
-			T.show_cursor = state;
-			break;
-		case 1047: // to alt/main buffer
-			if (state) {
-				switch_buffer(1);
-				// do we clear when already in alt screen?
-				clear_region(0, 0, T.width, T.height);
-			} else
-				switch_buffer(0);
-			break;
-		case 1048: // save/load cursor
-			if (state)
-				save_cursor();
-			else
-				restore_cursor();
-			break;
-		case 1049: // 1048 and 1049
-			if (state) {
-				save_cursor();
-				switch_buffer(1);
-				clear_region(0, 0, T.width, T.height);
-			} else {
-				switch_buffer(0);	
-				restore_cursor();
-			}
-			break;
-		case 2004: // set bracketed paste mode
-			T.bracketed_paste = state;
-			break;
-		default:
-			print("unknown private mode: %d\n", a);
+static void set_private_mode(int mode, bool state) {
+	switch (mode) {
+	default:
+		print("unknown private mode: %d\n", mode);
+		break;
+	case 0: // ignore
+		break;
+	case 1: // application cursor mode
+		T.app_cursor = state;
+		break;
+		//case 5: // reverse video eye bleeding mode
+		//break;
+		//case 6: // cursor origin mode??
+		//break;
+		//case 7: // wrap?
+		//break;
+	case 12: // enable/disable cursor blink
+		T.cursor_blink = state;
+		break;
+	case 25: // show/hide cursor
+		T.show_cursor = state;
+		break;
+	case 1047: // to alt/main buffer
+		if (state) {
+			switch_buffer(1);
+			// do we clear when already in alt screen?
+			clear_region(0, 0, T.width, T.height);
+		} else
+			switch_buffer(0);
+		break;
+	case 1048: // save/load cursor
+		if (state)
+			save_cursor();
+		else
+			restore_cursor();
+		break;
+	case 1049: // 1048 and 1049
+		if (state) {
+			save_cursor();
+			switch_buffer(1);
+			clear_region(0, 0, T.width, T.height);
+		} else {
+			switch_buffer(0);	
+			restore_cursor();
 		}
+		break;
+	case 2004: // set bracketed paste mode
+		T.bracketed_paste = state;
+		break;
 	}
 }
 
@@ -273,14 +289,13 @@ static void process_csi_command(Char c) {
 		break;
 	case '?':
 		switch (c) {
-		case 'h':
-			set_private_modes(true);
-			break;
-		case 'l':
-			set_private_modes(false);
-			break;
 		default:
 			dump(c);
+			break;
+		case 'h':
+		case 'l':
+			for (int i=0; i<P.argc; i++)
+				set_private_mode(P.argv[i], c=='h');
 			break;
 		}
 		break;
@@ -290,6 +305,10 @@ static void process_csi_command(Char c) {
 		break;
 	case 0:
 		switch (c) {
+		default:
+			print("UNKNOWN: ");
+			dump(c);
+			break;
 		case '@': // insert blank =ich=
 			insert_blank(arg01());
 			break;
@@ -313,11 +332,16 @@ static void process_csi_command(Char c) {
 			cursor_to(arg01()-1, T.c.y);
 			break;
 		case 'g': // tab clear
-			if (arg==0)
+			switch (arg) {
+			default:
+				goto invalid;
+			case 0:
 				T.tabs[T.c.x] = false;
-			else if (arg==3)
+				break;
+			case 3:
 				for (int i=0; i<T.width+1; i++)
 					T.tabs[i] = false;
+			}
 			break;
 		case 'H': // move cursor =clear= =cup= =home=
 		case 'f': // (confirmed: eqv. in xterm)
@@ -325,6 +349,8 @@ static void process_csi_command(Char c) {
 			break;
 		case 'J': // erase lines =ed=
 			switch (arg) {
+			default:
+				goto invalid;
 			case 0: // after cursor
 				clear_region(T.c.x, T.c.y, T.width, T.c.y+1);
 				clear_region(0, T.c.y+1, T.width, T.height);
@@ -344,6 +370,8 @@ static void process_csi_command(Char c) {
 			break;
 		case 'K': // erase characters in line =el= =el1=
 			switch (arg) {
+			default:
+				goto invalid;
 			case 0: // clear line after cursor
 				clear_region(T.c.x, T.c.y, T.width, T.c.y+1);
 				break;
@@ -353,8 +381,6 @@ static void process_csi_command(Char c) {
 			case 2: // entire line
 				clear_region(0, T.c.y, T.width, T.c.y+1);
 				break;
-			default:
-				goto invalid;
 			}
 			break;
 		case 'L': // insert lines =il= =il1=
@@ -373,10 +399,11 @@ static void process_csi_command(Char c) {
 			process_sgr();
 			break;
 		case 'n':
-			if (arg == 6) {
-				tty_printf("\x1B[%d;%dR", T.c.y+1, T.c.x+1);
-			} else {
+			switch (arg) {
+			default:
 				goto invalid;
+			case 6:
+				tty_printf("\x1B[%d;%dR", T.c.y+1, T.c.x+1);
 			}
 			break;
 		case 'P': // delete characters =dch= =dch1=
@@ -407,9 +434,6 @@ static void process_csi_command(Char c) {
 			P.csi_char = c;
 			P.state = CSI_2;
 			return;
-		default:
-			print("UNKNOWN: ");
-			dump(c);
 		}
 	}
 	P.state = NORMAL;
