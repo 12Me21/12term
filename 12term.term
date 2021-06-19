@@ -12,6 +12,8 @@ xterm-12term|my terminal owo,
   use=xterm+tmux,
 # allow setting window title
   use=xterm+sl,
+# kitty underline styling
+  Su,
 # base xterm
   use=xterm-256color,
 

@@ -98,10 +98,17 @@ static void process_sgr(void) {
 			T.c.attrs.italic = true;
 			break;
 		case 4: // underline
-			T.c.attrs.underline = 1;
+			if (P.arg_colon[i]) { // 4:<type>
+				i++;
+				int t = P.argv[i];
+				if (t>=0 && t<=5)
+					T.c.attrs.underline = t;
+			} else // normal
+				T.c.attrs.underline = 1;
 			break;
 		case 5: //slow blink
 		case 6: //fast blink
+			// todo? Personally I have no interest in this since it's obnoxious and complicates rendering, but...
 			break;
 		case 7: // reverse colors
 			T.c.attrs.reverse = true;

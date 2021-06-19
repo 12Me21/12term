@@ -11,3 +11,10 @@ Starting ~June 6th, i've been writing this terminal using itself (with emacs of 
 todo: ok so i renamed buffer1.h to buffer.h and got an error running make
 one of the dependency files listed buffer1.h and it didn't realize nothing needed it
 how to fix?
+
+# References:
+- st source code
+- https://invisible-island.net/xterm/ctlseqs/ctlseqs.html
+- xterm source code + behavior
+- https://sw.kovidgoyal.net/kitty/protocol-extensions.html
+- https://en.wikipedia.org/wiki/ANSI_escape_code (this page sucks but a lot of people probably read it so it's good to support the stuff listed there)

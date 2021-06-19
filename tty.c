@@ -107,8 +107,8 @@ void tty_init(void) {
 
 // read from child process and process the text
 size_t tty_read(void) {
-	char buf[1024*100];
-	ssize_t len = read(cmdfd, buf, sizeof(buf));
+	char buf[1024]; // how big to make this?
+	ssize_t len = read(cmdfd, buf, LEN(buf));
 	//print("read %ld bytes\n", len);
 	if (len>0) {
 		// todo: move this stuff into x.c maybe so we don't need buffer.h in this file?

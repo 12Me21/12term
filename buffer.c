@@ -456,7 +456,7 @@ static const Char DEC_GRAPHICS_CHARSET[128] = {
 
 static int char_width(Char c) {
 	int width;
-	if (c<=128) {
+	if (c<=128) { // assume ascii chars are never wide, to avoid calling wcwidth all the time
 		width = 1;
 	} else {
 		width = wcwidth(c);
