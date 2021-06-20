@@ -103,6 +103,11 @@ typedef struct Term {
 	
 	bool app_keypad, app_cursor;
 	bool bracketed_paste;
+	/*struct mouse_settings {
+		bool button, motion, sgr, many,
+		} mouse;*/ //to allow easy clearing
+	int mouse_mode;
+	bool mouse_sgr;
 } Term;
 
 void init_term(int width, int height);

@@ -82,7 +82,7 @@ void clear_row(Buffer* buffer, int y, int start) {
 			.chr=0,
 			.attrs = {
 				.color = T.c.attrs.color,
-				.background = T.c.attrs.background,
+				.background = T.c.attrs.background, //todo: option for disabling bce?
 			},
 		};
 	}

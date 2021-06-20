@@ -213,11 +213,26 @@ static void set_private_mode(int mode, bool state) {
 		//break;
 		//case 7: // wrap?
 		//break;
+	case 9: // X10 mouse compatibility mode
+		T.mouse_mode = state ? 9 : 0;
+		break;
 	case 12: // enable/disable cursor blink
 		T.cursor_blink = state;
 		break;
 	case 25: // show/hide cursor
 		T.show_cursor = state;
+		break;
+	case 1000: // report button press
+		T.mouse_mode = state ? 1000 : 0;
+		break;
+	case 1002: // report motion on button press
+		T.mouse_mode = state ? 1002 : 0;
+		break;
+	case 1003: // enable all mouse motions
+		T.mouse_mode = state ? 1003 : 0;
+		break;
+	case 1006: // extended reporting mode
+		T.mouse_sgr = state;
 		break;
 	case 1047: // to alt/main buffer
 		if (state) {

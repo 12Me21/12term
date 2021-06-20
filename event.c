@@ -13,6 +13,80 @@
 #define XEMBED_FOCUS_IN  4
 #define XEMBED_FOCUS_OUT 5
 
+int ox=-1, oy=-1, oldbutton = 3;
+static void mouse_event(XEvent* ev) {
+	int x = (ev->xbutton.x - W.border) / W.cw;
+	int y = (ev->xbutton.y - W.border) / W.ch;
+	// todo: do we clamp this or just ignore, or...
+	if (x<0)
+		x=0;
+	if (y<0)
+		y=0;
+	if (x>T.width-1)
+		x=T.width-1;
+	if (y>T.height-1)
+		y=T.height-1;
+	int button = ev->xbutton.button;
+	int mods = ev->xbutton.state;
+	
+	/* from urxvt */
+	if (ev->xbutton.type == MotionNotify) {
+		if (x==ox && y==oy)
+			return;
+		if (T.mouse_mode!=1002 && T.mouse_mode!=1003)
+			return;
+		if (T.mouse_mode==1002 && oldbutton==3)
+			return;
+		button = oldbutton + 32;
+		ox = x;
+		oy = y;
+	} else {
+		if (!T.mouse_sgr && ev->xbutton.type == ButtonRelease) {
+			button = 3;
+		} else {
+			button -= Button1;
+			if (button >= 7)
+				button += 128 - 7;
+			else if (button >= 3)
+				button += 64 - 3;
+		}
+		if (ev->xbutton.type == ButtonPress) {
+			oldbutton = button;
+			ox = x;
+			oy = y;
+		} else if (ev->xbutton.type == ButtonRelease) {
+			oldbutton = 3;
+			/* MODE_MOUSEX10: no button release reporting */
+			if (T.mouse_mode==9)
+				return;
+			if (button == 64 || button == 65)
+				return;
+		}
+	}
+	
+	if (T.mouse_mode!=9) {
+		button += !!(mods & ShiftMask)<<2 | !!(mods & Mod4Mask)<<3 | !!(mods & ControlMask)<<4;
+	}
+	
+	if (T.mouse_sgr) {
+		tty_printf("\x1B[<%d;%d;%d%c", button, x+1, y+1, ev->xbutton.type==ButtonRelease ? 'm' : 'M');
+	} else if (x+1<256-32 && y+1<256-32) { //todo: the utf8 version of this?
+		tty_printf("\x1B[M%c%c%c", 32+button, 32+x+1, 32+y+1);
+	}
+}
+
+static void on_motionnotify(XEvent* ev) {
+	mouse_event(ev);
+}
+
+static void on_buttonpress(XEvent* ev) {
+	mouse_event(ev);
+}
+
+static void on_buttonrelease(XEvent* ev) {
+	mouse_event(ev);
+}
+
 static void on_visibilitynotify(XEvent* ev) {
 	//XVisibilityEvent* e = &ev->xvisibility;
 	print("visibility\n");
@@ -316,6 +390,9 @@ const HandlerFunc HANDLERS[LASTEvent] = {
 	[KeyPress] = on_keypress,
 	[FocusIn] = on_focusin,
 	[FocusOut] = on_focusout,
+	[MotionNotify] = on_motionnotify,
+	[ButtonPress] = on_buttonpress,
+	[ButtonRelease] = on_buttonrelease,
 };
 
 void clippaste(void) {
