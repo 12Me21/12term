@@ -11,7 +11,7 @@
 typedef struct ParseState {
 	int state;
 	
-	char string[1030];
+	char string[1030]; // bytes
 	int string_command;
 	int string_length;
 	

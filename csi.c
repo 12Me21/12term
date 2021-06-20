@@ -39,14 +39,14 @@ static bool process_sgr_color(int* i, Color* out) {
 	switch (type) {
 	default:
 		print("unknown SGR color type: %d\n", type);
-		(*i) ++;
+		*i += 1; // do NOT change this to ++
 		break;
 		// and then here we should skip the rest of the colon parameters
 	case 2:; // 2;<red>;<green>;<blue>
 		int r = P.argv[*i+2];
 		int g = P.argv[*i+3];
 		int b = P.argv[*i+4];
-		(*i) += 4;
+		*i += 4;
 		*out = (Color){
 			.truecolor = true,
 			.rgb = (RGBColor){
@@ -59,7 +59,7 @@ static bool process_sgr_color(int* i, Color* out) {
 		break;
 	case 5:; // 5;<palette index>
 		int c = P.argv[*i+2];
-		(*i) += 2;
+		*i += 2;
 		if (c<0 || c>=256) {
 			print("invalid color index in SGR: %d\n", c);
 		} else {

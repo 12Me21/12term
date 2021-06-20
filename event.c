@@ -13,8 +13,12 @@
 #define XEMBED_FOCUS_IN  4
 #define XEMBED_FOCUS_OUT 5
 
+// copied from ST: todo: rewrite this
 int ox=-1, oy=-1, oldbutton = 3;
 static void mouse_event(XEvent* ev) {
+	if (!T.mouse_mode)
+		return;
+	
 	int x = (ev->xbutton.x - W.border) / W.cw;
 	int y = (ev->xbutton.y - W.border) / W.ch;
 	// todo: do we clamp this or just ignore, or...
@@ -65,7 +69,7 @@ static void mouse_event(XEvent* ev) {
 	}
 	
 	if (T.mouse_mode!=9) {
-		button += !!(mods & ShiftMask)<<2 | !!(mods & Mod4Mask)<<3 | !!(mods & ControlMask)<<4;
+		button |= !!(mods & ShiftMask)<<2 | !!(mods & Mod4Mask)<<3 | !!(mods & ControlMask)<<4;
 	}
 	
 	if (T.mouse_sgr) {

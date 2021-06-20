@@ -1,10 +1,15 @@
 // Parsing control sequences
 
 #include <stdio.h>
+#include <string.h>
 
 #include "common.h"
 #include "ctlseqs.h"
 #include "ctlseqs2.h"
+// messy
+extern RGBColor parse_x_color(const char* c);
+extern void set_title(char* c);
+extern void change_font(const char* name);
 
 ParseState P;
 
@@ -34,7 +39,13 @@ bool process_control_char(unsigned char c) {
 	return true;
 }
 
-void process_escape_char(Char c) {
+static void begin_string(int type) {
+	P.state = STRING;
+	P.string_command = type;
+	P.string_length = 0;
+}
+
+static void process_escape_char(Char c) {
 	switch (c) {
 		// multi-char sequences
 	case '(': // designate G0-G3 char sets
@@ -54,20 +65,16 @@ void process_escape_char(Char c) {
 		
 	// things that take string parameters
 	case 'P': // Device Control String
-		P.state = STRING;
-		P.string_command = DCS;
+		begin_string(DCS);
 		return;
 	case ']': // Operating System Command
-		P.state = STRING;
-		P.string_command = OSC;
+		begin_string(OSC);
 		return;
 	case '^': // Privacy Message
-		P.state = STRING;
-		P.string_command = PM;
+		begin_string(PM);
 		return;
 	case '_': // Application Program Command
-		P.state = STRING;
-		P.string_command = APC;
+		begin_string(APC);
 		return;
 		
 	// single char sequences
@@ -100,26 +107,89 @@ void process_escape_char(Char c) {
 	P.state = NORMAL;
 }
 
-static void process_char(Char c) {
-	if (P.state == STRING) {
-		// end of string
-		// todo: maybe check other characters here just in case
-		if (c==0x07 || c==0x18 || c==0x1A || c==0x1B || (c>=0x80 && c<=0x9F)) {
-			// (then we want to process the string sequence)
-			// TODO
-			// and /sometimes/ also process the character itself
-			P.state = NORMAL;
-		} else {
-			// add char to string if possible
-			if (P.string_length < LEN(P.string)) {
-				P.string[P.string_length++] = c;
-			} else { //string too long!!
-				
-			}
-		}
-		return;
+static int parse_number(char** str) {
+	int num = 0;
+	char* s = *str;
+	while (*s>='0' && *s<='9') {
+		num *= 10;
+		num += *s - '0';
+		s++;
 	}
-	
+	if (s==*str) // fail: no digits
+		return -1;
+	//if (*s==';' || *s=='\0') {
+	*str = s;
+	return num;
+	//	}
+	//return -1; // fail: found char other than ; or end of string
+}
+
+static void process_osc(void) {
+	char* s = P.string;
+	int p = parse_number(&s);
+	//else if (*s!='\0') {// unexpected char
+	//	print("Invalid OSC command: %s\n", P.string);
+	//	return;
+	//}
+	switch (p) {
+	default:
+		print("Unknown OSC command: %d\n", p);
+		break;
+	case 0: // set window title + icon title
+		if (*s==';') {
+			s++;
+			set_title(s);
+		} else
+			set_title(NULL);
+		break;
+	case 4: // change palette color
+		while (s && *s==';') {
+			s++;
+			int id = parse_number(&s);
+			if (id<0 || id>=256)
+				goto invalid;
+			if (*s!=';')
+				goto invalid;
+			s++;
+			char* se = strchr(s, ';');
+			T.palette[id] = parse_x_color(s);
+			dirty_all();
+			s = se;
+		}
+		break;
+	case 10: // set foreground, background, cursor colors
+	case 11:
+	case 12:
+		while (s && *s==';') {
+			s++;
+			RGBColor col = parse_x_color(s);
+			switch (p) {
+			case 10:
+				T.foreground = col;
+				break;
+			case 11:
+				T.background = col;
+				break;
+			case 12:
+				T.cursor_color = col;
+				break;
+			}
+			p++;
+			dirty_all();
+		}
+		break;
+	case 50: // 
+		if (*s==';') {
+			s++;
+			change_font(s);
+		}
+	}
+	return;
+ invalid:
+	print("Invalid OSC command: %s\n", P.string);
+}
+
+static void process_char(Char c) {
 	if (c<256 && c>=0 && process_control_char(c))
 		return;
 	////////////////////////
@@ -182,47 +252,76 @@ static Char utf8_buffer = 0;
 static int utf8_state = 0;
 void process_chars(int len, const char cs[len]) {
 	for (int i=0; i<len; i++) {
-		Char c = (int)(unsigned char)cs[i]; //important! we need to convert to unsigned before casting to int
-		int type = utf8_type[c>>3]; // figure out what type of utf-8 byte this is (number of leading 1 bits) using a lookup table
-		c = c & (1<<7-type)-1; // extract the data bits
-		// process the byte:
-		switch (utf8_state<<3 | type) {
-		// starts of sequences (state=0)
-		case 2: case 3: case 4:
-			utf8_buffer = c<<6*(type-1);
-			utf8_state = 3*(type-1);
-			break;
-		// final/only byte
-		case 0:
-			process_char(c);
-			utf8_state = 0;
-			break;
-		case 3*1+0<<3 | 1: //1,0 2,1 3,2
-		case 3*2+1<<3 | 1:
-		case 3*3+2<<3 | 1:
-			utf8_buffer |= c;
-			process_char(utf8_buffer);
-			utf8_buffer = 0;
-			utf8_state = 0;
-			break;
-		// second to last byte
-		case 3*2+0<<3 | 1: //2,0 3,1
-		case 3*3+1<<3 | 1:
-			utf8_buffer |= c<<6;
-			utf8_state++;
-			break;
-		// 3rd to last byte
-		case 3*3+0<<3 | 1: //3,0
-			utf8_buffer |= c<<6*2;
-			utf8_state++;
-			break;
-		//invalid!
-		default:
-			print("Invalid utf8! [%d]\n", cs[i]);
-			process_char(0xFFFD);
-			utf8_buffer = 0;
-			utf8_state = 0;
-			break;
+		if (P.state == STRING) {
+			unsigned char c = cs[i];
+			// TODO: do we want to run the utf-8 decoder all the time or...
+			// end of string
+			// todo: maybe check other characters here just in case
+			if (c==0x07 || c==0x18 || c==0x1A || c==0x1B || (c>=0x80 && c<=0x9F)) {
+				P.string[P.string_length] = '\0';
+				switch (P.string_command) {
+				default:
+					print("unknown string command\n");
+					break;
+				case OSC:
+					process_osc();
+					break;
+				}
+				// (then we want to process the string sequence)
+				// TODO
+				// and /sometimes/ also process the character itself
+				P.state = NORMAL;
+			} else {
+				// add char to string if possible
+				if (P.string_length < LEN(P.string)-1) {
+					P.string[P.string_length++] = c;
+				} else { //string too long!!
+					
+				}
+			}
+		} else {
+			Char c = (int)(unsigned char)cs[i]; //important! we need to convert to unsigned before casting to int
+			int type = utf8_type[c>>3]; // figure out what type of utf-8 byte this is (number of leading 1 bits) using a lookup table
+			c = c & (1<<7-type)-1; // extract the data bits
+			// process the byte:
+			switch (utf8_state<<3 | type) {
+				// starts of sequences (state=0)
+			case 2: case 3: case 4:
+				utf8_buffer = c<<6*(type-1);
+				utf8_state = 3*(type-1);
+				break;
+				// final/only byte
+			case 0:
+				process_char(c);
+				utf8_state = 0;
+				break;
+			case 3*1+0<<3 | 1: //1,0 2,1 3,2
+			case 3*2+1<<3 | 1:
+			case 3*3+2<<3 | 1:
+				utf8_buffer |= c;
+				process_char(utf8_buffer);
+				utf8_buffer = 0;
+				utf8_state = 0;
+				break;
+				// second to last byte
+			case 3*2+0<<3 | 1: //2,0 3,1
+			case 3*3+1<<3 | 1:
+				utf8_buffer |= c<<6;
+				utf8_state++;
+				break;
+				// 3rd to last byte
+			case 3*3+0<<3 | 1: //3,0
+				utf8_buffer |= c<<6*2;
+				utf8_state++;
+				break;
+				//invalid!
+			default:
+				print("Invalid utf8! [%d]\n", cs[i]);
+				process_char(0xFFFD);
+				utf8_buffer = 0;
+				utf8_state = 0;
+				break;
+			}
 		}
 	}
 	//write_char(c[i]);

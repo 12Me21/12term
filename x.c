@@ -24,6 +24,17 @@ extern char* ICON_XPM[];
 
 Xw W = {0};
 
+// hhhh
+RGBColor parse_x_color(const char* c) {
+	XColor ret;
+	XParseColor(W.d, W.cmap, c, &ret);
+	return (RGBColor){
+		ret.red*255/65535,
+		ret.green*255/65535,
+		ret.blue*255/65535,
+	};
+}
+
 // when the size of the terminal (in character cells) changes
 // (also called to initialize size)
 // todo: what if the size (in pixels) changes but not the size in char cells?
@@ -58,6 +69,7 @@ static void update_charsize(Px w, Px h) {
 		.min_width = base + W.cw*2,
 		.min_height = base + W.ch*2,
 	});
+	dirty_all();
 }
 
 __attribute__((noreturn)) void sleep_forever(bool hangup) {
@@ -201,6 +213,15 @@ extern RGBColor default_background; //messy messy messy
 // 7: initialize everything else
 // 8: start main loop
 
+
+void set_title(char* s) {
+	if (!s)
+		s = "12term";
+	XSetWMName(W.d, W.win, &(XTextProperty){
+		(unsigned char*)s, W.atoms.utf8_string, 8, strlen(s)
+	});
+}
+
 int main(int argc, char* argv[argc+1]) {
 	time_log(NULL);
 	
@@ -276,9 +297,7 @@ int main(int argc, char* argv[argc+1]) {
 		.res_name = "12term",
 		.res_class = "12term",
 	});
-	XSetWMName(W.d, W.win, &(XTextProperty){
-		(unsigned char*)"12term", W.atoms.utf8_string, 8, 6
-	});
+	set_title(NULL);
 	
 	update_charsize(W.cw, W.ch);
 	
@@ -296,4 +315,11 @@ int main(int argc, char* argv[argc+1]) {
 	
 	run();
 	return 0;
+}
+
+void change_font(const char* name) {
+	init_fonts(name, 16);
+	update_charsize(W.cw, W.ch);
+	update_size(T.width, T.height);
+	XResizeWindow(W.d, W.win, W.w, W.h);
 }
