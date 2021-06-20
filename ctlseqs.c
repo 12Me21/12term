@@ -111,7 +111,7 @@ static void process_char(Char c) {
 			P.state = NORMAL;
 		} else {
 			// add char to string if possible
-			if (P.string_length < sizeof(P.string)) {
+			if (P.string_length < LEN(P.string)) {
 				P.string[P.string_length++] = c;
 			} else { //string too long!!
 				

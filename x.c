@@ -202,8 +202,6 @@ extern RGBColor default_background; //messy messy messy
 // 8: start main loop
 
 int main(int argc, char* argv[argc+1]) {
-	print("sizeof cell: %d\n", (int)sizeof(Cell));
-	print("sizeof color: %d\n", (int)sizeof(Color));
 	time_log(NULL);
 	
 	// hecking locale

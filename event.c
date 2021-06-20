@@ -192,18 +192,15 @@ static bool match_modifiers(KeyMap* want, int got) {
 void on_keypress(XEvent* ev) {
 	XKeyEvent* e = &ev->xkey;
 	
-	//if (IS_SET(MODE_KBDLOCK))
-	//	return;
-	
 	KeySym ksym;
-	char buf[64] = {0};
+	char buf[1024] = {0};
 	int len = 0;
 	
 	Status status;
 	if (ime.xic)
-		len = XmbLookupString(ime.xic, e, buf, sizeof(buf)-1, &ksym, &status);
+		len = Xutf8LookupString(ime.xic, e, buf, sizeof(buf)-1, &ksym, &status);
 	else {
-		len = XLookupString(e, buf, sizeof(buf)-1, &ksym, NULL); //can't we just use the last argument of this instead of xmb?
+		len = XLookupString(e, buf, sizeof(buf)-1, &ksym, NULL);
 		status = XLookupBoth;
 	}
 	
@@ -217,13 +214,7 @@ void on_keypress(XEvent* ev) {
 				} else if (map->mode==10) {
 					map->func();
 				} else {
-					int mods = 0;
-					if (e->state & ShiftMask)
-						mods |= 1;
-					if (e->state & Mod1Mask)
-						mods |= 2;
-					if (e->state & ControlMask)
-						mods |= 4;
+					int mods = !!(e->state & ShiftMask) | !!(e->state & Mod1Mask)<<1 | !!(e->state & ControlMask)<<2;
 					if (map->mode==1)
 						tty_printf(map->output, mods+1);
 					else if (map->mode==2)

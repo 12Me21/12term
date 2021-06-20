@@ -271,7 +271,7 @@ void init_term(int width, int height) {
 	if (f) {
 		char buf[1024*100];
 		while (1) {
-			ssize_t len = read(f, buf, sizeof(buf));
+			ssize_t len = read(f, buf, LEN(buf));
 			if (len<=0)
 				break;
 			process_chars(len, buf);

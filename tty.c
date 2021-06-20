@@ -127,7 +127,7 @@ void tty_printf(const char* format, ...) {
 	va_list ap;
 	va_start(ap, format);
 	static char buf[1024];
-	int len = vsnprintf(buf, sizeof(buf), format, ap);
+	int len = vsnprintf(buf, LEN(buf), format, ap);
 	va_end(ap);
 	tty_write(len, buf);
 }
