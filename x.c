@@ -238,7 +238,7 @@ int main(int argc, char* argv[argc+1]) {
 	
 	// create the window
 	
-	unsigned long bg_pixel = make_color((Color){.truecolor=true,.rgb=default_background}).pixel;
+	unsigned long bg_pixel = alloc_color((Color){.truecolor=true,.rgb=default_background}); // yuck
 	
 	W.event_mask = FocusChangeMask | KeyPressMask | KeyReleaseMask | ExposureMask | VisibilityChangeMask | StructureNotifyMask | ButtonMotionMask | ButtonPressMask | ButtonReleaseMask;
 	

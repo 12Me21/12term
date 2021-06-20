@@ -536,6 +536,13 @@ void put_char(Char c) {
 		dest->attrs.color = T.c.attrs.background;
 		dest->attrs.background = T.c.attrs.color;
 	}
+	if (T.c.attrs.weight==1) { // mm we do this after reverse right?
+		if (!dest->attrs.color.truecolor) {
+			int i = dest->attrs.color.i;
+			if (i>=0 && i<8)
+				dest->attrs.color.i += 8;
+		}
+	}
 	// inserting a wide character
 	if (width==2) {
 		dest->wide = 1;

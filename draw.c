@@ -24,10 +24,43 @@ static XftDraw* xft_draw;
 
 static GC gc;
 
+// todo: cache the palette colors?
+// or perhaps store them as xrendercolor internally
+static XftColor make_color(Color c) {
+	RGBColor rgb;
+	if (c.truecolor)
+		rgb = c.rgb;
+	else {
+		int i = c.i;
+		if (i>=0 && i<256) {
+			rgb = T.palette[i];
+		} else if (i == -1)
+			rgb = T.foreground;
+		else if (i == -3)
+			rgb = T.cursor_color;
+		else // -2
+			rgb = T.background;
+	}
+	return (XftColor){
+		.color = {
+			.red = rgb.r*65535/255,
+			.green = rgb.g*65535/255,
+			.blue = rgb.b*65535/255,
+			.alpha = 65535,
+		},
+	};
+}
+
+unsigned long alloc_color(Color c) {
+	XftColor x = make_color(c);
+	XftColorAllocValue(W.d, W.vis, W.cmap, &x.color, &x);
+	return x.pixel;
+}
+
 static void clear_background(void) {
-	XftColor xcol = make_color((Color){.i=-2});
 	XftDrawSetClip(xft_draw, 0);
-	XftDrawRect(xft_draw, &xcol, 0, 0, W.w, W.h);
+	XftColor col = make_color((Color){.i=-2});
+	XftDrawRect(xft_draw, &col, 0, 0, W.w, W.h);
 }
 
 static void init_pixmap(void) {
@@ -59,60 +92,14 @@ void draw_resize(int width, int height) {
 	}
 }
 
-// todo: cache the palette colors?
-// or perhaps store them as xrendercolor internally
-static XRenderColor get_color(Color c, bool bold) {
-	RGBColor rgb;
-	if (c.truecolor)
-		rgb = c.rgb;
-	else {
-		int i = c.i;
-		if (i>=0 && i<256) {
-			if (bold && i<8)
-				i+=8;
-			rgb = T.palette[i];
-		} else if (i == -1)
-			rgb = T.foreground;
-		else if (i == -3)
-			rgb = T.cursor_color;
-		else // -2
-			rgb = T.background;
-	}
-	return (XRenderColor){
-		.red = rgb.r*65535/255,
-		.green = rgb.g*65535/255,
-		.blue = rgb.b*65535/255,
-		.alpha = 65535,
-	};
-}
-
-static void alloc_color(XRenderColor* col, XftColor* out) {
-	// todo: check if it's faster to just do this manually & assume 24bit color.
-	//yeah it totally is gosh
-	//out->color = *col;
-	// ok is it really though
-	
-	XftColorAllocValue(W.d, W.vis, W.cmap, col, out);
-}
-
-XftColor make_color(Color c) {
-	XftColor out;
-	XRenderColor r = get_color(c, false);
-	alloc_color(&r, &out);
-	return out;
-}
-
-static int same_color(XRenderColor a, XRenderColor b) {
-	return a.red==b.red && a.green==b.green && a.blue==b.blue && a.alpha==b.alpha;
+static int same_color(XftColor a, XftColor b) {
+	return a.color.red==b.color.red && a.color.green==b.color.green && a.color.blue==b.color.blue && a.color.alpha==b.color.alpha;
 }
 
 // todo: allow drawing multiple at once for efficiency
-static void draw_char_spec(int x, int y, XftGlyphFontSpec* spec, XRenderColor col) {
+static void draw_char_spec(int x, int y, XftGlyphFontSpec* spec, XftColor col) {
 	if (!spec)
 		return;
-	
-	XftColor xcol;
-	alloc_color(&col, &xcol);
 	
 	Px winx = W.border+x*W.cw;
 	Px winy = W.border+y*W.ch;
@@ -120,7 +107,7 @@ static void draw_char_spec(int x, int y, XftGlyphFontSpec* spec, XRenderColor co
 	if (spec) {
 		spec->x += winx;
 		spec->y += winy;
-		XftDrawGlyphFontSpec(xft_draw, &xcol, spec, 1);
+		XftDrawGlyphFontSpec(xft_draw, &col, spec, 1);
 	}
 }
 
@@ -132,20 +119,17 @@ static void draw_char_overlays(int x, int y, Cell* c) {
 	Px winx = W.border+x*W.cw;
 	Px winy = W.border+y*W.ch;
 	
-	XftColor xcol;
 	if (c->attrs.underline) {
-		XRenderColor fg;
+		XftColor col;
 		if (c->attrs.colored_underline)
-			fg = get_color(c->attrs.underline_color, false);
+			col = make_color(c->attrs.underline_color);
 		else
-			fg = get_color(c->attrs.color, c->attrs.weight==1);
-		alloc_color(&fg, &xcol);
-		XftDrawRect(xft_draw, &xcol, winx, winy+W.font_ascent+1, width*W.cw, c->attrs.underline);
+			col = make_color(c->attrs.color);
+		XftDrawRect(xft_draw, &col, winx, winy+W.font_ascent+1, width*W.cw, c->attrs.underline);
 	}
 	if (c->attrs.strikethrough) {
-		XRenderColor fg = get_color(c->attrs.color, c->attrs.weight==1);
-		alloc_color(&fg, &xcol);
-		XftDrawRect(xft_draw, &xcol, winx, winy+W.font_ascent*2/3, width*W.cw, 1);
+		XftColor col = make_color(c->attrs.color);
+		XftDrawRect(xft_draw, &col, winx, winy+W.font_ascent*2/3, width*W.cw, 1);
 	}
 }
 
@@ -190,17 +174,17 @@ static void draw_cursor(int x, int y) {
 	}, 1);
 	
 	// draw background
-	XftColor xcol = make_color((Color){.i=-3});
-	XftDrawRect(xft_draw, &xcol, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch);
+	XftColor col = make_color((Color){.i=-3});
+	XftDrawRect(xft_draw, &col, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch);
 	
 	// draw char
 	if (temp.chr) {
-		XRenderColor fg = get_color(temp.attrs.color, false);
+		XftColor col = make_color(temp.attrs.color);
 		XftGlyphFontSpec spec;
 		int indexs[1];
 		int num = make_glyphs(1, &spec, &temp, indexs, NULL);
 		if (num)
-			draw_char_spec(x, y, &spec, fg);
+			draw_char_spec(x, y, &spec, col);
 	}
 	
 	draw_char_overlays(x, y, &temp);
@@ -225,22 +209,19 @@ static void draw_cursor(int x, int y) {
 // draw cell backgrounds
 static void draw_row_bg(int y) {
 	Row row = T.current->rows[y];
-	XftColor xcol;
 	
-	XRenderColor prev_color = get_color(row[0].attrs.background, 0);
+	XftColor prev_color = make_color(row[0].attrs.background);
 	int prev_start = 0;
 	int x;
 	for (x=1; x<T.width; x++) {
-		XRenderColor bg = get_color(row[x].attrs.background, 0);
+		XftColor bg = make_color(row[x].attrs.background);
 		if (!same_color(bg, prev_color)) {
-			alloc_color(&prev_color, &xcol);
-			XftDrawRect(xft_draw, &xcol, W.border+W.cw*prev_start, W.border+W.ch*y, W.cw*(prev_start-x), W.ch);
+			XftDrawRect(xft_draw, &prev_color, W.border+W.cw*prev_start, W.border+W.ch*y, W.cw*(prev_start-x), W.ch);
 			prev_start = x;
 			prev_color = bg;
 		}
 	}
-	alloc_color(&prev_color, &xcol);
-	XftDrawRect(xft_draw, &xcol, W.border+W.cw*prev_start, W.border+W.ch*y, W.cw*(prev_start-x), W.ch);
+	XftDrawRect(xft_draw, &prev_color, W.border+W.cw*prev_start, W.border+W.ch*y, W.cw*(prev_start-x), W.ch);
 }
 
 // draw strikethrough and underlines
@@ -267,8 +248,8 @@ static void draw_row(int y) {
 	for (int i=0; i<num; i++) {
 		int x = indexs[i];
 		Cell* c = &row[x];
-		XRenderColor fg = get_color(c->attrs.color, c->attrs.weight==1);
-		draw_char_spec(x, y, &specs[i], fg);
+		XftColor col = make_color(c->attrs.color);
+		draw_char_spec(x, y, &specs[i], col);
 	}
 	
 	draw_row_overlays(y);
