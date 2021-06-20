@@ -25,10 +25,11 @@ typedef struct Attrs {
 	
 	char weight: 2; // 1 = bold, -1 = faint
 	bool italic: 1;
-	unsigned char underline: 3; // 0-5 = none,normal,double,wavy,dotted,dashed (todo: support more of these)
+	unsigned char underline: 3; // 0 = none, 1-5 = normal,double,wavy,dotted,dashed (todo: support more of these)
 	bool colored_underline: 1; // whether to use special underline color
 	bool blink: 1;
-	bool reverse: 1; //the renderer doesn't actually read this flag: when writing chars to the screen, the color and background are swapped if this attrib is set.
+	bool reverse: 1;
+	// note: the renderer doesn't actually use the .reverse and .bold to determine color: these transformations are done when writing text to the screen.
 	bool strikethrough: 1;
 	
 	bool invisible: 1; // todo

@@ -25,7 +25,7 @@ static XftDraw* xft_draw;
 static GC gc;
 
 // todo: cache the palette colors?
-// or perhaps store them as xrendercolor internally
+// or perhaps store them as xftcolor internally
 static XftColor make_color(Color c) {
 	RGBColor rgb;
 	if (c.truecolor)
@@ -59,8 +59,7 @@ unsigned long alloc_color(Color c) {
 
 static void clear_background(void) {
 	XftDrawSetClip(xft_draw, 0);
-	XftColor col = make_color((Color){.i=-2});
-	XftDrawRect(xft_draw, &col, 0, 0, W.w, W.h);
+	XftDrawRect(xft_draw, (XftColor[]){make_color((Color){.i=-2})}, 0, 0, W.w, W.h);
 }
 
 static void init_pixmap(void) {
@@ -120,16 +119,11 @@ static void draw_char_overlays(int x, int y, Cell* c) {
 	Px winy = W.border+y*W.ch;
 	
 	if (c->attrs.underline) {
-		XftColor col;
-		if (c->attrs.colored_underline)
-			col = make_color(c->attrs.underline_color);
-		else
-			col = make_color(c->attrs.color);
+		XftColor col = make_color(c->attrs.colored_underline ? c->attrs.underline_color : c->attrs.color);
 		XftDrawRect(xft_draw, &col, winx, winy+W.font_ascent+1, width*W.cw, c->attrs.underline);
 	}
 	if (c->attrs.strikethrough) {
-		XftColor col = make_color(c->attrs.color);
-		XftDrawRect(xft_draw, &col, winx, winy+W.font_ascent*2/3, width*W.cw, 1);
+		XftDrawRect(xft_draw, (XftColor[]){make_color(c->attrs.color)}, winx, winy+W.font_ascent*2/3, width*W.cw, 1);
 	}
 }
 
@@ -174,17 +168,15 @@ static void draw_cursor(int x, int y) {
 	}, 1);
 	
 	// draw background
-	XftColor col = make_color((Color){.i=-3});
-	XftDrawRect(xft_draw, &col, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch);
+	XftDrawRect(xft_draw, (XftColor[]){make_color((Color){.i=-3})}, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch);
 	
 	// draw char
 	if (temp.chr) {
-		XftColor col = make_color(temp.attrs.color);
-		XftGlyphFontSpec spec;
+		XftGlyphFontSpec spec[1];
 		int indexs[1];
-		int num = make_glyphs(1, &spec, &temp, indexs, NULL);
+		int num = make_glyphs(1, spec, &temp, indexs, NULL);
 		if (num)
-			draw_char_spec(x, y, &spec, col);
+			draw_char_spec(x, y, spec, make_color(temp.attrs.color));
 	}
 	
 	draw_char_overlays(x, y, &temp);
@@ -248,8 +240,7 @@ static void draw_row(int y) {
 	for (int i=0; i<num; i++) {
 		int x = indexs[i];
 		Cell* c = &row[x];
-		XftColor col = make_color(c->attrs.color);
-		draw_char_spec(x, y, &specs[i], col);
+		draw_char_spec(x, y, &specs[i], make_color(c->attrs.color));
 	}
 	
 	draw_row_overlays(y);
@@ -293,7 +284,7 @@ void init_draw(void) {
 }
 
 void draw_free(void) {
-	draw_resize(0,0);
+	// whatever
 }
 
 // todo: display characters CENTERED within the cell rather than aligned to the left side.
