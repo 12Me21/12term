@@ -225,6 +225,8 @@ static void draw_row_overlays(int y) {
 
 static void draw_row(int y) {
 	// set clip region to entire row
+	// todo: maybe include the border regions too, for chars that overflow their cells
+	// but, we do need to remember to clear these regions then
 	XftDrawSetClipRectangles(xft_draw, W.border, y*W.ch+W.border, &(XRectangle){
 		.width = W.cw*T.width,
 		.height = W.ch,

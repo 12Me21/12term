@@ -158,7 +158,10 @@ static void run(void) {
 		}
 		
 		// I don't exactly understand how this timeout delay system works.
-		// needs to be rewritten maybe
+		// needs to be rewritten maybe.
+		// Things which should delay redrawing:
+		// - when there are new lines scrolled into the screen which haven't been written to yet
+		// - when cursor is hidden
 		if (text || xev) {
 			if (!drawing) {
 				trigger = now;
@@ -169,6 +172,8 @@ static void run(void) {
 				continue;
 		}
 		timeout = -1;
+		if (!T.show_cursor)
+			continue;
 		
 		if (readed) {
 			if (!got_draw) {
