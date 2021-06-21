@@ -41,7 +41,6 @@ static bool process_sgr_color(int* i, Color* out) {
 		print("unknown SGR color type: %d\n", type);
 		*i += 1; // do NOT change this to ++
 		break;
-		// and then here we should skip the rest of the colon parameters
 	case 2:; // 2;<red>;<green>;<blue>
 		int r = P.argv[*i+2];
 		int g = P.argv[*i+3];

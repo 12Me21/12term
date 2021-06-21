@@ -107,6 +107,63 @@ static void process_escape_char(Char c) {
 	P.state = NORMAL;
 }
 
+static void process_kitty(int args[128], int length, char data[length]) {
+	print("got kitty data\n");
+}
+
+static void process_apc(void) {
+	char* s = P.string;
+	if (s[0]=='G') { // kitty graphics
+		s++;
+		int args[128] = {
+			['a'] = 't',
+			['f'] = 32,
+			['t'] = 'd',
+		};
+		char key;
+		char* valueStart;
+		
+		while (1) {
+			if (*s==';') {// end of key=value parameters
+				s++;
+				break;
+			}
+			if (*s>='a'&&*s<='z' || *s>='A'&&*s<='Z') { // key name
+				key = *s;
+				s++;
+				if (*s=='=') { // =
+					s++;
+					valueStart = s;
+					while (*s!=',' && *s!=';')
+						s++;
+					// now we have the value
+					if (*valueStart=='-' || *valueStart>='0'&&*valueStart<='9') {
+						args[key] = atoi(valueStart); //number
+					} else {
+						args[key] = *valueStart; // just 1 char
+					}
+					if (*s==',')
+						s++;
+					else if (*s!=';') {
+						print("invalid char after value in kitty seq\n");
+						return; // error, invalid character after value
+					}
+				} else {
+					print("missing = after key name '%c' in kitty seq\n", key);
+					return; // error, missing = after key name
+				}
+			} else {
+				print("invalid char in kitty seq\n");
+				return;
+				// idk invalid character
+			}
+		}
+		process_kitty(args, P.string_length-(s-P.string), s);
+	} else {
+		print("unknown APC command (yes i know the C already stands for command shhh)\n");
+	}
+}
+
 static int parse_number(char** str) {
 	int num = 0;
 	char* s = *str;
@@ -178,11 +235,12 @@ static void process_osc(void) {
 			dirty_all();
 		}
 		break;
-	case 50: // 
+	case 50: // change font
 		if (*s==';') {
 			s++;
 			change_font(s);
 		}
+		break;
 	}
 	return;
  invalid:
@@ -237,23 +295,22 @@ static void process_char(Char c) {
 	}
 }
 
-// 128, 192, 224, 240, 248
-
-static const char utf8_type[32] = {
-	// 0 - ascii byte
-	[16] = 1,1,1,1,1,1,1,1, // 1 - continuation byte
-	[24] = 2,2,2,2, // 2 - start of 2 byte sequence
-	[28] = 3,3, // 3 - start of 3 byte sequence
-	[30] = 4, // 4 - start of 4 byte sequence
-	[31] = -1, // invalid
-};
-	
 static Char utf8_buffer = 0;
-static int utf8_state = 0;
+static int utf8_remaining = 0;
 void process_chars(int len, const char cs[len]) {
+	// 128, 192, 224, 240, 248
+	static const char utf8_type[32] = {
+		// 0 - ascii byte
+		[16] = 1,1,1,1,1,1,1,1, // 1 - continuation byte
+		[24] = 2,2,2,2, // 2 - start of 2 byte sequence
+		[28] = 3,3, // 3 - start of 3 byte sequence
+		[30] = 4, // 4 - start of 4 byte sequence
+		[31] = -1, // invalid
+	};
+	
 	for (int i=0; i<len; i++) {
+		Char c = (unsigned char)cs[i]; //important! we need to convert to unsigned before casting to int
 		if (P.state == STRING) {
-			unsigned char c = cs[i];
 			// TODO: do we want to run the utf-8 decoder all the time or...
 			// end of string
 			// todo: maybe check other characters here just in case
@@ -265,6 +322,9 @@ void process_chars(int len, const char cs[len]) {
 					break;
 				case OSC:
 					process_osc();
+					break;
+				case APC:
+					process_apc();
 					break;
 				}
 				// (then we want to process the string sequence)
@@ -280,47 +340,34 @@ void process_chars(int len, const char cs[len]) {
 				}
 			}
 		} else {
-			Char c = (int)(unsigned char)cs[i]; //important! we need to convert to unsigned before casting to int
+			// outside of a string: start decoding utf-8
+			
 			int type = utf8_type[c>>3]; // figure out what type of utf-8 byte this is (number of leading 1 bits) using a lookup table
 			c = c & (1<<7-type)-1; // extract the data bits
 			// process the byte:
-			switch (utf8_state<<3 | type) {
-				// starts of sequences (state=0)
-			case 2: case 3: case 4:
-				utf8_buffer = c<<6*(type-1);
-				utf8_state = 3*(type-1);
-				break;
-				// final/only byte
-			case 0:
-				process_char(c);
-				utf8_state = 0;
-				break;
-			case 3*1+0<<3 | 1: //1,0 2,1 3,2
-			case 3*2+1<<3 | 1:
-			case 3*3+2<<3 | 1:
-				utf8_buffer |= c;
-				process_char(utf8_buffer);
-				utf8_buffer = 0;
-				utf8_state = 0;
-				break;
-				// second to last byte
-			case 3*2+0<<3 | 1: //2,0 3,1
-			case 3*3+1<<3 | 1:
-				utf8_buffer |= c<<6;
-				utf8_state++;
-				break;
-				// 3rd to last byte
-			case 3*3+0<<3 | 1: //3,0
-				utf8_buffer |= c<<6*2;
-				utf8_state++;
-				break;
-				//invalid!
-			default:
-				print("Invalid utf8! [%d]\n", cs[i]);
-				process_char(0xFFFD);
-				utf8_buffer = 0;
-				utf8_state = 0;
-				break;
+			if (type==1) { // continuation byte
+				if (utf8_remaining>0) {
+					utf8_remaining--;
+					utf8_buffer |= c<<(6*utf8_remaining);
+					if (utf8_remaining==0)
+						process_char(utf8_buffer);
+				} else {
+					print("Invalid utf8! unexpected continuation byte\n");
+				}
+			} else if (type==-1) { // invalid
+				print("Invalid utf8! invalid byte\n");
+			} else { // start byte
+				if (utf8_remaining!=0) {
+					print("Invalid utf8! interrupted sequence\n");
+					process_char(0xFFFD);
+				}
+				if (type==0) {
+					utf8_remaining = 0;
+					process_char(c);
+				} else {
+					utf8_remaining = type-1;
+					utf8_buffer = c<<(6*utf8_remaining);
+				}
 			}
 		}
 	}
@@ -328,7 +375,7 @@ void process_chars(int len, const char cs[len]) {
 }
 
 void reset_parser(void) {
-	utf8_state = 0;
+	utf8_remaining = 0;
 	utf8_buffer = 0;
 	P.state = NORMAL;
 }
