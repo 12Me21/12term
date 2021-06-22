@@ -73,7 +73,7 @@ void init_scrollback(void) {
 	T.scrollback.lines = 0;
 }
 
-void clear_row(Buffer* buffer, int y, int start) {
+static void clear_row(Buffer* buffer, int y, int start, bool bce) {
 	Row row = buffer->rows[y];
 	T.dirty_rows[y] = true;
 	for (int i=start; i<T.width; i++) {
@@ -82,7 +82,7 @@ void clear_row(Buffer* buffer, int y, int start) {
 			.chr=0,
 			.attrs = {
 				.color = T.c.attrs.color,
-				.background = T.c.attrs.background, //todo: option for disabling bce?
+				.background = bce ? T.c.attrs.background : (Color){.i=-2},
 			},
 		};
 	}
@@ -126,7 +126,7 @@ void term_resize(int width, int height) {
 			for (int y=0; y<T.height && y<height; y++) {
 				REALLOC(T.buffers[i].rows[y], T.width);
 				if (T.width > old_width)
-					clear_row(&T.buffers[i], y, old_width);
+					clear_row(&T.buffers[i], y, old_width, true);
 			}
 		}
 		// update tab stops
@@ -162,13 +162,13 @@ void term_resize(int width, int height) {
 		// alt buffer: add rows at bottom
 		for (int y=old_height; y<T.height; y++) {
 			ALLOC(T.buffers[1].rows[y], T.width);
-			clear_row(&T.buffers[1], y, 0);
+			clear_row(&T.buffers[1], y, 0, true);
 		}
 		// main buffer: also add rows at bottom
 		// todo: option to move lines out of scrollback instead?
 		for (int y=old_height; y<T.height; y++) {
 			ALLOC(T.buffers[0].rows[y], T.width);
-			clear_row(&T.buffers[0], y, 0);
+			clear_row(&T.buffers[0], y, 0, true);
 		}
 	}
 	
@@ -305,16 +305,16 @@ static void rotate(int count, int itemsize, unsigned char data[count][itemsize],
 
 // shift the rows in [`y1`,`y2`) by `amount` (negative = up, positive = down)
 // and clear the "new" lines
-static void shift_rows(int y1, int y2, int amount) {
+static void shift_rows(int y1, int y2, int amount, bool bce) {
 	rotate(y2-y1, sizeof(Cell*), (void*)&T.current->rows[y1], amount);
 	for (int y=y1; y<y2; y++)
 		T.dirty_rows[y] = true;
 	if (amount>0) {
 		for (int y=y1; y<y1+amount; y++)
-			clear_row(T.current, y, 0);
+			clear_row(T.current, y, 0, bce);
 	} else {
 		for (int y=y2+amount; y<y2; y++)
-			clear_row(T.current, y, 0);
+			clear_row(T.current, y, 0, bce);
 	}
 }
 
@@ -323,10 +323,10 @@ static void scroll_down_internal(int amount) {
 	int y1 = T.scroll_top;
 	int y2 = T.scroll_bottom;
 	limit(&amount, 0, y2-y1);
-	shift_rows(y1, y2, amount);
+	shift_rows(y1, y2, amount, true);
 }
 
-static void scroll_up_internal(int amount) {
+static void scroll_up_internal(int amount, bool bce) {
 	int y1 = T.scroll_top;
 	int y2 = T.scroll_bottom;
 	limit(&amount, 0, y2-y1);
@@ -336,7 +336,7 @@ static void scroll_up_internal(int amount) {
 			push_scrollback(y);
 			ALLOC(T.current->rows[y], T.width);
 		}
-	shift_rows(y1, y2, -amount);
+	shift_rows(y1, y2, -amount, bce);
 }
 
 void cursor_to(int x, int y) {
@@ -350,7 +350,7 @@ void cursor_to(int x, int y) {
 // these scroll + move the cursor with the scrolled text
 // todo: confirm the cases where these are supposed to move the cursor
 void scroll_up(int amount) {
-	scroll_up_internal(amount);
+	scroll_up_internal(amount, true);
 	if (T.c.y>=T.scroll_top && T.c.y<T.scroll_bottom) {
 		limit(&amount, 0, T.c.y-T.scroll_top);
 		cursor_to(T.c.x, T.c.y-amount);
@@ -490,6 +490,15 @@ static void erase_wc_right(int x, int y) {
 	}
 }
 
+// Note: "background color erase" is a controversial issue
+// for now, my solution is:
+// 1: bce is always enabled on the alternate screen
+//  - this is to improve compatibility and efficiency for 'graphical' programs, which run in the alternate screen
+// 2: bce is enabled on the main screen, when using commands to scroll or insert/delete lines etc.
+
+// 3: bce is DISABLED on the main screen, when printing newlines and when text wraps automatically.
+//  - this is so that, if a line break occurs in the middle of a highlighted region of text, it will not affect the background color of the new row.
+//  - I think I can get away with this, because it's rather uncommon to have large areas with custom background color on the main screen, so bce is rarely useful here.
 void forward_index(int amount) {
 	if (amount<=0)
 		return;
@@ -500,7 +509,7 @@ void forward_index(int amount) {
 		int push = cursor_down(amount);
 		// check if the cursor tried to pass through the margin
 		if (push > 0)
-			scroll_up_internal(push);
+			scroll_up_internal(push, T.current==&T.buffers[1]);
 	}
 }
 
@@ -593,7 +602,7 @@ void delete_chars(int n) {
 		return;
 	Row line = T.current->rows[T.c.y];
 	memmove(&line[T.c.x], &line[T.c.x+n], sizeof(Cell)*(T.width-T.c.x-n));
-	clear_row(T.current, T.c.y, T.width-n);
+	clear_row(T.current, T.c.y, T.width-n, true);
 }
 
 void insert_blank(int n) {
@@ -618,7 +627,7 @@ void insert_lines(int n) {
 	if (!n)
 		return;
 	// scroll lines down
-	shift_rows(T.c.y, T.scroll_bottom, n);
+	shift_rows(T.c.y, T.scroll_bottom, n, true);
 }
 	
 void delete_lines(int n) {
@@ -630,7 +639,7 @@ void delete_lines(int n) {
 	if (!n)
 		return;
 	// scroll lines up
-	shift_rows(T.c.y, T.scroll_bottom, -n);
+	shift_rows(T.c.y, T.scroll_bottom, -n, true);
 }
 
 void back_tab(int n) {
