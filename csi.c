@@ -212,34 +212,28 @@ static void set_private_mode(int mode, bool state) {
 		//break;
 		//case 7: // wrap?
 		//break;
-	case 9: // X10 mouse compatibility mode
-		T.mouse_mode = state ? 9 : 0;
-		break;
 	case 12: // enable/disable cursor blink
 		T.cursor_blink = state;
 		break;
 	case 25: // show/hide cursor
 		T.show_cursor = state;
 		break;
-	case 1000: // report button press
-		T.mouse_mode = state ? 1000 : 0;
+	case 9: // X10 mouse compatibility mode (report on button press only)
+	case 1000: // report on press+release, and send modifiers
+	case 1002: // like 1000, but also reports motion if button is held
+	case 1003: // like 1002, but always report motion
+		T.mouse_mode = state ? mode : 0;
 		break;
-	case 1002: // report motion on button press
-		T.mouse_mode = state ? 1002 : 0;
+	case 1004: // report focus in/out events
+		T.report_focus = state;
 		break;
-	case 1003: // enable all mouse motions
-		T.mouse_mode = state ? 1003 : 0;
-		break;
-	case 1006: // extended reporting mode
-		T.mouse_sgr = state;
+	case 1005: // utf-8 mouse encoding
+	case 1006: // sgr mouse encoding
+	case 1015: // urxvt mouse encoding
+		T.mouse_encoding = state ? mode : 0;
 		break;
 	case 1047: // to alt/main buffer
-		if (state) {
-			switch_buffer(1);
-			// do we clear when already in alt screen?
-			clear_region(0, 0, T.width, T.height);
-		} else
-			switch_buffer(0);
+		switch_buffer(state);
 		break;
 	case 1048: // save/load cursor
 		if (state)
@@ -248,14 +242,11 @@ static void set_private_mode(int mode, bool state) {
 			restore_cursor();
 		break;
 	case 1049: // 1048 and 1049
-		if (state) {
+		if (state)
 			save_cursor();
-			switch_buffer(1);
-			clear_region(0, 0, T.width, T.height);
-		} else {
-			switch_buffer(0);	
+		switch_buffer(state);
+		if (!state)
 			restore_cursor();
-		}
 		break;
 	case 2004: // set bracketed paste mode
 		T.bracketed_paste = state;

@@ -15,7 +15,7 @@ pkgs:= fontconfig freetype2 #harfbuzz
 CFLAGS+= -g
 
 CFLAGS+= -Wall -Wextra -pedantic -std=c11
-CFLAGS+= -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -Wno-parentheses
+CFLAGS+= -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -Wno-parentheses -Wno-char-subscripts
 CFLAGS+= -Werror=implicit-function-declaration -Werror=incompatible-pointer-types
 
 all: $(output) terminfo

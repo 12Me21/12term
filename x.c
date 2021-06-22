@@ -172,8 +172,8 @@ static void run(void) {
 				continue;
 		}
 		timeout = -1;
-		if (!T.show_cursor)
-			continue;
+		//if (!T.show_cursor)
+		//	continue;
 		
 		if (readed) {
 			if (!got_draw) {

@@ -107,7 +107,8 @@ typedef struct Term {
 		bool button, motion, sgr, many,
 		} mouse;*/ //to allow easy clearing
 	int mouse_mode;
-	bool mouse_sgr;
+	int mouse_encoding;
+	bool report_focus; //todo
 } Term;
 
 void init_term(int width, int height);

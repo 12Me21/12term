@@ -13,69 +13,96 @@
 #define XEMBED_FOCUS_IN  4
 #define XEMBED_FOCUS_OUT 5
 
+// only valid for inputs 0-2047
+static char* utf8_char(Char c) {
+	static char buffer[5];
+	if (c<128) {
+		sprintf(buffer, "%c", c);
+	} else if (c<2048) {
+		sprintf(buffer, "%c%c", c>>6, c&(1<<6)-1);
+	}
+	return buffer;
+}
+
+// 0-1: which button (left,middle,right,release)
+// 2: shift flag
+// 3: alt flag
+// 4: ctrl flag
+// 5: motion flag
+// 6: buttons 4-5 flag (sent by scroll wheel)
+// 7: buttons 6-7 flag (these are used for left/right scrolling on some mice + touchpads)
+// 8: buttons 8-11 flag
+
 // copied from ST: todo: rewrite this
 int ox=-1, oy=-1, oldbutton = 3;
 static void mouse_event(XEvent* ev) {
 	if (!T.mouse_mode)
 		return;
-	
+	int type = ev->xbutton.type;
+	bool click = type==ButtonPress || type==ButtonRelease;
+	int button = ev->xbutton.button;
 	int x = (ev->xbutton.x - W.border) / W.cw;
 	int y = (ev->xbutton.y - W.border) / W.ch;
 	// todo: do we clamp this or just ignore, or...
-	if (x<0)
-		x=0;
-	if (y<0)
-		y=0;
-	if (x>T.width-1)
-		x=T.width-1;
-	if (y>T.height-1)
-		y=T.height-1;
-	int button = ev->xbutton.button;
-	int mods = ev->xbutton.state;
+	if (x<0) x=0;
+	if (y<0) y=0;
+	if (x>T.width-1) x=T.width-1;
+	if (y>T.height-1) y=T.height-1;
+	bool moved = x!=ox || y!=oy;
+	ox = x; oy = y;
+	// filter out the events we actually need to report
+	if (!(
+		(T.mouse_mode==9 && type==ButtonPress) ||
+		(T.mouse_mode==1000 && click) ||
+		(T.mouse_mode==1002 && (click || (button && moved))) ||
+		(T.mouse_mode==1003 && (click || moved))))
+		return;
 	
-	/* from urxvt */
-	if (ev->xbutton.type == MotionNotify) {
-		if (x==ox && y==oy)
-			return;
-		if (T.mouse_mode!=1002 && T.mouse_mode!=1003)
-			return;
-		if (T.mouse_mode==1002 && oldbutton==3)
-			return;
-		button = oldbutton + 32;
-		ox = x;
-		oy = y;
-	} else {
-		if (!T.mouse_sgr && ev->xbutton.type == ButtonRelease) {
-			button = 3;
-		} else {
-			button -= Button1;
-			if (button >= 7)
-				button += 128 - 7;
-			else if (button >= 3)
-				button += 64 - 3;
-		}
-		if (ev->xbutton.type == ButtonPress) {
-			oldbutton = button;
-			ox = x;
-			oy = y;
-		} else if (ev->xbutton.type == ButtonRelease) {
-			oldbutton = 3;
-			/* MODE_MOUSEX10: no button release reporting */
-			if (T.mouse_mode==9)
-				return;
-			if (button == 64 || button == 65)
-				return;
-		}
+	int data = 0;
+	// this is an 8 bit value which encodes which button was pressed
+	// bits 0-1: button number (by default: 0=left, 1=middle, 2=right, 3=release(any))
+	// bits 2-4: flags for the modifier keys: shift, alt, ctrl
+	// bit 5: motion flag
+	// bit 6: if set, button number is interpreted as: 0=button4, 1=button5, 2=button6, 3=button7 (buttons 4/5 are for up/down scrolling, and 6/7 are for left/right (on touchpads and some mice))
+	// bit 7: same as bit 6, except this encodes buttons 8-11 (most mice don't have these buttons, though)
+	
+	// all button releases send the same code, except in the SGR encoding, where there is a separate flag.
+	
+	if (click) {
+		if (type==ButtonRelease && T.mouse_encoding!=1006) // release
+			data |= 3;
+		else if (button>=1 && button<=3) // left, middle, right
+			data |= button-1;
+		else if (button>=4 && button<=7) // scroll up/down/left/right
+			data |= button-4 | 1<<6;
+		else if (button>=8 && button<=11) // extra buttons
+			data |= button-8 | 1<<7;
+	} else if (type==MotionNotify) {
+		data |= 1<<5;
 	}
 	
 	if (T.mouse_mode!=9) {
-		button |= !!(mods & ShiftMask)<<2 | !!(mods & Mod4Mask)<<3 | !!(mods & ControlMask)<<4;
+		int mods = ev->xbutton.state;
+		if (mods & ShiftMask) data |= 1<<2;
+		if (mods & Mod1Mask) data |= 1<<3;
+		if (mods & ControlMask) data |= 1<<4;
 	}
 	
-	if (T.mouse_sgr) {
-		tty_printf("\x1B[<%d;%d;%d%c", button, x+1, y+1, ev->xbutton.type==ButtonRelease ? 'm' : 'M');
-	} else if (x+1<256-32 && y+1<256-32) { //todo: the utf8 version of this?
-		tty_printf("\x1B[M%c%c%c", 32+button, 32+x+1, 32+y+1);
+	switch (T.mouse_encoding) {
+	default: // ESC [ M `btn` `x` `y` (chars)
+		if (' '+x+1<256 && ' '+y+1<256)
+			tty_printf("\x1B[M%c%c%c", ' '+data, ' '+x+1, ' '+y+1);
+		break;
+	case 1005: // ESC [ M `btn` `x` `y` (utf-8 chars)
+		if (' '+x+1<2048 && ' '+y+1<2048)
+			tty_printf("\x1B[M%s%s%s", utf8_char(' '+data), utf8_char(' '+x+1), utf8_char(' '+y+1));
+		break;
+	case 1006: // sgr: ESC [ < `btn` ; `x` ; `y` ; `M/m` (decimal)
+		tty_printf("\x1B[<%d;%d;%d%c", data, x+1, y+1, type==ButtonRelease?'m':'M');
+		break;
+	case 1015: // urxvt: ESC [ `btn` ; `x` ; `y` ; `M` (decimal)
+		tty_printf("\x1B[%d;%d;%dM", data, x+1, y+1);
+		break;
 	}
 }
 
