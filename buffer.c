@@ -490,15 +490,6 @@ static void erase_wc_right(int x, int y) {
 	}
 }
 
-// Note: "background color erase" is a controversial issue
-// for now, my solution is:
-// 1: bce is always enabled on the alternate screen
-//  - this is to improve compatibility and efficiency for 'graphical' programs, which run in the alternate screen
-// 2: bce is enabled on the main screen, when using commands to scroll or insert/delete lines etc.
-
-// 3: bce is DISABLED on the main screen, when printing newlines and when text wraps automatically.
-//  - this is so that, if a line break occurs in the middle of a highlighted region of text, it will not affect the background color of the new row.
-//  - I think I can get away with this, because it's rather uncommon to have large areas with custom background color on the main screen, so bce is rarely useful here.
 void forward_index(int amount) {
 	if (amount<=0)
 		return;
@@ -509,7 +500,7 @@ void forward_index(int amount) {
 		int push = cursor_down(amount);
 		// check if the cursor tried to pass through the margin
 		if (push > 0)
-			scroll_up_internal(push, T.current==&T.buffers[1]);
+			scroll_up_internal(push, T.current==&T.buffers[1]); // note: here, bce is only enabled on the alt screen
 	}
 }
 

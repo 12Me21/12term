@@ -7,6 +7,15 @@ I hope to perhaps add image support eventually, using the kitty graphics protoco
 
 Starting ~June 6th, i've been writing this terminal using itself (with emacs of course)
 
+Note: "background color erase" is a controversial issue...
+for now, my solution is:
+1: bce is always enabled on the alternate screen
+ - this is to improve compatibility and efficiency for 'graphical' programs, which run in the alternate screen
+2: bce is enabled on the main screen, when using commands to scroll or insert/delete lines etc.
+3: bce is DISABLED on the main screen, when printing newlines and when text wraps automatically.
+ - this is so that, if a line break occurs in the middle of a highlighted region of text, it will not affect the background color of the new row.
+ - I think I can get away with this, because it's rather uncommon to have large areas with custom background color on the main screen, so bce is rarely useful here.
+
 
 todo: ok so i renamed buffer1.h to buffer.h and got an error running make
 one of the dependency files listed buffer1.h and it didn't realize nothing needed it
