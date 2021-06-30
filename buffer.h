@@ -116,4 +116,3 @@ void term_resize(int width, int height);
 void dirty_all(void);
 
 extern Term T;
-

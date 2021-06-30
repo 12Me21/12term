@@ -1,5 +1,7 @@
 #pragma once
-// Functions for manipulating the buffer contents
+// == Functions for manipulating the buffer contents ==
+// these are all defined in buffer.c, but I didn't want to include them in buffer.h because they're only used by the control sequence parser
+// so, buffer.h just contains the structure definitions and a few basic functions, while buffer2.h contains the commands
 
 #include "common.h"
 
@@ -37,8 +39,3 @@ void select_charset(int g, Char set);
 void full_reset(void);
 
 void switch_buffer(bool alt);
-
-
-
-
-
