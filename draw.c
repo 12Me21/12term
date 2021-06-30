@@ -19,8 +19,9 @@ static bool cursor_drawn = false;
 static int cursor_x, cursor_y;
 static int cursor_width;
 
-static Pixmap pix;
-static XftDraw* xft_draw;
+static Pixmap pix = None;
+static XftDraw* xft_draw = NULL;
+static Pixmap under_cursor = None;
 
 static GC gc;
 
@@ -74,7 +75,8 @@ static void init_pixmap(void) {
 	clear_background();
 }
 
-void draw_resize(int width, int height) {
+void draw_resize(int width, int height, bool charsize) {
+	print("got draw resize\n");
 	init_pixmap();
 	
 	if (drawn_chars) {
@@ -88,6 +90,12 @@ void draw_resize(int width, int height) {
 		ALLOC(drawn_chars[y], drawn_width);
 		for (int x=0; x<drawn_width; x++)
 			drawn_chars[y][x] = (DrawnCell){0}; // mreh
+	}
+	// char size changing
+	if (charsize) {
+		if (under_cursor)
+			XFreePixmap(W.d, under_cursor);
+		under_cursor = XCreatePixmap(W.d, W.win, W.cw*2, W.ch, DefaultDepth(W.d, W.scr));
 	}
 }
 
@@ -130,7 +138,7 @@ static void draw_char_overlays(int x, int y, Cell* c) {
 static void erase_cursor(void) {
 	if (!cursor_drawn)
 		return;
-	XCopyArea(W.d, W.under_cursor, pix, gc,
+	XCopyArea(W.d, under_cursor, pix, gc,
 		0, 0, W.cw*cursor_width, W.ch, // source area
 		W.border+W.cw*cursor_x, W.border+W.ch*cursor_y); // dest pos
 	cursor_drawn = false;
@@ -159,7 +167,7 @@ static void draw_cursor(int x, int y) {
 	int width = temp.wide==1 ? 2 : 1;
 	
 	// save the area underneath the cursor so we can redraw it later
-	XCopyArea(W.d, pix, W.under_cursor, gc, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch, 0, 0);
+	XCopyArea(W.d, pix, under_cursor, gc, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch, 0, 0);
 	
 	// this time we do NOT want it to overflow ever
 	XftDrawSetClipRectangles(xft_draw, x*W.cw+W.border, y*W.ch+W.border, &(XRectangle){
@@ -254,7 +262,7 @@ static void draw_row(int y) {
 }
 
 void repaint(void) {
-	if (pix != W.win)
+	if (pix)
 		XCopyArea(W.d, pix, W.win, gc, 0, 0, W.w, W.h, 0, 0);
 }
 
@@ -281,7 +289,7 @@ void draw(void) {
 
 void init_draw(void) {
 	gc = XCreateGC(W.d, W.win, GCGraphicsExposures, &(XGCValues){
-		.graphics_exposures = False,	
+		.graphics_exposures = False,
 	});
 }
 

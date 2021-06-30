@@ -27,19 +27,18 @@
 #include "ctlseqs.h"
 void sleep_forever(bool hangup); // nnn where do these decs go...
 
-const char* termname = "xterm-12term"; // todo
+static Fd master_fd;
+static pid_t child_pid;
 
-static Fd cmdfd;
-static pid_t pid;
-
-void sigchld(int a) {
+void sigchld(int signum) {
+	(void)signum;
 	int stat;
-	pid_t p = waitpid(pid, &stat, WNOHANG);
+	pid_t pid = waitpid(child_pid, &stat, WNOHANG);
 	
-	if (p < 0)
-		die("waiting for pid %hd failed: %s\n", pid, strerror(errno));
+	if (pid < 0)
+		die("waiting for pid %hd failed: %s\n", child_pid, strerror(errno));
 	
-	if (pid != p)
+	if (pid != child_pid)
 		return;
 	
 	if (WIFEXITED(stat) && WEXITSTATUS(stat))
@@ -68,7 +67,7 @@ static void execsh(void) {
 	setenv("USER", pw->pw_name, 1);
 	setenv("SHELL", sh, 1);
 	setenv("HOME", pw->pw_dir, 1);
-	setenv("TERM", termname, 1);
+	setenv("TERM", "xterm-12term", 1);
 	
 	signal(SIGCHLD, SIG_DFL);
 	signal(SIGHUP, SIG_DFL);
@@ -92,10 +91,10 @@ static void openbsd_pledge(const char* a, void* b) {
 #endif
 
 void tty_init(void) {
-	pid = forkpty(&cmdfd, NULL, NULL, NULL);
-	if (pid<0) { // ERROR
+	child_pid = forkpty(&master_fd, NULL, NULL, NULL);
+	if (child_pid<0) { // ERROR
 		die("forkpty failed: %s\n", strerror(errno));
-	} else if (pid==0) { // CHILD
+	} else if (child_pid==0) { // CHILD
 		openbsd_pledge("stdio getpw proc exec", NULL); 
 		execsh();
 		_exit(0);
@@ -108,7 +107,7 @@ void tty_init(void) {
 // read from child process and process the text
 size_t tty_read(void) {
 	char buf[1024]; // how big to make this?
-	ssize_t len = read(cmdfd, buf, LEN(buf));
+	ssize_t len = read(master_fd, buf, LEN(buf));
 	//print("read %ld bytes\n", len);
 	if (len>0) {
 		// todo: move this stuff into x.c maybe so we don't need buffer.h in this file?
@@ -145,19 +144,19 @@ void tty_write(size_t len, const char str[len]) {
 		// wait for uhhhh
 		FD_ZERO(&write_fds);
 		FD_ZERO(&read_fds);
-		FD_SET(cmdfd, &write_fds);
-		FD_SET(cmdfd, &read_fds);
-		if (pselect(cmdfd+1, &read_fds, &write_fds, NULL, NULL, NULL) < 0) {
+		FD_SET(master_fd, &write_fds);
+		FD_SET(master_fd, &read_fds);
+		if (pselect(master_fd+1, &read_fds, &write_fds, NULL, NULL, NULL) < 0) {
 			if (errno==EINTR || errno==EAGAIN)
 				continue;
 			die("select failed: %s\n", strerror(errno));
 		}
 		
-		if (FD_ISSET(cmdfd, &write_fds)) {
+		if (FD_ISSET(master_fd, &write_fds)) {
 			// Only write the bytes written by ttywrite() or the
 			// default of 256. This seems to be a reasonable value
 			// for a serial line. Bigger values might clog the I/O.
-			ssize_t written = write(cmdfd, pos, min(len, lim));
+			ssize_t written = write(master_fd, pos, min(len, lim));
 			if (written < 0) {
 				die("write error on tty: %s\n", strerror(errno));
 			} else if (written >= len) {
@@ -173,18 +172,19 @@ void tty_write(size_t len, const char str[len]) {
 				pos += written;
 			}
 		}
-		if (FD_ISSET(cmdfd, &read_fds))
+		if (FD_ISSET(master_fd, &read_fds))
 			lim = tty_read();
 	}
 }
 
 void tty_hangup(void) {
 	//signal(SIGCHLD, SIG_DFL);
-	kill(pid, SIGHUP);
+	kill(child_pid, SIGHUP);
 }
 
 void tty_resize(int w, int h, Px pw, Px ph) {
-	if (ioctl(cmdfd, TIOCSWINSZ, &(struct winsize){
+	// TIOCSWINSZ = T? IOCtl() Set WINdow SiZe
+	if (ioctl(master_fd, TIOCSWINSZ, &(struct winsize){
 		.ws_col = w,
 		.ws_row = h,
 		.ws_xpixel = pw,
@@ -199,13 +199,13 @@ static int max(int a, int b) {
 	return b;
 }
 
-//wait until data is recieved on either cmdfd (the fd used to communicate with the child) OR xfd (notifies when x events are recieved)
-// returns true if data was recvd on cmdfd
+//wait until data is recieved on either master_fd (the fd used to communicate with the child) OR xfd (notifies when x events are recieved)
+// returns true if data was recvd on master_fd
 bool tty_wait(Fd xfd, int timeout) {
 	fd_set rfd;
 	while (1) {
 		FD_ZERO(&rfd);
-		FD_SET(cmdfd, &rfd);
+		FD_SET(master_fd, &rfd);
 		FD_SET(xfd, &rfd);
 		
 		struct timespec seltv = {
@@ -214,11 +214,11 @@ bool tty_wait(Fd xfd, int timeout) {
 		};
 		struct timespec* tv = timeout>=0 ? &seltv : NULL;
 		
-		if (pselect(max(xfd, cmdfd)+1, &rfd, NULL, NULL, tv, NULL) < 0) {
+		if (pselect(max(xfd, master_fd)+1, &rfd, NULL, NULL, tv, NULL) < 0) {
 			if (!(errno==EINTR || errno==EAGAIN))
 				die("select failed: %s\n", strerror(errno));
 		} else
 			break;
 	}
-	return FD_ISSET(cmdfd, &rfd);
+	return FD_ISSET(master_fd, &rfd);
 }

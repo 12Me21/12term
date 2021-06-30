@@ -132,13 +132,9 @@ static void on_expose(XEvent* e) {
 	//repaint();
 }
 
+// when window is resized
 static void on_configurenotify(XEvent* e) {
-	Px width = e->xconfigure.width;
-	Px height = e->xconfigure.height;
-	if (width==W.w && height==W.h)
-		return;
-	
-	update_size((width-W.border*2)/W.cw, (height-W.border*2)/W.ch);
+	change_size(e->xconfigure.width, e->xconfigure.height, false);
 }
 
 static void on_clientmessage(XEvent* e) {

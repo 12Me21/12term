@@ -36,41 +36,42 @@ RGBColor parse_x_color(const char* c) {
 	};
 }
 
-// when the size of the terminal (in character cells) changes
-// (also called to initialize size)
-// todo: what if the size (in pixels) changes but not the size in char cells?
-// like, if someone resizes the window by 1px, OR if the font size changes?
-void update_size(int width, int height) {
-	W.w = W.border*2+width*W.cw;
-	W.h = W.border*2+height*W.ch;
+// so we need to clean up these size change functions
+// basically, there are a few cases:
+// 1: on init, we update both the window size and the char size
+// 2: when the font changes, we update the char size and probably the window size too? (do we preserve the window size or??)
+// 3: when the window is resized, we update the window size only.
+
+// updating the char size is the main expensive operation, as it requires clearing the font cache (or whatever).
+
+// so anyway how about this:
+// when the window is resized, we call a function which just updates the total size.
+// on init, and when switching fonts, we call another function which updates both.
+
+// this is called when changing the window size
+// set `charsize` if W.cw or W.ch have changed.
+void change_size(Px w, Px h, bool charsize) {
+	Px base = W.border*2;
+	int width = (w-base) / W.cw;
+	int height = (h-base) / W.ch;
+	W.w = w;
+	W.h = h;
+	if (charsize) {
+		XSetWMNormalHints(W.d, W.win, &(XSizeHints){
+			.flags = PSize | PResizeInc | PBaseSize | PMinSize,
+			.width = W.w,
+			.height = W.h,
+			.width_inc = W.cw,
+			.height_inc = W.ch,
+			.base_width = base,
+			.base_height = base,
+			.min_width = base + W.cw*2,
+			.min_height = base + W.ch*2,
+		});
+	}
 	tty_resize(width, height, width*W.cw, height*W.ch);
 	term_resize(width, height);
-	draw_resize(width, height); //todo: order?
-	//draw();
-}
-
-// when the size of the character cells changes (i.e. when changing fontsize)
-// we don't actually use this yet except during init
-static void update_charsize(Px w, Px h) {
-	W.cw = w;
-	W.ch = h;
-	if (W.under_cursor)
-		XFreePixmap(W.d, W.under_cursor);
-	W.under_cursor = XCreatePixmap(W.d, W.win, W.cw*2, W.ch, DefaultDepth(W.d, W.scr));
-	
-	Px base = W.border*2;
-	XSetWMNormalHints(W.d, W.win, &(XSizeHints){
-		.flags = PSize | PResizeInc | PBaseSize | PMinSize,
-		.width = W.w,
-		.height = W.h,
-		.width_inc = W.cw,
-		.height_inc = W.ch,
-		.base_width = base,
-		.base_height = base,
-		.min_width = base + W.cw*2,
-		.min_height = base + W.ch*2,
-	});
-	dirty_all();
+	draw_resize(width, height, charsize);
 }
 
 __attribute__((noreturn)) void sleep_forever(bool hangup) {
@@ -108,17 +109,11 @@ static void run(void) {
 		if (XFilterEvent(&ev, None))
 			continue;
 		if (ev.type == ConfigureNotify) {
-			W.w = ev.xconfigure.width;
-			W.h = ev.xconfigure.height;
+			change_size(ev.xconfigure.width, ev.xconfigure.height, true);
 		}
 	} while (ev.type != MapNotify);
 	
 	time_log("window mapped");
-	
-	int w = (W.w-W.border*2) / W.cw;
-	int h = (W.h-W.border*2) / W.ch;
-	
-	update_size(w, h); // must be called after tty is created
 	
 	float timeout = -1;
 	struct timespec trigger = {0};
@@ -192,10 +187,11 @@ static void run(void) {
 }
 
 static void init_atoms(void) {
-	XInternAtoms(W.d, (char*[]){
-		"_XEMBED", "WM_DELETE_WINDOW", "_NET_WM_NAME", "_NET_WM_ICON_NAME", "_NET_WM_PID", "UTF8_STRING", "CLIPBOARD", "INCR"
-	}, 8, False, W.atoms_array);
-	if (!W.atoms.utf8_string)
+	char* ATOM_NAMES[] = {
+		"_XEMBED", "WM_DELETE_WINDOW", "_NET_WM_NAME", "_NET_WM_ICON_NAME", "_NET_WM_PID", "UTF8_STRING", "CLIPBOARD", "INCR",
+	};
+	XInternAtoms(W.d, ATOM_NAMES, LEN(ATOM_NAMES), False, &W.atoms_0);
+	if (!W.atoms.utf8_string) // is this even like, possible?
 		W.atoms.utf8_string = XA_STRING;
 }
 
@@ -235,7 +231,7 @@ int main(int argc, char* argv[argc+1]) {
 	setlocale(LC_CTYPE, "");
 	XSetLocaleModifiers("");
 	
-	// default size
+	// default size (todo)
 	int w = 50;
 	int h = 10;
 	
@@ -291,22 +287,24 @@ int main(int argc, char* argv[argc+1]) {
 	// set _NET_WM_PID property
 	XChangeProperty(W.d, W.win, W.atoms.net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (unsigned char*)&(pid_t){getpid()}, 1);
 	
-	Pixmap mask = 0;
-	XpmCreatePixmapFromData(W.d, W.win, ICON_XPM, &W.icon_pixmap, &mask, 0);
-	
-	XSetWMHints(W.d, W.win, &(XWMHints){
-		.flags = InputHint | IconPixmapHint,
-		.input = true, // which input focus model
-		.icon_pixmap = W.icon_pixmap,
-	});
+	// set title and icon
 	XSetClassHint(W.d, W.win, &(XClassHint){
 		.res_name = "12term",
 		.res_class = "12term",
 	});
 	set_title(NULL);
 	
-	update_charsize(W.cw, W.ch);
+	Pixmap icon_pixmap;
+	Pixmap mask = 0;
+	XpmCreatePixmapFromData(W.d, W.win, ICON_XPM, &icon_pixmap, &mask, 0);
 	
+	XSetWMHints(W.d, W.win, &(XWMHints){
+		.flags = InputHint | IconPixmapHint,
+		.input = true, // which input focus model
+		.icon_pixmap = icon_pixmap,
+	});
+	
+	// init other things
 	init_draw();
 	
 	init_input();
@@ -315,15 +313,13 @@ int main(int argc, char* argv[argc+1]) {
 	
 	time_log("created window");
 	
-	init_term(w, h);
+	init_term(w, h); // todo: we are going to get a term_resize event quickly after this, mmm
 	
 	run();
 	return 0;
 }
 
 void change_font(const char* name) {
-	init_fonts(name, 16);
-	update_charsize(W.cw, W.ch);
-	update_size(T.width, T.height);
-	XResizeWindow(W.d, W.win, W.w, W.h);
+	init_fonts(name, 0);
+	change_size(W.w, W.h, true);
 }
