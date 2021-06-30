@@ -13,7 +13,6 @@ libs:= m rt X11 util Xft Xpm
 pkgs:= fontconfig freetype2 #harfbuzz
 
 CFLAGS+= -g
-
 CFLAGS+= -Wall -Wextra -pedantic -std=c11
 CFLAGS+= -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -Wno-parentheses -Wno-char-subscripts
 CFLAGS+= -Werror=implicit-function-declaration -Werror=incompatible-pointer-types
@@ -25,6 +24,10 @@ all: $(output) terminfo
 include .Nice.mk
 
 
+
+# change the variable defined by icon.xpm from `static char* icon_xpm[]` to `const char* ICON_XPM[]` so it can be linked as a separate c file.
+icon.xpm.c: icon.xpm
+	sed 's`^static char .*`// THIS FILE IS GENERATED FROM icon.xpm\nconst char* ICON_XPM[] = {`g' $< >$@
 
 # call `tic -D` to figure out the location of terminfo files
 terminfo!= tic -D 2>/dev/null | head -n1
