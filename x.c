@@ -25,6 +25,7 @@ extern char* ICON_XPM[];
 Xw W = {0};
 
 // hhhh
+// todo: output some kind of status for invalid?
 RGBColor parse_x_color(const char* c) {
 	XColor ret;
 	XParseColor(W.d, W.cmap, c, &ret);
@@ -192,8 +193,8 @@ static void run(void) {
 
 static void init_atoms(void) {
 	XInternAtoms(W.d, (char*[]){
-			"_XEMBED", "WM_DELETE_WINDOW", "_NET_WM_NAME", "_NET_WM_ICON_NAME", "_NET_WM_PID", "UTF8_STRING", "CLIPBOARD", "INCR"
-		}, 8, False, W.atoms_array);
+		"_XEMBED", "WM_DELETE_WINDOW", "_NET_WM_NAME", "_NET_WM_ICON_NAME", "_NET_WM_PID", "UTF8_STRING", "CLIPBOARD", "INCR"
+	}, 8, False, W.atoms_array);
 	if (!W.atoms.utf8_string)
 		W.atoms.utf8_string = XA_STRING;
 }
@@ -221,7 +222,7 @@ extern RGBColor default_background; //messy messy messy
 
 void set_title(char* s) {
 	if (!s)
-		s = "12term";
+		s = "12term"; // default title
 	XSetWMName(W.d, W.win, &(XTextProperty){
 		(unsigned char*)s, W.atoms.utf8_string, 8, strlen(s)
 	});
@@ -311,8 +312,6 @@ int main(int argc, char* argv[argc+1]) {
 	init_input();
 	
 	XMapWindow(W.d, W.win);
-	
-	//XSync(W.d, False); //do we need this?
 	
 	time_log("created window");
 	

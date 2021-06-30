@@ -660,9 +660,8 @@ void select_charset(int g, Char set) {
 }
 
 void switch_buffer(bool alt) {
-	bool change = T.current==&T.buffers[0] ? alt : !alt;
-	print("switching buffer to %d. change? %d\n", alt, change);
-	if (change) {
+	bool prev = T.current==&T.buffers[1];
+	if (prev != alt) {
 		T.current = &T.buffers[alt];
 		if (alt)
 			clear_region(0, 0, T.width, T.height);
