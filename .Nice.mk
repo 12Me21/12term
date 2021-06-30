@@ -46,6 +46,9 @@ $(junkdir)/%.o $(junkdir)/%.mk : $(srcdir)/%.c
 clean:
 	$(RM) -r $(junkbase)
 	$(RM) $(output)
+ifdef clean_extra # extra user defined files to be cleaned
+	$(RM) $(clean_extra)
+endif
 
 ifneq ($(findstring clean,$(MAKECMDGOALS)),)
  #disable multiple jobs when clean is running, since that will break.
