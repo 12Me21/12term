@@ -9,9 +9,10 @@ xterm-12term|my terminal owo,
   setf24=\E[38:2:%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm,
   setb24=\E[48:2:%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm,
 # cursor shapes/colors, clipboard
-  use=xterm+tmux,
+  Cr=\E]112\007, Cs=\E]12;%p1%s\007,
+  Ms=\E]52;%p1%s;%p2%s\007, Se=\E[2 q, Ss=\E[%p1%d q,
 # allow setting window title
-  use=xterm+sl,
+  hs, dsl=\E]0;\007, fsl=^G, tsl=\E]0;, TS=\E]0;,
 # kitty underline styling
   Su,
 # base xterm
