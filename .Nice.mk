@@ -16,17 +16,17 @@ srcdir?= .
 empty:=
 comma:= ,
 printlist = [$1m$(subst $(empty) $(empty),[39m$(comma) [$1m,$(2:$3%=[$1m%))
-print = echo '[48:5:230m[K$(call printlist,33,$1,$2)	[37mfrom: $(call printlist,32,$3,$4)[m'
+print = echo '[48;5;230m[K$(call printlist,33,$1,$2)	[37mfrom: $(call printlist,32,$3,$4)[m'
 
 ifdef pkgs
  CFLAGS+= $(shell pkg-config --cflags $(pkgs))
- LDFLAGS+= $(shell pkg-config --libs $(pkgs))
+ libflags:= $(shell pkg-config --libs $(pkgs))
 endif
 
 # Link
 $(output): $(srcs:%=$(junkdir)/%.o)
 	@$(call print,$@,,$^,$(junkdir)/)
-	@$(CC) $(LDFLAGS) $^ $(libs:%=-l%) -o $@
+	@$(CC) $^ $(libflags) $(libs:%=-l%) -o $@
 
 # Compile
 # (this should be a grouped target ( &: instead of : ) but,

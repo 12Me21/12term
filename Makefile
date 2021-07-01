@@ -7,8 +7,9 @@ libs:= m rt X11 util Xft Xpm
 # rt: realtime extensions (do i need this?)
 # X11: X
 # util: pty stuff
-# Xft: X FreeType interface
+# Xft: X FreeType interface (font rendering)
 # Xpm: reading xpm image data (for icon)
+# fontconfig: loading fonts
 
 pkgs:= fontconfig freetype2 #harfbuzz
 
