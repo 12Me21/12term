@@ -240,6 +240,8 @@ int main(int argc, char* argv[argc+1]) {
 	//W.ligatures = true;
 	
 	W.d = XOpenDisplay(NULL);
+	if (!W.d)
+		die("Could not connect to X server\n");
 	W.scr = XDefaultScreen(W.d);
 	W.vis = XDefaultVisual(W.d, W.scr);
 	

@@ -1,6 +1,7 @@
-all: $(output) terminfo
 # output executable
 output:= 12term
+
+all: $(output) terminfo
 
 # all the .c files
 srcs:= x tty debug buffer ctlseqs keymap csi draw font icon.xpm event

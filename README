@@ -4,9 +4,9 @@ This probably complicates licensing, but fortunately I don't care :)
 # Dependencies
 - xlib
 - freetype 2
-- fontconfig (libfontconfig-dev)
-- xft (libxft-dev)
-- xpm (libxpm-dev)
+- fontconfig (libfontconfig-dev) (fontconfig)
+- xft (libxft-dev) (libxft)
+- xpm (libxpm-dev) (libxpm)
 (you ccan probably just install xft and xpm and the rest will be dependencies of those)
 
 the goal is to match the behavior of xterm (minus some complex features that aren't used much)
