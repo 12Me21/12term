@@ -1,19 +1,27 @@
 Much of the X and pseudoterminal code is borrowed from st (https://st.suckless.org/)
 This probably complicates licensing, but fortunately I don't care :)
 
-# Dependencies
-- xlib
-- freetype 2
-- fontconfig (libfontconfig-dev) (fontconfig)
-- xft (libxft-dev) (libxft)
-- xpm (libxpm-dev) (libxpm)
-(you ccan probably just install xft and xpm and the rest will be dependencies of those)
-
 the goal is to match the behavior of xterm (minus some complex features that aren't used much)
 
 I hope to perhaps add image support eventually, using the kitty graphics protocol.
 
 Starting ~June 6th, i've been writing this terminal using itself (with emacs of course)
+
+# Dependencies
+
+| name | apt        | pacman |
+|------|------------|--------|
+| xft  | libxft-dev | libxft |
+| xpm  | libxpm-dev | libxpm |
+
+# References:
+- st source code
+- https://invisible-island.net/xterm/ctlseqs/ctlseqs.html
+- xterm source code + behavior
+- https://sw.kovidgoyal.net/kitty/protocol-extensions.html
+- https://en.wikipedia.org/wiki/ANSI_escape_code (this page sucks but a lot of people probably read it so it's good to support the stuff listed there)
+
+# Notes
 
 Note: "background color erase" is a controversial issue...
 for now, my solution is:
@@ -24,14 +32,6 @@ for now, my solution is:
  - this is so that, if a line break occurs in the middle of a highlighted region of text, it will not affect the background color of the new row.
  - I think I can get away with this, because it's rather uncommon to have large areas with custom background color on the main screen, so bce is rarely useful here.
 
-
 todo: ok so i renamed buffer1.h to buffer.h and got an error running make
 one of the dependency files listed buffer1.h and it didn't realize nothing needed it
 how to fix?
-
-# References:
-- st source code
-- https://invisible-island.net/xterm/ctlseqs/ctlseqs.html
-- xterm source code + behavior
-- https://sw.kovidgoyal.net/kitty/protocol-extensions.html
-- https://en.wikipedia.org/wiki/ANSI_escape_code (this page sucks but a lot of people probably read it so it's good to support the stuff listed there)

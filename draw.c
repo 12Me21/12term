@@ -76,7 +76,6 @@ static void init_pixmap(void) {
 }
 
 void draw_resize(int width, int height, bool charsize) {
-	print("got draw resize\n");
 	init_pixmap();
 	
 	if (drawn_chars) {

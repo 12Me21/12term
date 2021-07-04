@@ -10,9 +10,6 @@
 #include "tty.h"
 #include "draw.h"
 
-#define XEMBED_FOCUS_IN  4
-#define XEMBED_FOCUS_OUT 5
-
 // only valid for inputs 0-2047
 static char* utf8_char(Char c) {
 	static char buffer[5];
@@ -109,27 +106,23 @@ static void mouse_event(XEvent* ev) {
 static void on_motionnotify(XEvent* ev) {
 	mouse_event(ev);
 }
-
 static void on_buttonpress(XEvent* ev) {
 	mouse_event(ev);
 }
-
 static void on_buttonrelease(XEvent* ev) {
 	mouse_event(ev);
 }
 
 static void on_visibilitynotify(XEvent* ev) {
 	//XVisibilityEvent* e = &ev->xvisibility;
-	print("visibility\n");
+	//print("visibility\n");
 	//MODBIT(win.mode, e->state != VisibilityFullyObscured, MODE_VISIBLE);
 }
 
 static void on_expose(XEvent* e) {
 	(void)e;
-	print("expose\n");
 	dirty_all();
-	draw(); // maybe this helps
-	//repaint();
+	draw();
 }
 
 // when window is resized
@@ -138,15 +131,7 @@ static void on_configurenotify(XEvent* e) {
 }
 
 static void on_clientmessage(XEvent* e) {
-	if (e->xclient.message_type == W.atoms.xembed && e->xclient.format == 32) {
-		// do we need to do this anymore?
-		if (e->xclient.data.l[1] == XEMBED_FOCUS_IN) {
-			//win.mode |= MODE_FOCUSED;
-			//xseturgency(0);
-		} else if (e->xclient.data.l[1] == XEMBED_FOCUS_OUT) {
-			//win.mode &= ~MODE_FOCUSED;
-		}
-	} else if (e->xclient.data.l[0] == W.atoms.wm_delete_window) {
+	if (e->xclient.data.l[0] == W.atoms.wm_delete_window) {
 		print("window closing\n");
 		sleep_forever(true);
 	}

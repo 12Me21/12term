@@ -104,14 +104,18 @@ static double maxlatency = 33;
 // todo: clean this up
 static void run(void) {
 	XEvent ev;
+	int w = W.w, h = W.h;
 	do {
 		XNextEvent(W.d, &ev);
 		if (XFilterEvent(&ev, None))
 			continue;
 		if (ev.type == ConfigureNotify) {
-			change_size(ev.xconfigure.width, ev.xconfigure.height, true);
+			w = ev.xconfigure.width;
+			h = ev.xconfigure.height;
 		}
 	} while (ev.type != MapNotify);
+	
+	change_size(w, h, true);
 	
 	time_log("window mapped");
 	
