@@ -4,7 +4,7 @@ output:= 12term
 all: $(output) terminfo
 
 # all the .c files
-srcs:= x tty debug buffer ctlseqs keymap csi draw font icon.xpm event
+srcs:= x tty debug buffer ctlseqs keymap csi draw font icon.xpm event #lua
 
 lua_version:= 5.2
 
@@ -15,7 +15,7 @@ libs:= m rt util
 # util: pty stuff
 
 # arguments for pkg-config
-pkgs:= fontconfig freetype2 x11 xpm xft #lua$(lua_version) #//harfbuzz
+pkgs:= xft xpm x11 freetype2 fontconfig #lua$(lua_version) #//harfbuzz
 # fontconfig: (loading fonts)
 # freetype2: (font rendering)
 # X11: X window system (graphics, input, etc.)
@@ -24,7 +24,7 @@ pkgs:= fontconfig freetype2 x11 xpm xft #lua$(lua_version) #//harfbuzz
 
 
 
-CFLAGS+= -g # include debug symbols
+CFLAGS+= -s
 CFLAGS+= -Wall -Wextra -pedantic -std=c11 # turn on a bunch of warnings
 CFLAGS+= -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -Wno-parentheses -Wno-char-subscripts # disable these warnings
 CFLAGS+= -Werror=implicit-function-declaration -Werror=incompatible-pointer-types # make these warnings into errors

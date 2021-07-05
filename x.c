@@ -19,6 +19,7 @@
 #include "font.h"
 #include "buffer.h"
 #include "event.h"
+//#include "lua.h"
 
 extern char* ICON_XPM[];
 
@@ -124,6 +125,9 @@ static void run(void) {
 	bool drawing = false;
 	bool got_text = false, got_draw = false; //just for logging
 	bool readed = false;
+	
+	//init_lua();
+	//time_log("lua");
 	
 	while (1) {
 		Fd xfd = XConnectionNumber(W.d); // do we need to check this every time?
@@ -255,7 +259,7 @@ int main(int argc, char* argv[argc+1]) {
 	
 	init_atoms();
 	
-	FcInit();
+	XftInit(NULL);
 	// todo: this
 	init_fonts("cascadia code,fira code,monospace:pixelsize=16:antialias=true:autohint=true", 0);
 	
