@@ -55,6 +55,8 @@ void change_size(Px w, Px h, bool charsize) {
 	Px base = W.border*2;
 	int width = (w-base) / W.cw;
 	int height = (h-base) / W.ch;
+	if (width<2) width=2;
+	if (height<2) height=2;
 	W.w = w;
 	W.h = h;
 	if (charsize) {
