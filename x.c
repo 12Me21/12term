@@ -260,8 +260,7 @@ int main(int argc, char* argv[argc+1]) {
 	init_atoms();
 	
 	XftInit(NULL);
-	// todo: this
-	init_fonts("cascadia code,fira code,monospace:size=12:antialias=true:autohint=true", 0);
+	init_fonts(default_font, 0);
 	
 	// messy messy
 	W.w = W.cw*w+W.border*2;

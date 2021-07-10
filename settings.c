@@ -22,7 +22,6 @@ RGBColor default_palette[16] = {
 	{ 85,255,255}, // light cyan
 	{255,255,255}, // light white
 };
-
 RGBColor default_cursor = {  0,192,  0};
 RGBColor default_foreground = {  0,  0,  0};
 RGBColor default_background = {255,255,255};
@@ -30,3 +29,5 @@ int default_cursor_style = 2;
 
 int default_width = 80;
 int default_height = 24;
+
+const char* default_font = "cascadia code,fira code,monospace:size=12:antialias=true:autohint=true";

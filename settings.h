@@ -9,3 +9,5 @@ extern int default_cursor_style;
 
 extern int default_width;
 extern int default_height;
+
+extern const char* default_font;
