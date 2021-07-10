@@ -24,3 +24,6 @@ RGBColor default_cursor = {  0,192,  0};
 RGBColor default_foreground = {  0,  0,  0};
 RGBColor default_background = {255,255,255};
 int default_cursor_style = 2;
+
+int default_width = 80;
+int default_height = 24;

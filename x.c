@@ -240,9 +240,8 @@ int main(int argc, char* argv[argc+1]) {
 	setlocale(LC_CTYPE, "");
 	XSetLocaleModifiers("");
 	
-	// default size (todo)
-	int w = 50;
-	int h = 10;
+	int w = default_width;
+	int h = default_height;
 	
 	W.border = 3;
 	
