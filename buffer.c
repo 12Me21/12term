@@ -9,32 +9,9 @@
 #include "common.h"
 #include "buffer.h"
 #include "ctlseqs.h"
+#include "settings.h"
 
 Term T; // ok there's really no reason to ever need more than one of these anyway.
-
-RGBColor default_palette[16] = {
-	//r , g , b 
-	{  0,  0,  0},
-	{170,  0,  0},
-	{  0,170,  0},
-	{170, 85,  0},
-	{  0,  0,170},
-	{170,  0,170},
-	{  0,170,170},
-	{170,170,170},
-	{ 85, 85, 85},
-	{255, 85, 85},
-	{ 85,255, 85},
-	{255,255, 85},
-	{ 85, 85,255},
-	{255, 85,255},
-	{ 85,255,255},
-	{255,255,255},
-};
-RGBColor default_cursor = {  0,192,  0};
-RGBColor default_foreground = {  0,  0,  0};
-RGBColor default_background = {255,255,255};
-int default_cursor_style = 2;
 
 static void limit(int* x, int min, int max) {
 	if (*x<min)

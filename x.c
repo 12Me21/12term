@@ -19,6 +19,7 @@
 #include "font.h"
 #include "buffer.h"
 #include "event.h"
+#include "settings.h"
 //#include "lua.h"
 
 extern char* ICON_XPM[];
@@ -204,8 +205,6 @@ static void init_atoms(void) {
 	if (!W.atoms.utf8_string) // is this even like, possible?
 		W.atoms.utf8_string = XA_STRING;
 }
-
-extern RGBColor default_background; //messy messy messy
 
 // TODO: clean up startup process
 // 1: set locale
