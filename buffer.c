@@ -237,7 +237,7 @@ void init_term(int width, int height) {
 	full_reset();
 	init_scrollback();
 	int f = open("init", O_RDONLY);
-	print("init\n");
+	//print("init\n");
 	if (f) {
 		char buf[1024*100];
 		while (1) {
