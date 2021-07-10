@@ -25,14 +25,6 @@ static void dump(Char last) {
 	print("\n");
 }
 
-static int limit(int x, int min, int max) {
-	if (x<min)
-		return min;
-	if (x>max)
-		return max;
-	return x;
-}
-
 static bool process_sgr_color(int* i, Color* out) {
 	int type = P.argv[*i+1];
 	// TODO: check to make sure there are enough args left
@@ -46,26 +38,24 @@ static bool process_sgr_color(int* i, Color* out) {
 		int g = P.argv[*i+3];
 		int b = P.argv[*i+4];
 		*i += 4;
+		if (r<0||r>=256 || g<0||g>=256 || b<0||b>=256) {
+			print("invalid rgb color in SGR: %d,%d,%d\n", r,g,b);
+			break;
+		}
 		*out = (Color){
 			.truecolor = true,
-			.rgb = (RGBColor){
-				limit(r, 0, 255),
-				limit(g, 0, 255),
-				limit(b, 0, 255),
-			},
+			.rgb = {r, g, b},
 		};
 		return true;
-		break;
 	case 5:; // 5;<palette index>
 		int c = P.argv[*i+2];
 		*i += 2;
 		if (c<0 || c>=256) {
 			print("invalid color index in SGR: %d\n", c);
-		} else {
-			*out = (Color){.i = c};
-			return true;
+			break;
 		}
-		break;
+		*out = (Color){.i = c};
+		return true;
 	}
 	return false;
 }

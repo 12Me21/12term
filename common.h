@@ -9,6 +9,14 @@
 
 #define LEN(var) (sizeof(var)/sizeof((var)[0]))
 
+static inline int limit(int x, int min, int max) {
+	if (x<min)
+		return min;
+	else if (x>max)
+		return max;
+	return x;
+}
+
 // unicode character
 // this is SIGNED since unicode only uses 21 of the 32 bits, so we can use negatives to easily represent invalid chars etc.
 typedef int32_t Char;

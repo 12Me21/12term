@@ -107,6 +107,8 @@ static double maxlatency = 33;
 
 // todo: clean this up
 static void run(void) {
+	XMapWindow(W.d, W.win);
+	
 	XEvent ev;
 	int w = W.w, h = W.h;
 	do {
@@ -245,8 +247,6 @@ int main(int argc, char* argv[argc+1]) {
 	
 	W.border = 3;
 	
-	//W.ligatures = true;
-	
 	W.d = XOpenDisplay(NULL);
 	if (!W.d)
 		die("Could not connect to X server\n");
@@ -304,6 +304,8 @@ int main(int argc, char* argv[argc+1]) {
 	});
 	set_title(NULL);
 	
+	time_log("created window");
+	
 	Pixmap icon_pixmap;
 	Pixmap mask = 0;
 	XpmCreatePixmapFromData(W.d, W.win, ICON_XPM, &icon_pixmap, &mask, 0);
@@ -314,16 +316,16 @@ int main(int argc, char* argv[argc+1]) {
 		.icon_pixmap = icon_pixmap,
 	});
 	
+	time_log("set window icon");
+	
 	// init other things
 	init_draw();
 	
 	init_input();
 	
-	XMapWindow(W.d, W.win);
-	
-	time_log("created window");
-	
 	init_term(w, h); // todo: we are going to get a term_resize event quickly after this, mmm
+	
+	time_log("init other things");
 	
 	run();
 	return 0;

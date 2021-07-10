@@ -11,14 +11,7 @@
 #include "ctlseqs.h"
 #include "settings.h"
 
-Term T; // ok there's really no reason to ever need more than one of these anyway.
-
-static void limit(int* x, int min, int max) {
-	if (*x<min)
-		*x = min;
-	else if (*x>max)
-		*x = max;
-}
+Term T;
 
 static void init_palette(void) {
 	T.foreground = default_foreground;
@@ -299,14 +292,14 @@ static void shift_rows(int y1, int y2, int amount, bool bce) {
 static void scroll_down_internal(int amount) {
 	int y1 = T.scroll_top;
 	int y2 = T.scroll_bottom;
-	limit(&amount, 0, y2-y1);
+	amount = limit(amount, 0, y2-y1);
 	shift_rows(y1, y2, amount, true);
 }
 
 static void scroll_up_internal(int amount, bool bce) {
 	int y1 = T.scroll_top;
 	int y2 = T.scroll_bottom;
-	limit(&amount, 0, y2-y1);
+	amount = limit(amount, 0, y2-y1);
 	if (y1==0 && T.current==&T.buffers[0])
 		for (int y=y1; y<y1+amount; y++) {
 		// if we are on the main screen, and the scroll region starts at the top of the screen, we add the lines to the scrollback list.
@@ -317,9 +310,9 @@ static void scroll_up_internal(int amount, bool bce) {
 }
 
 void cursor_to(int x, int y) {
-	// but is it ok to move the cursor to the offscreen column?
-	limit(&x, 0, T.width-1);
-	limit(&y, 0, T.height-1);
+	// todo: is it ok to move the cursor to the offscreen column?
+	x = limit(x, 0, T.width-1);
+	y = limit(y, 0, T.height-1);
 	T.c.x = x;
 	T.c.y = y;
 }
@@ -329,7 +322,7 @@ void cursor_to(int x, int y) {
 void scroll_up(int amount) {
 	scroll_up_internal(amount, true);
 	if (T.c.y>=T.scroll_top && T.c.y<T.scroll_bottom) {
-		limit(&amount, 0, T.c.y-T.scroll_top);
+		amount = limit(amount, 0, T.c.y-T.scroll_top);
 		cursor_to(T.c.x, T.c.y-amount);
 	}
 }
@@ -337,7 +330,7 @@ void scroll_up(int amount) {
 void scroll_down(int amount) {
 	scroll_down_internal(amount);
 	if (T.c.y>=T.scroll_top && T.c.y<T.scroll_bottom) {
-		limit(&amount, 0, T.scroll_bottom-1-T.c.y);
+		amount = limit(amount, 0, T.scroll_bottom-1-T.c.y);
 		cursor_to(T.c.x, T.c.y+amount);
 	}
 }
@@ -565,7 +558,7 @@ void cursor_left(int amount) {
 }
 
 void delete_chars(int n) {
-	limit(&n, 0, T.width-T.c.x);
+	n = limit(n, 0, T.width-T.c.x);
 	if (!n)
 		return;
 	Row line = T.current->rows[T.c.y];
@@ -574,7 +567,7 @@ void delete_chars(int n) {
 }
 
 void insert_blank(int n) {
-	limit(&n, 0, T.width-T.c.x);
+	n = limit(n, 0, T.width-T.c.x);
 	if (!n)
 		return;
 	
@@ -591,7 +584,7 @@ void insert_lines(int n) {
 		return;
 	if (T.c.y >= T.scroll_bottom)
 		return;
-	limit(&n, 0, T.scroll_bottom - T.c.y);
+	n = limit(n, 0, T.scroll_bottom - T.c.y);
 	if (!n)
 		return;
 	// scroll lines down
@@ -603,7 +596,7 @@ void delete_lines(int n) {
 		return;
 	if (T.c.y >= T.scroll_bottom)
 		return;
-	limit(&n, 0, T.scroll_bottom - T.c.y);
+	n = limit(n, 0, T.scroll_bottom - T.c.y);
 	if (!n)
 		return;
 	// scroll lines up
@@ -627,7 +620,7 @@ void forward_tab(int n) {
 }
 
 void erase_characters(int n) {
-	limit(&n, 0, T.width-T.c.x);
+	n = limit(n, 0, T.width-T.c.x);
 	clear_region(T.c.x, T.c.y, T.c.x+n, T.c.y+1);
 }
 
@@ -659,8 +652,8 @@ void set_scroll_region(int y1, int y2) {
 	// behavior taken from xterm
 	if (y2 < y1)
 		return;
-	limit(&y1, 0, T.height-1);
-	limit(&y2, 0, T.height);
+	y1 = limit(y1, 0, T.height-1);
+	y2 = limit(y2, 0, T.height);
 	T.scroll_top = y1;
 	T.scroll_bottom = y2;
 	cursor_to(0, 0); // where is this supposed to move the cursor?
