@@ -10,7 +10,6 @@
 #include <X11/Xlib.h>
 #include <X11/Xft/Xft.h>
 #include <X11/Xatom.h>
-#include <X11/xpm.h>
 
 #include "common.h"
 #include "tty.h"
@@ -253,13 +252,16 @@ int main(int argc, char* argv[argc+1]) {
 	W.scr = XDefaultScreen(W.d);
 	W.vis = XDefaultVisual(W.d, W.scr);
 	
-	time_log("x stuff 1");
+	init_atoms();
 	
 	tty_init(); // todo: maybe try to pass the window size here if we can guess it?
 	
-	init_atoms();
+	time_log("init stuff 1");
 	
 	XftInit(NULL);
+	
+	time_log("init xft");
+	
 	init_fonts(default_font, 0);
 	
 	// messy messy
@@ -291,6 +293,10 @@ int main(int argc, char* argv[argc+1]) {
 		}
 	);
 	
+	W.gc = XCreateGC(W.d, W.win, GCGraphicsExposures, &(XGCValues){
+		.graphics_exposures = False,
+	});
+	
 	// allow listening for window close event
 	XSetWMProtocols(W.d, W.win, &W.atoms.wm_delete_window, 1);
 	// set _NET_WM_PID property
@@ -305,9 +311,13 @@ int main(int argc, char* argv[argc+1]) {
 	
 	time_log("created window");
 	
-	Pixmap icon_pixmap;
-	Pixmap mask = 0;
-	XpmCreatePixmapFromData(W.d, W.win, ICON_XPM, &icon_pixmap, &mask, 0);
+	char ICON_DATA[32][32][4] = {0};
+	
+	//Pixmap icon_pixmap;
+	//Pixmap mask = 0;
+	Pixmap icon_pixmap = XCreatePixmap(W.d, W.win, 32, 32, 24);
+	XImage* icon_image = XCreateImage(W.d, W.vis, 24, ZPixmap, 0, (char*)ICON_DATA, 32, 32, 8, 0);
+	XPutImage(W.d, icon_pixmap, W.gc, icon_image, 0,0,0,0, 32, 32);
 	
 	XSetWMHints(W.d, W.win, &(XWMHints){
 		.flags = InputHint | IconPixmapHint,
@@ -315,16 +325,16 @@ int main(int argc, char* argv[argc+1]) {
 		.icon_pixmap = icon_pixmap,
 	});
 	
-	time_log("set window icon");
+	time_log("set icon");
 	
 	// init other things
-	init_draw();
-	
 	init_input();
+	
+	time_log("init input");
 	
 	init_term(w, h); // todo: we are going to get a term_resize event quickly after this, mmm
 	
-	time_log("init other things");
+	time_log("init term");
 	
 	run();
 	return 0;

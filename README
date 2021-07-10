@@ -9,10 +9,10 @@ Starting ~June 6th, i've been writing this terminal using itself (with emacs of 
 
 # Dependencies
 
-| name | apt        | pacman |
-|------|------------|--------|
-| xft  | libxft-dev | libxft |
-| xpm  | libxpm-dev | libxpm |
+| name       | apt        | pacman |
+|------------|------------|--------|
+| xft        | libxft-dev | libxft |
+(you also need x11, freetype2, and fontconfig, but these are all dependencies of xft)
 
 # References:
 - st source code

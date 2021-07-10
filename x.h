@@ -12,6 +12,7 @@ typedef struct Xw {
 	int scr;
 	Visual* vis;
 	Colormap cmap;
+	GC gc;
 	Window win;
 	
 	int event_mask;

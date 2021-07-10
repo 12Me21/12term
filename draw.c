@@ -23,8 +23,6 @@ static Pixmap pix = None;
 static XftDraw* xft_draw = NULL;
 static Pixmap under_cursor = None;
 
-static GC gc;
-
 // todo: cache the palette colors?
 // or perhaps store them as xftcolor internally
 static XftColor make_color(Color c) {
@@ -137,7 +135,7 @@ static void draw_char_overlays(int x, int y, Cell* c) {
 static void erase_cursor(void) {
 	if (!cursor_drawn)
 		return;
-	XCopyArea(W.d, under_cursor, pix, gc,
+	XCopyArea(W.d, under_cursor, pix, W.gc,
 		0, 0, W.cw*cursor_width, W.ch, // source area
 		W.border+W.cw*cursor_x, W.border+W.ch*cursor_y); // dest pos
 	cursor_drawn = false;
@@ -166,7 +164,7 @@ static void draw_cursor(int x, int y) {
 	int width = temp.wide==1 ? 2 : 1;
 	
 	// save the area underneath the cursor so we can redraw it later
-	XCopyArea(W.d, pix, under_cursor, gc, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch, 0, 0);
+	XCopyArea(W.d, pix, under_cursor, W.gc, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch, 0, 0);
 	
 	// this time we do NOT want it to overflow ever
 	XftDrawSetClipRectangles(xft_draw, x*W.cw+W.border, y*W.ch+W.border, &(XRectangle){
@@ -262,7 +260,7 @@ static void draw_row(int y) {
 
 void repaint(void) {
 	if (pix)
-		XCopyArea(W.d, pix, W.win, gc, 0, 0, W.w, W.h, 0, 0);
+		XCopyArea(W.d, pix, W.win, W.gc, 0, 0, W.w, W.h, 0, 0);
 }
 
 void draw(void) {
@@ -284,12 +282,6 @@ void draw(void) {
 	// todo: definitely avoid extra repaints
 	repaint();
 	time_log("redraw");
-}
-
-void init_draw(void) {
-	gc = XCreateGC(W.d, W.win, GCGraphicsExposures, &(XGCValues){
-		.graphics_exposures = False,
-	});
 }
 
 void draw_free(void) {
