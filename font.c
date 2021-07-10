@@ -118,8 +118,6 @@ void init_fonts(const char* fontstr, double fontsize) {
 		}
 	}
 	
-	time_log("parsed font pattern");
-	
 	load_font(&fonts[0], pattern);
 	
 	time_log("loaded font 0");
