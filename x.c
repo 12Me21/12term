@@ -19,9 +19,8 @@
 #include "buffer.h"
 #include "event.h"
 #include "settings.h"
+#include "icon.h"
 //#include "lua.h"
-
-extern char* ICON_XPM[];
 
 Xw W = {0};
 
@@ -234,6 +233,10 @@ void set_title(char* s) {
 	});
 }
 
+static int gosh_dang_destroy_image_function(XImage* img) {
+	return 1;
+}
+
 int main(int argc, char* argv[argc+1]) {
 	time_log(NULL);
 	
@@ -255,6 +258,8 @@ int main(int argc, char* argv[argc+1]) {
 	init_atoms();
 	
 	tty_init(); // todo: maybe try to pass the window size here if we can guess it?
+	
+	init_term(w, h); // todo: we are going to get a term_resize event quickly after this, mmm.. idk if this is the right place for this, also. I mostly just put it here to simplify the timing logs
 	
 	time_log("init stuff 1");
 	
@@ -302,22 +307,19 @@ int main(int argc, char* argv[argc+1]) {
 	// set _NET_WM_PID property
 	XChangeProperty(W.d, W.win, W.atoms.net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (unsigned char*)&(pid_t){getpid()}, 1);
 	
-	// set title and icon
+	// set title
 	XSetClassHint(W.d, W.win, &(XClassHint){
 		.res_name = "12term",
 		.res_class = "12term",
 	});
 	set_title(NULL);
 	
-	time_log("created window");
-	
-	char ICON_DATA[32][32][4] = {0};
-	
-	//Pixmap icon_pixmap;
-	//Pixmap mask = 0;
-	Pixmap icon_pixmap = XCreatePixmap(W.d, W.win, 32, 32, 24);
-	XImage* icon_image = XCreateImage(W.d, W.vis, 24, ZPixmap, 0, (char*)ICON_DATA, 32, 32, 8, 0);
-	XPutImage(W.d, icon_pixmap, W.gc, icon_image, 0,0,0,0, 32, 32);
+	// set icon
+	Pixmap icon_pixmap = XCreatePixmap(W.d, W.win, ICON_SIZE, ICON_SIZE, 24);
+	XImage* icon_image = XCreateImage(W.d, W.vis, 24, ZPixmap, 0, (char*)ICON_DATA, ICON_SIZE, ICON_SIZE, 8, 0);
+	icon_image->f.destroy_image = gosh_dang_destroy_image_function;
+	XPutImage(W.d, icon_pixmap, W.gc, icon_image, 0,0,0,0, icon_image->width, icon_image->height);
+	XDestroyImage(icon_image);
 	
 	XSetWMHints(W.d, W.win, &(XWMHints){
 		.flags = InputHint | IconPixmapHint,
@@ -325,16 +327,11 @@ int main(int argc, char* argv[argc+1]) {
 		.icon_pixmap = icon_pixmap,
 	});
 	
-	time_log("set icon");
+	time_log("created window");
 	
-	// init other things
 	init_input();
 	
 	time_log("init input");
-	
-	init_term(w, h); // todo: we are going to get a term_resize event quickly after this, mmm
-	
-	time_log("init term");
 	
 	run();
 	return 0;

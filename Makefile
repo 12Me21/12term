@@ -4,7 +4,7 @@ output:= 12term
 all: $(output) terminfo
 
 # all the .c files
-srcs:= x tty debug buffer ctlseqs keymap csi draw font event settings #lua
+srcs:= x tty debug buffer ctlseqs keymap csi draw font event settings icon #lua
 
 lua_version:= 5.2
 
