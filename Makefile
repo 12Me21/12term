@@ -48,3 +48,8 @@ clean_extra+= $(terminfo)
 
 
 include .Nice.mk
+
+
+
+# the compiler's dependency checker can't see assembly .incbin directives, so I have to add this manually.
+$(junkdir)/icon.o: icon.pam
