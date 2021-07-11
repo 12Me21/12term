@@ -36,7 +36,7 @@ void sigchld(int signum) {
 	pid_t pid = waitpid(child_pid, &stat, WNOHANG);
 	
 	if (pid < 0)
-		die("waiting for pid %hd failed: %s\n", child_pid, strerror(errno));
+		die("waiting for pid %d failed: %s\n", child_pid, strerror(errno));
 	
 	if (pid != child_pid)
 		return;
