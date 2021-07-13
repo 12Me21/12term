@@ -254,6 +254,8 @@ int main(int argc, char* argv[argc+1]) {
 		die("Could not connect to X server\n");
 	W.scr = XDefaultScreen(W.d);
 	W.vis = XDefaultVisual(W.d, W.scr);
+	if (W.vis->class!=TrueColor)
+		die("Cannot handle non true color visual ...\n");
 	
 	init_atoms();
 	
