@@ -216,6 +216,8 @@ void full_reset(void) {
 	T.bracketed_paste = false;
 	T.app_keypad = false;
 	T.app_cursor = false;
+	T.mouse_mode = 0;
+	T.mouse_encoding = 0;
 	
 	dirty_all();
 	
