@@ -211,7 +211,7 @@ void full_reset(void) {
 	for (int i=0; i<T.width+1; i++)
 		T.tabs[i] = i%8==0;
 	
-	T.charsets[0] = 0;
+	T.charsets[0] = 0; // like, whatever, man
 	
 	T.bracketed_paste = false;
 	T.app_keypad = false;

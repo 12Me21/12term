@@ -6,6 +6,11 @@
 #include <locale.h>
 #include <errno.h>
 #include <time.h>
+#ifdef CATCH_SEGFAULT
+# include <signal.h>
+# define __USE_GNU
+# include <ucontext.h>
+#endif
 
 #include <X11/Xlib.h>
 #include <X11/Xft/Xft.h>
@@ -224,7 +229,6 @@ static void init_atoms(void) {
 // 7: initialize everything else
 // 8: start main loop
 
-
 void set_title(char* s) {
 	if (!s)
 		s = "12term"; // default title
@@ -237,7 +241,20 @@ static int gosh_dang_destroy_image_function(XImage* img) {
 	return 1;
 }
 
+#ifdef CATCH_SEGFAULT
+static void hecko(int signum, siginfo_t* si, ucontext_t* context) {
+	static unsigned long long n[10];
+	print("SEGFAULT CAUGHT!!! probably address: %p\n", (void*)context->uc_mcontext.__gregs[REG_RAX]);
+	context->uc_mcontext.__gregs[REG_RAX] = (long long)&n;
+}
+#endif
+
 int main(int argc, char* argv[argc+1]) {
+#ifdef CATCH_SEGFAULT
+	signal(SIGSEGV, (__sighandler_t)hecko);
+#endif
+	int* t;
+	*t = 0;
 	time_log(NULL);
 	
 	// hecking locale
