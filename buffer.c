@@ -80,6 +80,8 @@ static void push_scrollback(int y) {
 	T.scrollback.rows[T.scrollback.lines++] = T.buffers[0].rows[y];
 	// remove the row from the buffer itself so it doesn't get freed later
 	T.buffers[0].rows[y] = NULL;
+	if (T.scrollback.pos)
+		T.scrollback.pos++;
 }
 
 void dirty_all(void) {
