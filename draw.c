@@ -13,7 +13,8 @@
 static DrawnCell** drawn_chars = NULL;
 static int drawn_width = -1;
 static int drawn_height = -1;
-static Row* drawn_rows = NULL;
+static Cell** drawn_rows = NULL;
+static Row blank_row = NULL;
 
 // cursor
 static bool cursor_drawn = false;
@@ -89,8 +90,12 @@ void draw_resize(int width, int height, bool charsize) {
 		ALLOC(drawn_chars[y], drawn_width);
 		for (int x=0; x<drawn_width; x++)
 			drawn_chars[y][x] = (DrawnCell){0}; // mreh
-		drawn_rows[y] = NULL;
+		ALLOC(drawn_rows[y], drawn_width);
 	}
+	REALLOC(blank_row, drawn_width);
+	for (int x=0; x<drawn_width; x++)
+		blank_row[x] = (Cell){.attrs={.background={.i=-2}}};
+	
 	// char size changing
 	if (charsize) {
 		if (under_cursor)
@@ -219,13 +224,12 @@ static void draw_row(int y, Row row) {
 		.height = W.ch,
 	}, 1);
 	
-	//T.dirty_rows[y] = false;
-	drawn_rows[y] = row;
+	memcpy(drawn_rows[y], row, T.width*sizeof(Cell));
 	
 	if (cursor_y==y)
 		cursor_drawn = false;
 	
-	if (!row) {
+	if (row==blank_row) {
 		XftDrawRect(xft_draw, (XftColor[]){make_color((Color){.truecolor=true,.rgb=T.background})}, W.border, W.border+W.ch*y, W.cw*T.width, W.ch);
 		return;
 	}
@@ -273,15 +277,14 @@ void repaint(void) {
 void draw(void) {
 	time_log(NULL);
 	print("dirty rows: [");
-	for (int y=0; y<T.height; y++) {
-		print("%c", ".#"[T.dirty_rows[y]]);
-	}
-	print("] ");
+	//for (int y=0; y<T.height; y++) {
+	//	print("%c", ".#"[T.dirty_rows[y]]);
+	//}
 	for (int y=0; y<T.height; y++) {
 		// todo: dirty_rows always corresponds to the rows in the actual screen buffer, NOT scrollback etc.
 		// remember that scrollback content never changes so never needs to be redrawn anyway.
 		// ugh this is.. hmm i need to think
-		Row row = NULL;
+		Row row = blank_row;
 		int ry = y;
 		if (T.current == &T.buffers[0]) {
 			ry = y-T.scrollback.pos;
@@ -291,25 +294,29 @@ void draw(void) {
 			} else if (ry>=0 && ry<T.height) {
 				// row is in screen buffer
 				row = T.current->rows[ry];
-				if (!T.dirty_rows[ry])
-					goto skip;
-				T.dirty_rows[ry] = false;
-			} else {
-				// row doesn't exist (blank)
 			}
 		} else {
 			row = T.current->rows[y];
-			if (!T.dirty_rows[y])
-				goto skip;
-			T.dirty_rows[y] = false;
 		}
-		draw_row(y, row);
-	skip:
-		if (ry == T.c.y && T.show_cursor) {
+		if (row!=blank_row) {
+			if (memcmp(row, drawn_rows[y], sizeof(Cell)*T.width)) {
+				draw_row(y, row);
+				print("#");
+			} else {
+				print(".");
+			}
+		} else {
+			if (memcmp(row, drawn_rows[y], sizeof(Cell)*T.width)) {
+				draw_row(y, row);
+				print("~");
+			} else {
+				print(".");
+			}
+		}
+		if (ry == T.c.y && T.show_cursor)
 			draw_cursor(T.c.x, y, row);
-		}
 	}
-	
+	print("] ");
 	// todo: optimize this to avoid extra redraws I guess
 	if (!T.show_cursor)
 		erase_cursor();
