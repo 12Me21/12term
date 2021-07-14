@@ -13,6 +13,7 @@
 static DrawnCell** drawn_chars = NULL;
 static int drawn_width = -1;
 static int drawn_height = -1;
+static Row* drawn_rows = NULL;
 
 // cursor
 static bool cursor_drawn = false;
@@ -83,10 +84,12 @@ void draw_resize(int width, int height, bool charsize) {
 	drawn_height = height;
 	drawn_width = width;
 	REALLOC(drawn_chars, drawn_height);
+	REALLOC(drawn_rows, height);
 	for (int y=0; y<drawn_height; y++) {
 		ALLOC(drawn_chars[y], drawn_width);
 		for (int x=0; x<drawn_width; x++)
 			drawn_chars[y][x] = (DrawnCell){0}; // mreh
+		drawn_rows[y] = NULL;
 	}
 	// char size changing
 	if (charsize) {
@@ -141,7 +144,7 @@ static void erase_cursor(void) {
 	cursor_drawn = false;
 }
 
-static void draw_cursor(int x, int y) {
+static void draw_cursor(int x, int y, Row row) {
 	if (cursor_drawn) {
 		if (cursor_x==x && cursor_y==y)
 			return;
@@ -158,7 +161,11 @@ static void draw_cursor(int x, int y) {
 	if (y>T.height-1)
 		y = T.height-1;
 	
-	Cell temp = T.current->rows[y][x];
+	Cell temp;
+	if (row)
+		temp = row[x];
+	else
+		temp = (Cell){0};
 	temp.attrs.color = temp.attrs.background;
 		
 	int width = temp.wide==1 ? 2 : 1;
@@ -203,10 +210,27 @@ static void draw_cursor(int x, int y) {
 		draw_cursor(T.c.x, T.c.y);
 		}*/
 
-// draw cell backgrounds
-static void draw_row_bg(int y) {
-	Row row = T.current->rows[y];
+static void draw_row(int y, Row row) {
+	// set clip region to entire row
+	// todo: maybe include the border regions too, for chars that overflow their cells
+	// but, we do need to remember to clear these regions then
+	XftDrawSetClipRectangles(xft_draw, W.border, y*W.ch+W.border, &(XRectangle){
+		.width = W.cw*T.width,
+		.height = W.ch,
+	}, 1);
 	
+	//T.dirty_rows[y] = false;
+	drawn_rows[y] = row;
+	
+	if (cursor_y==y)
+		cursor_drawn = false;
+	
+	if (!row) {
+		XftDrawRect(xft_draw, (XftColor[]){make_color((Color){.truecolor=true,.rgb=T.background})}, W.border, W.border+W.ch*y, W.cw*T.width, W.ch);
+		return;
+	}
+	
+	// draw cell backgrounds
 	XftColor prev_color = make_color(row[0].attrs.background);
 	int prev_start = 0;
 	int x;
@@ -219,27 +243,8 @@ static void draw_row_bg(int y) {
 		}
 	}
 	XftDrawRect(xft_draw, &prev_color, W.border+W.cw*prev_start, W.border+W.ch*y, W.cw*(prev_start-x), W.ch);
-}
-
-// draw strikethrough and underlines
-static void draw_row_overlays(int y) {
-	Row row = T.current->rows[y];
-	for (int x=0; x<T.width; x++)
-		draw_char_overlays(x, y, &row[x]);
-}
-
-static void draw_row(int y) {
-	// set clip region to entire row
-	// todo: maybe include the border regions too, for chars that overflow their cells
-	// but, we do need to remember to clear these regions then
-	XftDrawSetClipRectangles(xft_draw, W.border, y*W.ch+W.border, &(XRectangle){
-		.width = W.cw*T.width,
-		.height = W.ch,
-	}, 1);
 	
-	draw_row_bg(y);
-	
-	Row row = T.current->rows[y];
+	// draw text
 	XftGlyphFontSpec specs[T.width];
 	int indexs[T.width];
 	int num = make_glyphs(T.width, specs, row, indexs, drawn_chars[y]);
@@ -250,18 +255,20 @@ static void draw_row(int y) {
 		draw_char_spec(x, y, &specs[i], make_color(c->attrs.color));
 	}
 	
-	draw_row_overlays(y);
+	// draw strikethrough and underlines
+	for (int x=0; x<T.width; x++)
+		draw_char_overlays(x, y, &row[x]);
 	
-	T.dirty_rows[y] = false;
-	
-	if (cursor_y==y)
-		cursor_drawn = false;
 }
 
 void repaint(void) {
 	if (pix)
 		XCopyArea(W.d, pix, W.win, W.gc, 0, 0, W.w, W.h, 0, 0);
 }
+
+// todo:
+// 1: dirty rows gets messed up by scrollback pos
+// 2: cursor buffer is used wrongly when scrolledback 
 
 void draw(void) {
 	time_log(NULL);
@@ -271,13 +278,40 @@ void draw(void) {
 	}
 	print("] ");
 	for (int y=0; y<T.height; y++) {
-		if (T.dirty_rows[y])
-			draw_row(y);
+		// todo: dirty_rows always corresponds to the rows in the actual screen buffer, NOT scrollback etc.
+		// remember that scrollback content never changes so never needs to be redrawn anyway.
+		// ugh this is.. hmm i need to think
+		Row row = NULL;
+		int ry = y;
+		if (T.current == &T.buffers[0]) {
+			ry = y-T.scrollback.pos;
+			if (ry<0 && -ry<T.scrollback.lines) {
+				// row is in scrollback
+				row = T.scrollback.rows[T.scrollback.lines+ry];
+			} else if (ry>=0 && ry<T.height) {
+				// row is in screen buffer
+				row = T.current->rows[ry];
+				if (!T.dirty_rows[ry])
+					goto skip;
+				T.dirty_rows[ry] = false;
+			} else {
+				// row doesn't exist (blank)
+			}
+		} else {
+			row = T.current->rows[y];
+			if (!T.dirty_rows[y])
+				goto skip;
+			T.dirty_rows[y] = false;
+		}
+		draw_row(y, row);
+	skip:
+		if (ry == T.c.y && T.show_cursor) {
+			draw_cursor(T.c.x, y, row);
+		}
 	}
+	
 	// todo: optimize this to avoid extra redraws I guess
-	if (T.show_cursor)
-		draw_cursor(T.c.x, T.c.y);
-	else
+	if (!T.show_cursor)
 		erase_cursor();
 	// todo: definitely avoid extra repaints
 	repaint();

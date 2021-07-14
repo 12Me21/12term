@@ -21,20 +21,11 @@ static char* utf8_char(Char c) {
 	return buffer;
 }
 
-// 0-1: which button (left,middle,right,release)
-// 2: shift flag
-// 3: alt flag
-// 4: ctrl flag
-// 5: motion flag
-// 6: buttons 4-5 flag (sent by scroll wheel)
-// 7: buttons 6-7 flag (these are used for left/right scrolling on some mice + touchpads)
-// 8: buttons 8-11 flag
-
-// copied from ST: todo: rewrite this
+// returns true if the event was eaten
 int ox=-1, oy=-1, oldbutton = 3;
-static void mouse_event(XEvent* ev) {
+static bool mouse_event(XEvent* ev) {
 	if (!T.mouse_mode)
-		return;
+		return false;
 	int type = ev->xbutton.type;
 	bool click = type==ButtonPress || type==ButtonRelease;
 	int button = ev->xbutton.button;
@@ -53,7 +44,7 @@ static void mouse_event(XEvent* ev) {
 		(T.mouse_mode==1000 && click) ||
 		(T.mouse_mode==1002 && (click || (button && moved))) ||
 		(T.mouse_mode==1003 && (click || moved))))
-		return;
+		return false;
 	
 	int data = 0;
 	// this is an 8 bit value which encodes which button was pressed
@@ -101,13 +92,20 @@ static void mouse_event(XEvent* ev) {
 		tty_printf("\x1B[%d;%d;%dM", data, x+1, y+1);
 		break;
 	}
+	return true;
 }
 
 static void on_motionnotify(XEvent* ev) {
 	mouse_event(ev);
 }
 static void on_buttonpress(XEvent* ev) {
-	mouse_event(ev);
+	if (mouse_event(ev))
+		return;
+	int button = ev->xbutton.button;
+	if (button==4)
+		set_scrollback(T.scrollback.pos+1);
+	if (button==5)
+		set_scrollback(T.scrollback.pos-1);
 }
 static void on_buttonrelease(XEvent* ev) {
 	mouse_event(ev);

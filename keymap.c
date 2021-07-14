@@ -73,6 +73,8 @@ KeyMap KEY_MAP[] = {
 	{XK_Tab         , S  , CSI_c('Z')},
 	{XK_ISO_Left_Tab, ANY, CSI_c('Z')},
 	
+	{XK_Tab, C_ANY, GENERAL('\t')},
+	
 	// Enter
 	{XK_Return, M  , ESC"\r"},
 	// from windows terminal: Ctrl+Enter sends \n

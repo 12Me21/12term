@@ -99,6 +99,7 @@ typedef struct Term {
 		Row* rows;
 		int size;
 		int lines;
+		int pos;
 	} scrollback;
 	
 	bool app_keypad, app_cursor;
@@ -114,5 +115,6 @@ typedef struct Term {
 void init_term(int width, int height);
 void term_resize(int width, int height);
 void dirty_all(void);
+void set_scrollback(int pos);
 
 extern Term T;

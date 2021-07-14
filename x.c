@@ -187,7 +187,7 @@ static void run(void) {
 		//if (!T.show_cursor)
 		//	continue;
 		
-		if (readed) {
+		//if (readed) {
 			if (!got_draw) {
 				time_log("first draw");
 				got_draw = true;
@@ -198,7 +198,7 @@ static void run(void) {
 				xim_spot(T.c.x, T.c.y);
 			readed = false;
 			drawing = false;
-		}
+			//}
 	}
 }
 
@@ -253,8 +253,6 @@ int main(int argc, char* argv[argc+1]) {
 #ifdef CATCH_SEGFAULT
 	signal(SIGSEGV, (__sighandler_t)hecko);
 #endif
-	int* t;
-	*t = 0;
 	time_log(NULL);
 	
 	// hecking locale

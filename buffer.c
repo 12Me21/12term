@@ -41,6 +41,7 @@ static void init_palette(void) {
 void init_scrollback(void) {
 	T.scrollback.size = 0;
 	T.scrollback.lines = 0;
+	T.scrollback.pos = 0;
 }
 
 static void clear_row(Buffer* buffer, int y, int start, bool bce) {
@@ -659,4 +660,9 @@ void set_scroll_region(int y1, int y2) {
 	T.scroll_top = y1;
 	T.scroll_bottom = y2;
 	cursor_to(0, 0); // where is this supposed to move the cursor?
+}
+
+void set_scrollback(int pos) {
+	T.scrollback.pos = pos;
+	dirty_all();
 }
