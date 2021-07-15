@@ -288,7 +288,7 @@ void draw(void) {
 		int ry = y;
 		if (T.current == &T.buffers[0]) {
 			ry = y-T.scrollback.pos;
-			if (ry<0 && -ry<T.scrollback.lines) {
+			if (ry<0 && -ry<=T.scrollback.lines) {
 				// row is in scrollback
 				row = T.scrollback.rows[T.scrollback.lines+ry];
 			} else if (ry>=0 && ry<T.height) {
