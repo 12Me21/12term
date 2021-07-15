@@ -46,7 +46,6 @@ void init_scrollback(void) {
 
 static void clear_row(Buffer* buffer, int y, int start, bool bce) {
 	Row row = buffer->rows[y];
-	T.dirty_rows[y] = true;
 	for (int i=start; i<T.width; i++) {
 		// todo: check for wide char halves!
 		row[i] = (Cell){
@@ -84,11 +83,6 @@ static void push_scrollback(int y) {
 		T.scrollback.pos++;
 }
 
-void dirty_all(void) {
-	for (int y=0; y<T.height; y++)
-		T.dirty_rows[y] = true;
-}
-
 void term_resize(int width, int height) {
 	if (width != T.width) {
 		int old_width = T.width;
@@ -124,13 +118,11 @@ void term_resize(int width, int height) {
 		T.height = height;
 		REALLOC(T.buffers[1].rows, height);
 		REALLOC(T.buffers[0].rows, height);
-		REALLOC(T.dirty_rows, height);
 	} else if (height > T.height) { // height INCREASE
 		// realloc lists of lines
 		int old_height = T.height;
 		REALLOC(T.buffers[1].rows, height);
 		REALLOC(T.buffers[0].rows, height);
-		REALLOC(T.dirty_rows, height);
 		T.height = height;
 		// alt buffer: add rows at bottom
 		for (int y=old_height; y<T.height; y++) {
@@ -145,7 +137,6 @@ void term_resize(int width, int height) {
 		}
 	}
 	
-	dirty_all(); // whatever
 	// todo: how do we handle the scrolling regions?
 	T.scroll_top = 0;
 	T.scroll_bottom = T.height;
@@ -175,7 +166,6 @@ void clear_region(int x1, int y1, int x2, int y2) {
 	// todo: handle wide chars
 	
 	for (int y=y1; y<y2; y++) {
-		T.dirty_rows[y] = true;
 		for (int x=x1; x<x2; x++) {
 			T.current->rows[y][x] = (Cell){
 				.chr=0,
@@ -221,8 +211,6 @@ void full_reset(void) {
 	T.app_cursor = false;
 	T.mouse_mode = 0;
 	T.mouse_encoding = 0;
-	
-	dirty_all();
 	
 	reset_parser();
 }
@@ -282,8 +270,6 @@ static void rotate(int count, int itemsize, unsigned char data[count][itemsize],
 // and clear the "new" lines
 static void shift_rows(int y1, int y2, int amount, bool bce) {
 	rotate(y2-y1, sizeof(Cell*), (void*)&T.current->rows[y1], amount);
-	for (int y=y1; y<y2; y++)
-		T.dirty_rows[y] = true;
 	if (amount>0) {
 		for (int y=y1; y<y1+amount; y++)
 			clear_row(T.current, y, 0, bce);
@@ -409,7 +395,6 @@ static int add_combining_char(int x, int y, Char c) {
 		if (dest->combining[i]==0) {
 			dest->combining[i] = c;
 			dest->combining[i+1] = 0;
-			T.dirty_rows[y] = true;
 			return 1;
 		}
 	}
@@ -536,7 +521,6 @@ void put_char(Char c) {
 	
 	T.c.x += width;
 	
-	T.dirty_rows[T.c.y] = true;
 }
 
 void backspace(void) {
@@ -640,7 +624,6 @@ void switch_buffer(bool alt) {
 		T.current = &T.buffers[alt];
 		if (alt)
 			clear_region(0, 0, T.width, T.height);
-		dirty_all();	
 	}
 }
 
@@ -666,5 +649,4 @@ void set_scroll_region(int y1, int y2) {
 
 void set_scrollback(int pos) {
 	T.scrollback.pos = pos;
-	dirty_all();
 }

@@ -210,7 +210,7 @@ static void process_osc(void) {
 			s++;
 			char* se = strchr(s, ';');
 			T.palette[id] = parse_x_color(s);
-			dirty_all();
+			//dirty_all();
 			s = se;
 		}
 		break;
@@ -232,7 +232,7 @@ static void process_osc(void) {
 				break;
 			}
 			p++;
-			dirty_all();
+			//dirty_all();
 		}
 		break;
 	case 50: // change font

@@ -119,7 +119,7 @@ static void on_visibilitynotify(XEvent* ev) {
 
 static void on_expose(XEvent* e) {
 	(void)e;
-	dirty_all();
+	//dirty_all();
 	draw();
 }
 

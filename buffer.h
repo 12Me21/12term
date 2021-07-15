@@ -90,9 +90,6 @@ typedef struct Term {
 	// and don't bother checking or resetting these
 	// so honestly idk if even allowing setting them is a good idea...
 	
-	bool* dirty_rows;
-	//bool** dirty_chars;
-	
 	int charsets[4];
 	
 	struct scrollback {
@@ -114,7 +111,6 @@ typedef struct Term {
 
 void init_term(int width, int height);
 void term_resize(int width, int height);
-void dirty_all(void);
 void set_scrollback(int pos);
 
 extern Term T;
