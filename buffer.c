@@ -648,5 +648,6 @@ void set_scroll_region(int y1, int y2) {
 }
 
 void set_scrollback(int pos) {
+	pos = limit(pos, 0, T.scrollback.lines);
 	T.scrollback.pos = pos;
 }
