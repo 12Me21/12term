@@ -215,7 +215,10 @@ static void draw_cursor(int x, int y, Row row) {
 		draw_cursor(T.c.x, T.c.y);
 		}*/
 
-static void draw_row(int y, Row row) {
+static bool draw_row(int y, Row row) {
+	if (!memcmp(row, drawn_rows[y], sizeof(Cell)*T.width))
+		return false;
+	
 	// set clip region to entire row
 	// todo: maybe include the border regions too, for chars that overflow their cells
 	// but, we do need to remember to clear these regions then
@@ -231,7 +234,7 @@ static void draw_row(int y, Row row) {
 	
 	if (row==blank_row) {
 		XftDrawRect(xft_draw, (XftColor[]){make_color((Color){.truecolor=true,.rgb=T.background})}, W.border, W.border+W.ch*y, W.cw*T.width, W.ch);
-		return;
+		return true;
 	}
 	
 	// draw cell backgrounds
@@ -263,6 +266,7 @@ static void draw_row(int y, Row row) {
 	for (int x=0; x<T.width; x++)
 		draw_char_overlays(x, y, &row[x]);
 	
+	return true;
 }
 
 void repaint(void) {
@@ -271,8 +275,7 @@ void repaint(void) {
 }
 
 // todo:
-// 1: dirty rows gets messed up by scrollback pos
-// 2: cursor buffer is used wrongly when scrolledback 
+// cursor system needs to be rewritten somewhat
 
 void draw(void) {
 	time_log(NULL);
@@ -280,6 +283,7 @@ void draw(void) {
 	//for (int y=0; y<T.height; y++) {
 	//	print("%c", ".#"[T.dirty_rows[y]]);
 	//}
+	erase_cursor(); // todo optimize avoid this
 	for (int y=0; y<T.height; y++) {
 		// todo: dirty_rows always corresponds to the rows in the actual screen buffer, NOT scrollback etc.
 		// remember that scrollback content never changes so never needs to be redrawn anyway.
@@ -288,38 +292,28 @@ void draw(void) {
 		int ry = y;
 		if (T.current == &T.buffers[0]) {
 			ry = y-T.scrollback.pos;
-			if (ry<0 && -ry<=T.scrollback.lines) {
-				// row is in scrollback
-				row = T.scrollback.rows[T.scrollback.lines+ry];
-			} else if (ry>=0 && ry<T.height) {
+			if (ry>=0 && ry<T.height) {
 				// row is in screen buffer
 				row = T.current->rows[ry];
+			} else if (ry<0 && T.scrollback.lines+ry>=0) {
+				// row is in scrollback
+				row = T.scrollback.rows[T.scrollback.lines+ry];
 			}
 		} else {
 			row = T.current->rows[y];
 		}
-		if (row!=blank_row) {
-			if (memcmp(row, drawn_rows[y], sizeof(Cell)*T.width)) {
-				draw_row(y, row);
-				print("#");
-			} else {
-				print(".");
-			}
+		if (draw_row(y, row)) {
+			print(row==blank_row ? "~" : "#");
 		} else {
-			if (memcmp(row, drawn_rows[y], sizeof(Cell)*T.width)) {
-				draw_row(y, row);
-				print("~");
-			} else {
-				print(".");
-			}
+			print(".");
 		}
 		if (ry == T.c.y && T.show_cursor)
 			draw_cursor(T.c.x, y, row);
 	}
 	print("] ");
 	// todo: optimize this to avoid extra redraws I guess
-	if (!T.show_cursor)
-		erase_cursor();
+	//if (!T.show_cursor)
+	//	erase_cursor();
 	// todo: definitely avoid extra repaints
 	repaint();
 	time_log("redraw");
