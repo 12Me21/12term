@@ -66,6 +66,7 @@ void term_free(void) {
 	free(T.tabs);
 }
 
+// idea: scroll lock support
 static void push_scrollback(int y) {
 	if (y<0 || y>=T.height)
 		return;
