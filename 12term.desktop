@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=12term
+Type=Application
+GenericName=Terminal
+Comment=work in progress terminal
+Exec=12term
+Terminal=true
+Categories=System;TerminalEmulator;
+Icon=12term

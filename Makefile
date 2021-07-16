@@ -30,7 +30,7 @@ CFLAGS+= -Werror=implicit-function-declaration -Werror=incompatible-pointer-type
 
 
 
-# Install the terminfo file
+# Install the terminfo file LOCALLY
 
 # call `tic -D` to figure out the location of terminfo files
 # todo: check if this fails?
@@ -44,6 +44,36 @@ $(terminfo): 12term.term
 	@$(call print,$@,,$^,)
 	@tic -x $<
 clean_extra+= $(terminfo)
+
+
+
+install ?= /usr/local
+
+# install desktop and icon files
+icon = $(install)/share/icons/hicolor/48x48/apps/12term.png
+$(icon): 48x48.png
+	@$(call print,$@,,$^,)
+	@cp $< $@
+
+desktop = $(install)/share/applications/12term.desktop
+$(desktop): 12term.desktop
+	@$(call print,$@,,$^,)
+	@cp $< $@
+
+bin = $(install)/bin/12term
+$(bin): 12term
+	@$(call print,$@,,$^,)
+	@cp $< $@
+
+.PHONY: install uninstall
+
+install: $(bin) $(terminfo) $(icon) $(desktop)
+
+uninstall:
+	$(RM) $(terminfo)
+	$(RM) $(bin)
+	$(RM) $(icon)
+	$(RM) $(desktop)
 
 
 

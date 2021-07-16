@@ -69,6 +69,8 @@ else
 # we skip including these files, because that will be redundant.
 # (and it would mess with `clean`, because Make will try to
 #  generate these included files if they don't exist)
+
+# alright this is also a problem when running make uninstall etc. ugh.
   include $(srcs:%=$(junkdir)/%.mk)
  endif
 endif
