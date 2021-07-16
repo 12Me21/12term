@@ -7,6 +7,11 @@ I hope to perhaps add image support eventually, using the kitty graphics protoco
 
 Starting ~June 6th, i've been writing this terminal using itself (with emacs of course)
 
+# Compiling
+run `make`.
+
+install with `sudo make install` (at your own risk!)
+
 # Dependencies
 
 | name       | apt        | pacman |
