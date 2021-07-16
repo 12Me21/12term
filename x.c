@@ -137,9 +137,9 @@ static void run(void) {
 	//init_lua();
 	//time_log("lua");
 	
+	Fd xfd = XConnectionNumber(W.d);
+	
 	while (1) {
-		Fd xfd = XConnectionNumber(W.d); // do we need to check this every time?
-		
 		if (XPending(W.d))
 			timeout = 0;
 		
