@@ -124,16 +124,24 @@ static void draw_char_spec(int x, int y, XftGlyphFontSpec* spec, XftColor col) {
 }
 
 static void draw_char_overlays(int x, int y, Cell* c) {
-	if (!(c->attrs.underline || c->attrs.strikethrough))
+	int underline = c->attrs.underline;
+	if (!(underline || c->attrs.strikethrough || c->attrs.link))
 		return;
+	Color underline_color = c->attrs.colored_underline ? c->attrs.underline_color : c->attrs.color;
 	int width = c->wide ? 2 : 1;
  
 	Px winx = W.border+x*W.cw;
 	Px winy = W.border+y*W.ch;
 	
-	if (c->attrs.underline) {
-		XftColor col = make_color(c->attrs.colored_underline ? c->attrs.underline_color : c->attrs.color);
-		XftDrawRect(xft_draw, &col, winx, winy+W.font_ascent+1, width*W.cw, c->attrs.underline);
+	// display a blue underline on hyperlinks (if they don't already have an underline)
+	if (c->attrs.link && !underline) {
+		underline = 1;
+		underline_color = (Color){.i=8+4}; //todo: maybe make a special palette entry for this purpose?
+	}
+	
+	if (underline) {
+		XftColor col = make_color(underline_color);
+		XftDrawRect(xft_draw, &col, winx, winy+W.font_ascent+1, width*W.cw, underline);
 	}
 	if (c->attrs.strikethrough) {
 		XftDrawRect(xft_draw, (XftColor[]){make_color(c->attrs.color)}, winx, winy+W.font_ascent*2/3, width*W.cw, 1);
