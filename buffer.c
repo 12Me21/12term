@@ -67,6 +67,7 @@ void term_free(void) {
 }
 
 // idea: scroll lock support
+// todo: add a limit to the number of pushed lines, and then turn this into a ring buffer.
 static void push_scrollback(int y) {
 	if (y<0 || y>=T.height)
 		return;
@@ -213,7 +214,19 @@ void full_reset(void) {
 	T.mouse_mode = 0;
 	T.mouse_encoding = 0;
 	
+	for (int i=0; i<T.links.length; i++)
+		free(T.links.items[i]);
+	T.links.length = 0;
+	
 	reset_parser();
+}
+
+int new_link(char* url) {
+	if (T.links.length < LEN(T.links.items))
+		if ((T.links.items[T.links.length] = strdup(url)))
+			return T.links.length++;
+	print("failed to allocate hyperlink\n");
+	return -1;
 }
 
 void init_term(int width, int height) {

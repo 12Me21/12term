@@ -22,6 +22,7 @@ typedef struct Color {
 // display attributes for characters
 typedef struct Attrs {
 	Color color, background, underline_color;
+	unsigned short link; // hyperlink. 0 = none, 1…max = T.links.items[n-1]
 	
 	char weight: 2; // 1 = bold, -1 = faint
 	bool italic: 1;
@@ -32,7 +33,7 @@ typedef struct Attrs {
 	// note: the renderer doesn't actually use the .reverse and .bold to determine color: these transformations are done when writing text to the screen.
 	bool strikethrough: 1;
 	
-	bool invisible: 1; // todo
+	bool invisible: 1; // todo?
 } Attrs;
 
 // single character cell
@@ -98,6 +99,11 @@ typedef struct Term {
 		int lines;
 		int pos;
 	} scrollback;
+	
+	struct links {
+		int length;
+		char* items[32767];
+	} links;
 	
 	bool app_keypad, app_cursor;
 	bool bracketed_paste;

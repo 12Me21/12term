@@ -214,6 +214,30 @@ static void process_osc(void) {
 			s = se;
 		}
 		break;
+	case 8: // set hyperlink
+		// skip past params for now
+		if (*s!=';') {
+			print("invalid OSC 8 hyperlink\n");
+			break;
+		}
+		s++;
+		s = strchr(s, ';');
+		if (!s) {
+			print("invalid OSC 8 hyperlink\n");
+			break;
+		}
+		s++;
+		if (*s == '\0') {
+			// reset (empty string)
+			T.c.attrs.link = 0;
+		} else {
+			// set url
+			print("hyperlink: %s\n", s);
+			int n = new_link(s);
+			if (n>=0)
+				T.c.attrs.link = n+1;
+		}
+		break;
 	case 10: // set foreground, background, cursor colors
 	case 11:
 	case 12:

@@ -39,3 +39,5 @@ void select_charset(int g, Char set);
 void full_reset(void);
 
 void switch_buffer(bool alt);
+
+int new_link(char* url);
