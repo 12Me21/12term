@@ -21,6 +21,15 @@ static char* utf8_char(Char c) {
 	return buffer;
 }
 
+// returns false if the click was out of range.
+static bool cell_at(Px x, Px y, int* ox, int* oy) {
+	int cx = (x-W.border)/W.cw;
+	int cy = (y-W.border)/W.ch;
+	*ox = limit(cx, 0, T.width-1);
+	*oy = limit(cy, 0, T.height-1);
+	return cx==*ox && cy==*oy;
+}
+
 // returns true if the event was eaten
 int ox=-1, oy=-1, oldbutton = 3;
 static bool mouse_event(XEvent* ev) {
@@ -29,13 +38,9 @@ static bool mouse_event(XEvent* ev) {
 	int type = ev->xbutton.type;
 	bool click = type==ButtonPress || type==ButtonRelease;
 	int button = ev->xbutton.button;
-	int x = (ev->xbutton.x - W.border) / W.cw;
-	int y = (ev->xbutton.y - W.border) / W.ch;
+	int x, y;
 	// todo: do we clamp this or just ignore, or...
-	if (x<0) x=0;
-	if (y<0) y=0;
-	if (x>T.width-1) x=T.width-1;
-	if (y>T.height-1) y=T.height-1;
+	cell_at(ev->xbutton.x, ev->xbutton.y, &x, &y);
 	bool moved = x!=ox || y!=oy;
 	ox = x; oy = y;
 	// filter out the events we actually need to report
@@ -102,10 +107,24 @@ static void on_buttonpress(XEvent* ev) {
 	if (mouse_event(ev))
 		return;
 	int button = ev->xbutton.button;
-	if (button==4)
+	switch (button) {
+	case 1:; // left click
+		int x, y;
+		if (cell_at(ev->xbutton.x, ev->xbutton.y, &x, &y)) {
+			Cell* c = &T.current->rows[y][x];
+			if (c->attrs.link && c->attrs.link-1<T.links.length) {
+				char* url = T.links.items[c->attrs.link-1];
+				print("clicked hyperlink: %s\n", url);
+			}
+		}
+		break;
+	case 4: // scroll up
 		set_scrollback(T.scrollback.pos+1);
-	if (button==5)
+		break;
+	case 5: // scroll down
 		set_scrollback(T.scrollback.pos-1);
+		break;
+	}
 }
 static void on_buttonrelease(XEvent* ev) {
 	mouse_event(ev);
