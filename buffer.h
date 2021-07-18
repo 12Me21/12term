@@ -94,10 +94,11 @@ typedef struct Term {
 	int charsets[4];
 	
 	struct scrollback {
-		Row* rows;
-		int size;
-		int lines;
-		int pos;
+		// these names are bad..
+		Row* rows; // array
+		int size; // length of array
+		int lines; // number of actual items stored in array
+		int pos; // visual scroll position
 	} scrollback;
 	
 	struct links {
