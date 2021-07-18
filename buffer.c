@@ -44,8 +44,7 @@ void init_scrollback(void) {
 	T.scrollback.pos = 0;
 }
 
-static void clear_row(Buffer* buffer, int y, int start, bool bce) {
-	Row row = buffer->rows[y];
+static void clear_row(Row row, int start, bool bce) {
 	for (int i=start; i<T.width; i++) {
 		// todo: check for wide char halves!
 		row[i] = (Cell){
@@ -92,16 +91,24 @@ void term_resize(int width, int height) {
 		// resize existing rows
 		// todo: option to re-wrap text?
 		for (int i=0; i<2; i++) {
-			for (int y=0; y<T.height && y<height; y++) {
+			for (int y=0; y<T.height; y++) {
 				REALLOC(T.buffers[i].rows[y], T.width);
 				if (T.width > old_width)
-					clear_row(&T.buffers[i], y, old_width, true);
+					clear_row(T.buffers[i].rows[y], old_width, true);
 			}
 		}
 		// update tab stops
 		REALLOC(T.tabs, T.width+1);
 		for (int x=0; x<T.width; x++) {
 			T.tabs[x] = (x%8 == 0);
+		}
+		// update cursor position
+		T.c.x = limit(T.c.x, 0, T.width); //note this is NOT width-1, since cursor is allowed to be in the right margin
+		// resize scrollback rows
+		for (int i=0; i<T.scrollback.lines; i++) {
+			REALLOC(T.scrollback.rows[i], T.width);
+			if (T.width > old_width)
+				clear_row(T.scrollback.rows[i], old_width, true);
 		}
 	}
 	
@@ -120,6 +127,8 @@ void term_resize(int width, int height) {
 		T.height = height;
 		REALLOC(T.buffers[1].rows, height);
 		REALLOC(T.buffers[0].rows, height);
+		// adjust cursor position
+		T.c.y = limit(T.c.y-diff, 0, T.height-1);
 	} else if (height > T.height) { // height INCREASE
 		// realloc lists of lines
 		int old_height = T.height;
@@ -129,13 +138,13 @@ void term_resize(int width, int height) {
 		// alt buffer: add rows at bottom
 		for (int y=old_height; y<T.height; y++) {
 			ALLOC(T.buffers[1].rows[y], T.width);
-			clear_row(&T.buffers[1], y, 0, true);
+			clear_row(T.buffers[1].rows[y], 0, true);
 		}
 		// main buffer: also add rows at bottom
 		// todo: option to move lines out of scrollback instead?
 		for (int y=old_height; y<T.height; y++) {
 			ALLOC(T.buffers[0].rows[y], T.width);
-			clear_row(&T.buffers[0], y, 0, true);
+			clear_row(T.buffers[0].rows[y], 0, true);
 		}
 	}
 	
@@ -286,10 +295,10 @@ static void shift_rows(int y1, int y2, int amount, bool bce) {
 	rotate(y2-y1, sizeof(Cell*), (void*)&T.current->rows[y1], amount);
 	if (amount>0) {
 		for (int y=y1; y<y1+amount; y++)
-			clear_row(T.current, y, 0, bce);
+			clear_row(T.current->rows[y], 0, bce);
 	} else {
 		for (int y=y2+amount; y<y2; y++)
-			clear_row(T.current, y, 0, bce);
+			clear_row(T.current->rows[y], 0, bce);
 	}
 }
 
@@ -566,7 +575,7 @@ void delete_chars(int n) {
 		return;
 	Row line = T.current->rows[T.c.y];
 	memmove(&line[T.c.x], &line[T.c.x+n], sizeof(Cell)*(T.width-T.c.x-n));
-	clear_row(T.current, T.c.y, T.width-n, true);
+	clear_row(T.current->rows[T.c.y], T.width-n, true);
 }
 
 void insert_blank(int n) {
