@@ -108,7 +108,7 @@ void tty_init(void) {
 
 // read from child process and process the text
 size_t tty_read(void) {
-	char buf[1024]; // how big to make this?
+	char buf[4096]; // how big to make this?
 	ssize_t len = read(master_fd, buf, LEN(buf));
 	//print("read %ld bytes\n", len);
 	if (len>0) {
