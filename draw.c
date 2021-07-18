@@ -164,7 +164,7 @@ static void draw_cursor(int x, int y, Row row) {
 			return;
 		erase_cursor();
 	}
-	xim_spot(T.c.x, T.c.y);
+	//xim_spot(T.c.x, T.c.y);
 	
 	// todo: adding border each time is a pain. can we specify an origin somehow?
 	
