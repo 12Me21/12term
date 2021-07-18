@@ -11,3 +11,5 @@ extern int default_width;
 extern int default_height;
 
 extern const char* default_font;
+
+void activate_hyperlink(const char* url);

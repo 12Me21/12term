@@ -9,6 +9,7 @@
 #include "keymap.h"
 #include "tty.h"
 #include "draw.h"
+#include "settings.h"
 
 // only valid for inputs 0-2047
 static char* utf8_char(Char c) {
@@ -114,7 +115,8 @@ static void on_buttonpress(XEvent* ev) {
 			Cell* c = &T.current->rows[y][x];
 			if (c->attrs.link && c->attrs.link-1<T.links.length) {
 				char* url = T.links.items[c->attrs.link-1];
-				print("clicked hyperlink: %s\n", url);
+				print("clicked hyperlink to: %s\n", url);
+				activate_hyperlink(url);
 			}
 		}
 		break;

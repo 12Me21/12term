@@ -1,3 +1,6 @@
+#include <sys/types.h>
+#include <unistd.h>
+
 #include "buffer.h"
 #include "settings.h"
 
@@ -30,4 +33,22 @@ int default_cursor_style = 2;
 int default_width = 80;
 int default_height = 24;
 
-const char* default_font = "cascadia code,monospace:size=12:antialias=true:autohint=true";
+const char* default_font = "cascadia code,monospace:size=12";
+
+void activate_hyperlink(const char* url) {
+	pid_t pid = fork();
+	if (pid<0) { // error
+		print("error starting hyperlink process\n");
+		return;
+	}
+	if (pid==0) { // child
+		close(0);
+		close(1);
+		close(2);
+		int err = execlp("xdg-open", "xdg-open", url, NULL);
+		_exit(err);
+		return;
+	}
+	// parent
+	// whatever man
+}
