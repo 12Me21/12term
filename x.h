@@ -46,3 +46,4 @@ extern Xw W;
 __attribute__((noreturn)) void sleep_forever(bool hangup);
 void clippaste(void);
 void change_size(int width, int height, bool charsize);
+void force_redraw(void);

@@ -108,6 +108,12 @@ static int timediff(struct timespec t1, struct timespec t2) {
 static double minlatency = 8;
 static double maxlatency = 33;
 
+bool redraw = false;
+
+void force_redraw(void) {
+	redraw = true;
+}
+
 // todo: clean this up
 static void run(void) {
 	XMapWindow(W.d, W.win);
@@ -128,40 +134,17 @@ static void run(void) {
 	
 	time_log("window mapped");
 	
-	float timeout = -1;
-	struct timespec trigger = {0};
-	bool drawing = false;
-	bool got_text = false, got_draw = false; //just for logging
-	bool readed = false;
-	
 	//init_lua();
 	//time_log("lua");
 	
 	Fd xfd = XConnectionNumber(W.d);
 	
 	while (1) {
-		if (XPending(W.d))
-			timeout = 0;
-		
-		bool text = tty_wait(xfd, timeout);
-		
-		struct timespec now;
-		clock_gettime(CLOCK_MONOTONIC, &now);
-		
-		// handle text
-		if (text) {
-			if (!got_text) {
-				time_log("first text");
-				got_text = true;
-			}
-			readed = true;
-			tty_read();
+		if (tty_read()) {
+			redraw = true;
 		}
 		
-		// handle x events
-		bool xev = false;
 		while (XPending(W.d)) {
-			xev = true;
 			XNextEvent(W.d, &ev);
 			if (XFilterEvent(&ev, None))
 				continue;
@@ -169,36 +152,12 @@ static void run(void) {
 				(HANDLERS[ev.type])(&ev);
 		}
 		
-		// I don't exactly understand how this timeout delay system works.
-		// needs to be rewritten maybe.
-		// Things which should delay redrawing:
-		// - when there are new lines scrolled into the screen which haven't been written to yet
-		// - when cursor is hidden
-		if (text || xev) {
-			if (!drawing) {
-				trigger = now;
-				drawing = true;
-			}
-			timeout = (float)(maxlatency - timediff(now, trigger)) / maxlatency * minlatency;
-			if (timeout > 0)
-				continue;
-		}
-		timeout = -1;
-		//if (!T.show_cursor)
-		//	continue;
-		
-		//if (readed) {
-			if (!got_draw) {
-				time_log("first draw");
-				got_draw = true;
-			}
-			
+		if (redraw) {
+			redraw = false;
 			draw();
-			if (T.show_cursor)
-				xim_spot(T.c.x, T.c.y);
-			readed = false;
-			drawing = false;
-			//}
+		}
+		
+		tty_wait(xfd, XPending(W.d) ? 0 : 10000);
 	}
 }
 

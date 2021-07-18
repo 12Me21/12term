@@ -8,6 +8,7 @@
 #include "buffer.h"
 #include "font.h"
 #include "draw.h"
+#include "event.h"
 
 // atm it doesnt actually matter if this data is correct, it's basically just treated as a cache (so it WILL be used if correct)
 static DrawnCell** drawn_chars = NULL;
@@ -163,6 +164,8 @@ static void draw_cursor(int x, int y, Row row) {
 			return;
 		erase_cursor();
 	}
+	xim_spot(T.c.x, T.c.y);
+	
 	// todo: adding border each time is a pain. can we specify an origin somehow?
 	
 	if (x<0)

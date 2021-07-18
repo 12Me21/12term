@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
@@ -100,6 +101,7 @@ void tty_init(void) {
 		_exit(0);
 	} else { // PARENT
 		openbsd_pledge("stdio rpath tty proc", NULL); 
+		fcntl(master_fd, F_SETFL, O_NONBLOCK);
 		signal(SIGCHLD, sigchld);
 	}
 }
@@ -113,7 +115,7 @@ size_t tty_read(void) {
 		// todo: move this stuff into x.c maybe so we don't need buffer.h in this file?
 		process_chars(len, buf);
 		return len;
-	} else if (len<0) {
+	} else if (len<0 && errno!=EAGAIN) {
 		print("couldn't read from shell: %s\n", strerror(errno));
 		// this is the normal exit condition.
 		sleep_forever(true);
