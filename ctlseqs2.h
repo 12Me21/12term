@@ -22,6 +22,8 @@ typedef struct ParseState {
 	char csi_char;
 	
 	int charset;
+	
+	Char last_printed;
 } ParseState;
 
 extern ParseState P;

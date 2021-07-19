@@ -432,6 +432,13 @@ static void process_csi_command(Char c) {
 		case 'Z': // back tab =cbt=
 			back_tab(arg01());
 			break;
+		case 'b': // repeat previous char
+			if (P.last_printed >= 0) {
+				int count = arg01();
+				for (int i=0; i<count; i++)
+					put_char(P.last_printed);
+			}
+			break;
 		case ' ': case '$': case '#': case '"':
 			P.csi_char = c;
 			P.state = CSI_2;

@@ -283,6 +283,7 @@ static void process_char(Char c) {
 			P.state = ESC;
 			break;
 		default:
+			P.last_printed = c; //todo: when to reset this?
 			put_char(c);
 		}
 		break;
@@ -402,4 +403,5 @@ void reset_parser(void) {
 	utf8_remaining = 0;
 	utf8_buffer = 0;
 	P.state = NORMAL;
+	P.last_printed = -1;
 }

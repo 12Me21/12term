@@ -656,7 +656,8 @@ void save_cursor(void) {
 
 void restore_cursor(void) {
 	T.c = T.saved_cursor;
-	cursor_to(T.c.x, T.c.y);
+	T.c.x = limit(T.c.x, 0, T.width); //note: not width-1!
+	T.c.y = limit(T.c.y, 0, T.height-1);
 }
 
 void set_scroll_region(int y1, int y2) {
