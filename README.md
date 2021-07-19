@@ -40,10 +40,10 @@ This is a controversial issue... For now, my solution is:
  - I think I can get away with this, because it's rather uncommon to have large areas with custom background color on the main screen, so bce is rarely useful here.
 
 ## offscreen column
-Terminals allow the cursor to be in the column just past the right edge of the screen. This, by itself, is good. BUT many terminals also have strange behaviors when in this state.
+Terminals allow the cursor to be in the column just past the right edge of the screen. This, by itself, is good. BUT some terminals also have strange behaviors when in this state.
 For example, in xterm: if the cursor is in this offscreen column, `ESC [ K` (clear rest of line) will *MOVE THE CURSOR 1 space to the left*
 This causes very serious issues, because this sequence is commonly used to reset the background color as a workaround for BCE, and so in rare cases you'll lose 1 character at the edge of the screen. (I've heard this happens in both grep and gcc, for example)
-I've chosen to not implement these quirks, because as far as I know there is no advantage to doing this.
+I've chosen to not implement these quirks, because as far as I know there is no advantage to doing this, and it seems like xterm is the only one that does this anyway.
 
 # um
 
