@@ -32,7 +32,7 @@ xterm-12term|my terminal owo,
 	indn=\E[%p1%dS, rin=\E[%p1%dT,
 	ind=\n, ri=\EM,
 # repeat character
-	rep=%p1%c\E[%p2%{1}%-%db
+	rep=%p1%c\E[%p2%{1}%-%db,
 # has automatic margins
 	am,
 # background color erase
