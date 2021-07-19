@@ -18,6 +18,7 @@ install with `sudo make install` (at your own risk!)
 | name       | apt        | pacman |
 |------------|------------|--------|
 | xft        | libxft-dev | libxft |
+
 (you also need x11, freetype2, and fontconfig, but these are all dependencies of xft)
 
 # References:
