@@ -234,7 +234,7 @@ static void copy_row_data(int src, int dest) {
 
 void draw_copy_rows(int src, int dest, int num) {
 	// TODO: when window is being resized, the heights can desync..
-	//print("copy %d rows, from %d to %d\n", num, src, dest);
+	print("copy %d rows, from %d to %d\n", num, src, dest);
 	if (num<=0)
 		return;
 	if (dest>src) {

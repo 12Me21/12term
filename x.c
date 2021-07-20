@@ -6,6 +6,7 @@
 #include <locale.h>
 #include <errno.h>
 #include <time.h>
+#include <fcntl.h>
 #ifdef CATCH_SEGFAULT
 # include <signal.h>
 # define __USE_GNU
@@ -212,6 +213,10 @@ int main(int argc, char* argv[argc+1]) {
 #ifdef CATCH_SEGFAULT
 	signal(SIGSEGV, (__sighandler_t)hecko);
 #endif
+	if (!(fcntl(2, F_GETFL)!=-1 || errno!=EBADF)) {
+		debug_enabled = false;
+	}
+	
 	time_log(NULL);
 	
 	// hecking locale

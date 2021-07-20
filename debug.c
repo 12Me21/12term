@@ -8,6 +8,8 @@
 #include "common.h"
 #include "debug.h"
 
+bool debug_enabled = true;
+
 __attribute__((noreturn)) void die(const char *errstr, ...) {
 	va_list ap;
 	va_start(ap, errstr);
@@ -39,6 +41,8 @@ const char* char_name(Char c) {
 }
 
 void print(const char* str, ...) {
+	if (!debug_enabled)
+		return;
 	va_list ap;
 	va_start(ap, str);
 	vfprintf(stderr, str, ap);
