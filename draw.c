@@ -11,10 +11,11 @@
 #include "event.h"
 
 // atm it doesnt actually matter if this data is correct, it's basically just treated as a cache (so it WILL be used if correct)
+// these will be pointers to arrays of size `drawn_height`, with each item being a pointer to an array of size `drawn width`
 static DrawnCell** drawn_chars = NULL;
-static int drawn_width = -1;
-static int drawn_height = -1;
 static Cell** drawn_rows = NULL;
+static int drawn_width = -1, drawn_height = -1;
+
 static Row blank_row = NULL;
 
 // cursor
@@ -225,6 +226,29 @@ static void draw_cursor(int x, int y, Row row) {
 	if (T.show_cursor)
 		draw_cursor(T.c.x, T.c.y);
 		}*/
+
+static void copy_row_data(int src, int dest) {
+	memcpy(drawn_rows[dest], drawn_rows[src], drawn_width*sizeof(Cell));
+	memcpy(drawn_chars[dest], drawn_chars[src], drawn_width*sizeof(DrawnCell));
+}
+
+void draw_copy_rows(int src, int dest, int num) {
+	// TODO: when window is being resized, the heights can desync..
+	//print("copy %d rows, from %d to %d\n", num, src, dest);
+	if (num<=0)
+		return;
+	if (dest>src) {
+		for (int i=num-1; i>=0; i--)
+			copy_row_data(src+i, dest+i);
+	} else if (dest<src) {
+		for (int i=0; i<num; i++)
+			copy_row_data(src+i, dest+i);
+	} else
+		return;
+	erase_cursor();
+	XftDrawSetClipRectangles(xft_draw, W.border, W.border, NULL, 0); //reset clipping (do we need to?)
+	XCopyArea(W.d, pix, pix, W.gc, W.border, W.border+W.ch*src, W.cw*T.width, W.ch*num, W.border, W.border+W.ch*dest);
+}
 
 static bool draw_row(int y, Row row) {
 	if (!memcmp(row, drawn_rows[y], sizeof(Cell)*T.width))
