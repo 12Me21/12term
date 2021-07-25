@@ -22,10 +22,11 @@ install with `sudo make install` (at your own risk!)
 
 # References:
 
-- st source code
+- st source code (https://st.suckless.org/)
 - https://invisible-island.net/xterm/ctlseqs/ctlseqs.html
-- xterm source code + behavior
+- xterm source code + behavior (https://invisible-island.net/xterm/)
 - https://sw.kovidgoyal.net/kitty/protocol-extensions.html
+- foot terminal source code (https://codeberg.org/dnkl/foot/)
 - https://en.wikipedia.org/wiki/ANSI_escape_code (this page sucks but a lot of people probably read it so it's good to support the stuff listed there)
 
 # Notes

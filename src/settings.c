@@ -33,7 +33,7 @@ int default_cursor_style = 2;
 int default_width = 80;
 int default_height = 24;
 
-const char* default_font = "cascadia code,monospace:size=12";
+const char* default_font = "comic mono:size=12";
 
 void activate_hyperlink(const char* url) {
 	pid_t pid = fork();
