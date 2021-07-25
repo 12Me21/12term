@@ -5,7 +5,6 @@
 #include <unistd.h>
 #include <locale.h>
 #include <errno.h>
-#include <time.h>
 #include <fcntl.h>
 #ifdef CATCH_SEGFAULT
 # include <signal.h>
@@ -101,13 +100,6 @@ __attribute__((noreturn)) void sleep_forever(bool hangup) {
 void clipboard_copy() {
 	
 }
-
-static int timediff(struct timespec t1, struct timespec t2) {
-	return (t1.tv_sec-t2.tv_sec)*1000 + (t1.tv_nsec-t2.tv_nsec)/1E6;
-}
-
-static double minlatency = 8;
-static double maxlatency = 33;
 
 bool redraw = false;
 

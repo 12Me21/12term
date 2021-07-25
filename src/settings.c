@@ -1,5 +1,8 @@
-#include <sys/types.h>
-#include <unistd.h>
+// todo: this should be loaded at runtime so you can have different settings per user.
+// probably either:
+// - X resources
+// - text config file
+// - dynamically loaded object file (important: this allows custom code to! otherwise we maybe need to add scripting language support)
 
 #include "buffer.h"
 #include "settings.h"
@@ -35,20 +38,4 @@ int default_height = 24;
 
 const char* default_font = "comic mono:size=12";
 
-void activate_hyperlink(const char* url) {
-	pid_t pid = fork();
-	if (pid<0) { // error
-		print("error starting hyperlink process\n");
-		return;
-	}
-	if (pid==0) { // child
-		close(0);
-		close(1);
-		close(2);
-		int err = execlp("xdg-open", "xdg-open", url, NULL);
-		_exit(err);
-		return;
-	}
-	// parent
-	// whatever man
-}
+const char* hyperlink_command = "xdg-open";

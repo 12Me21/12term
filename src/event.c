@@ -1,6 +1,8 @@
 // x event handler functions and related
 
 #include <X11/Xlib.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "common.h"
 #include "event.h"
@@ -10,6 +12,26 @@
 #include "tty.h"
 #include "draw.h"
 #include "settings.h"
+
+void activate_hyperlink(const char* url) {
+	if (!hyperlink_command)
+		return;
+	pid_t pid = fork();
+	if (pid<0) { // error
+		print("error starting hyperlink process\n");
+		return;
+	}
+	if (pid==0) { // child
+		close(0);
+		close(1);
+		close(2);
+		int err = execlp(hyperlink_command, hyperlink_command, url, NULL);
+		_exit(err);
+		return;
+	}
+	// parent
+	// whatever man
+}
 
 // only valid for inputs 0-2047
 static char* utf8_char(Char c) {

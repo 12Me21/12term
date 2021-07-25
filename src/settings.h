@@ -12,4 +12,4 @@ extern int default_height;
 
 extern const char* default_font;
 
-void activate_hyperlink(const char* url);
+extern const char* hyperlink_command;
