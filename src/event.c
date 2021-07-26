@@ -166,6 +166,7 @@ static void on_expose(XEvent* e) {
 	(void)e;
 	//dirty_all();
 	draw();
+	repaint();
 }
 
 // when window is resized

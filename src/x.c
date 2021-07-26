@@ -15,6 +15,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xft/Xft.h>
 #include <X11/Xatom.h>
+#include <X11/Xresource.h>
 
 #include "common.h"
 #include "tty.h"
@@ -227,6 +228,10 @@ int main(int argc, char* argv[argc+1]) {
 	W.vis = XDefaultVisual(W.d, W.scr);
 	if (W.vis->class!=TrueColor)
 		die("Cannot handle non true color visual ...\n");
+
+	XrmInitialize();
+	XrmDatabase database = XrmGetDatabase(W.d);
+	print("database: %p\n", database);
 	
 	init_atoms();
 	

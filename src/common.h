@@ -6,6 +6,7 @@
 // (these are macros because they calculate the size based on the type of the variable)
 #define ALLOC(var, length) (var) = malloc(sizeof(*(var)) * (length))
 #define REALLOC(var, length) (var) = realloc((var), sizeof(*(var)) * (length))
+#define FREE(var) { free(var); (var) = NULL; }
 
 #define LEN(var) (sizeof(var)/sizeof((var)[0]))
 

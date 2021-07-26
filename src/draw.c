@@ -1,5 +1,8 @@
 // Drawing graphics
 
+// idea: rather than having one framebuffer, have separate ones for each row
+// that way, it's easy to shift rows around (i.e. when scrolling) and then copy that data onto the window in whatever order
+
 #include <X11/Xlib.h>
 #include <X11/Xft/Xft.h>
 
@@ -10,22 +13,26 @@
 #include "draw.h"
 #include "event.h"
 
+typedef struct DrawRow {
+	DrawnCell* glyphs;
+	Cell* cells;
+	Pixmap pix;
+	XftDraw* draw;
+} DrawRow;
+
+DrawRow* rows = NULL;
+
 // atm it doesnt actually matter if this data is correct, it's basically just treated as a cache (so it WILL be used if correct)
 // these will be pointers to arrays of size `drawn_height`, with each item being a pointer to an array of size `drawn width`
-static DrawnCell** drawn_chars = NULL;
-static Cell** drawn_rows = NULL;
 static int drawn_width = -1, drawn_height = -1;
 
-static Row blank_row = NULL;
+static Cell* blank_row = NULL;
 
 // cursor
-static bool cursor_drawn = false;
-static int cursor_x, cursor_y;
+static Pixmap cursor_pix = None;
+static XftDraw* cursor_draw = NULL;
 static int cursor_width;
-
-static Pixmap pix = None;
-static XftDraw* xft_draw = NULL;
-static Pixmap under_cursor = None;
+static int cursor_y;
 
 // todo: cache the palette colors?
 // or perhaps store them as xftcolor internally
@@ -61,48 +68,46 @@ unsigned long alloc_color(Color c) {
 }
 
 static void clear_background(void) {
-	XftDrawSetClip(xft_draw, 0);
-	XftDrawRect(xft_draw, (XftColor[]){make_color((Color){.i=-2})}, 0, 0, W.w, W.h);
-}
-
-static void init_pixmap(void) {
-	if (pix)
-		XFreePixmap(W.d, pix);
-	pix = XCreatePixmap(W.d, W.win, W.w, W.h, DefaultDepth(W.d, W.scr));
-	if (xft_draw)
-		XftDrawChange(xft_draw, pix);
-	else
-		xft_draw = XftDrawCreate(W.d, pix, W.vis, W.cmap);
-	
-	clear_background();
+	//XftDrawSetClip(xft_draw, 0);
+	//XftDrawRect(xft_draw, (XftColor[]){make_color((Color){.i=-2})}, 0, 0, W.w, W.h);
 }
 
 void draw_resize(int width, int height, bool charsize) {
-	init_pixmap();
-	
-	if (drawn_chars) {
-		for (int i=0; i<drawn_height; i++)
-			free(drawn_chars[i]);
+	if (rows) {
+		for (int i=0; i<drawn_height; i++) {
+			FREE(rows[i].glyphs);
+			FREE(rows[i].cells);
+			XFreePixmap(W.d, rows[i].pix);
+			XftDrawDestroy(rows[i].draw);
+		}
 	}
 	drawn_height = height;
 	drawn_width = width;
-	REALLOC(drawn_chars, drawn_height);
-	REALLOC(drawn_rows, height);
+	REALLOC(rows, height);
 	for (int y=0; y<drawn_height; y++) {
-		ALLOC(drawn_chars[y], drawn_width);
-		for (int x=0; x<drawn_width; x++)
-			drawn_chars[y][x] = (DrawnCell){0}; // mreh
-		ALLOC(drawn_rows[y], drawn_width);
+		ALLOC(rows[y].glyphs, drawn_width);
+		ALLOC(rows[y].cells, drawn_width);
+		for (int x=0; x<drawn_width; x++) {
+			rows[y].glyphs[x] = (DrawnCell){0}; // mreh
+			rows[y].cells[x] = (Cell){0}; //ehnnnn
+		}
+		rows[y].pix = XCreatePixmap(W.d, W.win, W.w, W.ch, DefaultDepth(W.d, W.scr));
+		rows[y].draw = XftDrawCreate(W.d, rows[y].pix, W.vis, W.cmap);
 	}
+	
 	REALLOC(blank_row, drawn_width);
 	for (int x=0; x<drawn_width; x++)
 		blank_row[x] = (Cell){.attrs={.background={.i=-2}}};
 	
 	// char size changing
 	if (charsize) {
-		if (under_cursor)
-			XFreePixmap(W.d, under_cursor);
-		under_cursor = XCreatePixmap(W.d, W.win, W.cw*2, W.ch, DefaultDepth(W.d, W.scr));
+		if (cursor_pix)
+			XFreePixmap(W.d, cursor_pix);
+		cursor_pix = XCreatePixmap(W.d, W.win, W.cw*2, W.ch, DefaultDepth(W.d, W.scr));
+		if (cursor_draw)
+			XftDrawChange(cursor_draw, cursor_pix);
+		else
+			cursor_draw = XftDrawCreate(W.d, cursor_pix, W.vis, W.cmap);
 	}
 }
 
@@ -111,29 +116,22 @@ static int same_color(XftColor a, XftColor b) {
 }
 
 // todo: allow drawing multiple at once for efficiency
-static void draw_char_spec(int x, int y, XftGlyphFontSpec* spec, XftColor col) {
+static void draw_char_spec(XftDraw* draw, Px x, XftGlyphFontSpec* spec, XftColor col) {
 	if (!spec)
 		return;
 	
-	Px winx = W.border+x*W.cw;
-	Px winy = W.border+y*W.ch;
-	
 	if (spec) {
-		spec->x += winx;
-		spec->y += winy;
-		XftDrawGlyphFontSpec(xft_draw, &col, spec, 1);
+		spec->x += x;
+		XftDrawGlyphFontSpec(draw, &col, spec, 1);
 	}
 }
 
-static void draw_char_overlays(int x, int y, Cell* c) {
+static void draw_char_overlays(XftDraw* draw, Px winx, Cell* c) {
 	int underline = c->attrs.underline;
 	if (!(underline || c->attrs.strikethrough || c->attrs.link))
 		return;
 	Color underline_color = c->attrs.colored_underline ? c->attrs.underline_color : c->attrs.color;
 	int width = c->wide ? 2 : 1;
- 
-	Px winx = W.border+x*W.cw;
-	Px winy = W.border+y*W.ch;
 	
 	// display a blue underline on hyperlinks (if they don't already have an underline)
 	if (c->attrs.link && !underline) {
@@ -143,31 +141,15 @@ static void draw_char_overlays(int x, int y, Cell* c) {
 	
 	if (underline) {
 		XftColor col = make_color(underline_color);
-		XftDrawRect(xft_draw, &col, winx, winy+W.font_ascent+1, width*W.cw, underline);
+		XftDrawRect(draw, &col, winx, W.font_ascent+1, width*W.cw, underline);
 	}
 	if (c->attrs.strikethrough) {
-		XftDrawRect(xft_draw, (XftColor[]){make_color(c->attrs.color)}, winx, winy+W.font_ascent*2/3, width*W.cw, 1);
+		XftDrawRect(draw, (XftColor[]){make_color(c->attrs.color)}, winx, W.font_ascent*2/3, width*W.cw, 1);
 	}
 }
 
-static void erase_cursor(void) {
-	if (!cursor_drawn)
-		return;
-	XCopyArea(W.d, under_cursor, pix, W.gc,
-		0, 0, W.cw*cursor_width, W.ch, // source area
-		W.border+W.cw*cursor_x, W.border+W.ch*cursor_y); // dest pos
-	cursor_drawn = false;
-}
-
-static void draw_cursor(int x, int y, Row row) {
-	if (cursor_drawn) {
-		if (cursor_x==x && cursor_y==y)
-			return;
-		erase_cursor();
-	}
+static void draw_cursor(int x, int y) {
 	//xim_spot(T.c.x, T.c.y);
-	
-	// todo: adding border each time is a pain. can we specify an origin somehow?
 	
 	if (x<0)
 		x = 0;
@@ -178,6 +160,7 @@ static void draw_cursor(int x, int y, Row row) {
 	if (y>T.height-1)
 		y = T.height-1;
 	
+	Row row = T.current->rows[y];
 	Cell temp;
 	if (row)
 		temp = row[x];
@@ -187,17 +170,8 @@ static void draw_cursor(int x, int y, Row row) {
 		
 	int width = temp.wide==1 ? 2 : 1;
 	
-	// save the area underneath the cursor so we can redraw it later
-	XCopyArea(W.d, pix, under_cursor, W.gc, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch, 0, 0);
-	
-	// this time we do NOT want it to overflow ever
-	XftDrawSetClipRectangles(xft_draw, x*W.cw+W.border, y*W.ch+W.border, &(XRectangle){
-		.width = W.cw*width,
-		.height = W.ch,
-	}, 1);
-	
 	// draw background
-	XftDrawRect(xft_draw, (XftColor[]){make_color((Color){.i=-3})}, W.border+W.cw*x, W.border+W.ch*y, W.cw*width, W.ch);
+	XftDrawRect(cursor_draw, (XftColor[]){make_color((Color){.i=-3})}, 0, 0, W.cw*width, W.ch);
 	
 	// draw char
 	if (temp.chr) {
@@ -205,15 +179,12 @@ static void draw_cursor(int x, int y, Row row) {
 		int indexs[1];
 		int num = make_glyphs(1, spec, &temp, indexs, NULL);
 		if (num)
-			draw_char_spec(x, y, spec, make_color(temp.attrs.color));
+			draw_char_spec(cursor_draw, 0, spec, make_color(temp.attrs.color));
 	}
 	
-	draw_char_overlays(x, y, &temp);
+	draw_char_overlays(cursor_draw, 0, &temp);
 	
-	cursor_x = x;
-	cursor_y = y;
 	cursor_width = width;
-	cursor_drawn = true;
 }
 
 // todo: what we should do is,
@@ -228,11 +199,11 @@ static void draw_cursor(int x, int y, Row row) {
 		}*/
 
 static void copy_row_data(int src, int dest) {
-	memcpy(drawn_rows[dest], drawn_rows[src], drawn_width*sizeof(Cell));
-	memcpy(drawn_chars[dest], drawn_chars[src], drawn_width*sizeof(DrawnCell));
+	rows[dest] = rows[src];
 }
 
 void draw_copy_rows(int src, int dest, int num) {
+	return;
 	// TODO: when window is being resized, the heights can desync..
 	print("copy %d rows, from %d to %d\n", num, src, dest);
 	if (num<=0)
@@ -245,33 +216,23 @@ void draw_copy_rows(int src, int dest, int num) {
 			copy_row_data(src+i, dest+i);
 	} else
 		return;
-	erase_cursor();
-	XftDrawSetClipRectangles(xft_draw, W.border, W.border, NULL, 0); //reset clipping (do we need to?)
-	XCopyArea(W.d, pix, pix, W.gc, W.border, W.border+W.ch*src, W.cw*T.width, W.ch*num, W.border, W.border+W.ch*dest);
+	//XftDrawSetClipRectangles(xft_draw, W.border, W.border, NULL, 0); //reset clipping (do we need to?)
+	//XCopyArea(W.d, pix, pix, W.gc, W.border, W.border+W.ch*src, W.cw*T.width, W.ch*num, W.border, W.border+W.ch*dest);
 }
 
 static bool draw_row(int y, Row row) {
-	if (!memcmp(row, drawn_rows[y], sizeof(Cell)*T.width))
+	if (!memcmp(row, rows[y].cells, sizeof(Cell)*T.width))
 		return false;
 	
-	// set clip region to entire row
-	// todo: maybe include the border regions too, for chars that overflow their cells
-	// but, we do need to remember to clear these regions then
-	XftDrawSetClipRectangles(xft_draw, W.border, y*W.ch+W.border, &(XRectangle){
-		.width = W.cw*T.width,
-		.height = W.ch,
-	}, 1);
-	
-	memcpy(drawn_rows[y], row, T.width*sizeof(Cell));
-	
-	if (cursor_y==y)
-		cursor_drawn = false;
+	memcpy(rows[y].cells, row, drawn_width*sizeof(Cell));
 	
 	if (row==blank_row) {
-		XftDrawRect(xft_draw, (XftColor[]){make_color((Color){.truecolor=true,.rgb=T.background})}, W.border, W.border+W.ch*y, W.cw*T.width, W.ch);
+		XftDrawRect(rows[y].draw, (XftColor[]){make_color((Color){.truecolor=true,.rgb=T.background})}, W.border, 0, W.cw*T.width, W.ch);
 		return true;
 	}
 	
+	// draw left border background
+	XftDrawRect(rows[y].draw, (XftColor[]){make_color((Color){.i=-2})}, 0, 0, W.border, W.ch);
 	// draw cell backgrounds
 	XftColor prev_color = make_color(row[0].attrs.background);
 	int prev_start = 0;
@@ -279,34 +240,45 @@ static bool draw_row(int y, Row row) {
 	for (x=1; x<T.width; x++) {
 		XftColor bg = make_color(row[x].attrs.background);
 		if (!same_color(bg, prev_color)) {
-			XftDrawRect(xft_draw, &prev_color, W.border+W.cw*prev_start, W.border+W.ch*y, W.cw*(prev_start-x), W.ch);
+			XftDrawRect(rows[y].draw, &prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x), W.ch);
 			prev_start = x;
 			prev_color = bg;
 		}
 	}
-	XftDrawRect(xft_draw, &prev_color, W.border+W.cw*prev_start, W.border+W.ch*y, W.cw*(prev_start-x), W.ch);
+	XftDrawRect(rows[y].draw, &prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x), W.ch);
+	// draw right border background
+	XftDrawRect(rows[y].draw, (XftColor[]){make_color((Color){.i=-2})}, W.border+W.w, 0, W.border, W.ch);
 	
 	// draw text
 	XftGlyphFontSpec specs[T.width];
 	int indexs[T.width];
-	int num = make_glyphs(T.width, specs, row, indexs, drawn_chars[y]);
+	int num = make_glyphs(T.width, specs, row, indexs, rows[y].glyphs);
 	
 	for (int i=0; i<num; i++) {
 		int x = indexs[i];
 		Cell* c = &row[x];
-		draw_char_spec(x, y, &specs[i], make_color(c->attrs.color));
+		draw_char_spec(rows[y].draw, W.border+x*W.cw, &specs[i], make_color(c->attrs.color));
 	}
 	
 	// draw strikethrough and underlines
 	for (int x=0; x<T.width; x++)
-		draw_char_overlays(x, y, &row[x]);
+		draw_char_overlays(rows[y].draw, W.border+x*W.cw, &row[x]);
 	
 	return true;
 }
 
+static void paint_row(int y) {
+	XCopyArea(W.d, rows[y].pix, W.win, W.gc, 0, 0, W.w, W.ch, 0, W.border+W.ch*y);
+	if (T.c.y == y && T.show_cursor) {
+		XCopyArea(W.d, cursor_pix, W.win, W.gc, 0, 0, W.cw*cursor_width, W.ch, W.border+T.c.x*W.cw, W.border+W.ch*y);
+		cursor_y = y;
+	}
+}
+
 void repaint(void) {
-	if (pix)
-		XCopyArea(W.d, pix, W.win, W.gc, 0, 0, W.w, W.h, 0, 0);
+	// todo: we need to clear the top/bottom borders here
+	for (int i=0; i<drawn_height; i++)
+		paint_row(i);
 }
 
 // todo:
@@ -318,7 +290,8 @@ void draw(void) {
 	//for (int y=0; y<T.height; y++) {
 	//	print("%c", ".#"[T.dirty_rows[y]]);
 	//}
-	erase_cursor(); // todo optimize avoid this
+	draw_cursor(T.c.x, T.c.y);
+	paint_row(cursor_y); // not ideal ehh
 	for (int y=0; y<T.height; y++) {
 		// todo: dirty_rows always corresponds to the rows in the actual screen buffer, NOT scrollback etc.
 		// remember that scrollback content never changes so never needs to be redrawn anyway.
@@ -337,20 +310,18 @@ void draw(void) {
 		} else {
 			row = T.current->rows[y];
 		}
+		bool paint = false;
 		if (draw_row(y, row)) {
+			paint = true;
 			print(row==blank_row ? "~" : "#");
 		} else {
 			print(".");
 		}
-		if (ry == T.c.y && T.show_cursor)
-			draw_cursor(T.c.x, y, row);
+		if (paint || T.c.y == y) {
+			paint_row(y);
+		}
 	}
 	print("] ");
-	// todo: optimize this to avoid extra redraws I guess
-	//if (!T.show_cursor)
-	//	erase_cursor();
-	// todo: definitely avoid extra repaints
-	repaint();
 	time_log("redraw");
 }
 
