@@ -11,6 +11,7 @@
 #include "buffer.h"
 #include "font.h"
 #include "draw.h"
+#include "draw2.h"
 #include "event.h"
 
 typedef struct DrawRow {
@@ -20,10 +21,9 @@ typedef struct DrawRow {
 	XftDraw* draw;
 } DrawRow;
 
-DrawRow* rows = NULL;
-
 // atm it doesnt actually matter if this data is correct, it's basically just treated as a cache (so it WILL be used if correct)
-// these will be pointers to arrays of size `drawn_height`, with each item being a pointer to an array of size `drawn width`
+DrawRow* rows = NULL;
+// todo: it's kinda messy having the size stored in multiple places.
 static int drawn_width = -1, drawn_height = -1;
 
 static Cell* blank_row = NULL;
@@ -65,11 +65,6 @@ unsigned long alloc_color(Color c) {
 	XftColor x = make_color(c);
 	XftColorAllocValue(W.d, W.vis, W.cmap, &x.color, &x);
 	return x.pixel;
-}
-
-static void clear_background(void) {
-	//XftDrawSetClip(xft_draw, 0);
-	//XftDrawRect(xft_draw, (XftColor[]){make_color((Color){.i=-2})}, 0, 0, W.w, W.h);
 }
 
 void draw_resize(int width, int height, bool charsize) {
@@ -126,15 +121,15 @@ static void draw_char_spec(XftDraw* draw, Px x, XftGlyphFontSpec* spec, XftColor
 	}
 }
 
-static void draw_char_overlays(XftDraw* draw, Px winx, Cell* c) {
-	int underline = c->attrs.underline;
-	if (!(underline || c->attrs.strikethrough || c->attrs.link))
+static void draw_char_overlays(XftDraw* draw, Px winx, Cell c) {
+	int underline = c.attrs.underline;
+	if (!(underline || c.attrs.strikethrough || c.attrs.link))
 		return;
-	Color underline_color = c->attrs.colored_underline ? c->attrs.underline_color : c->attrs.color;
-	int width = c->wide ? 2 : 1;
+	Color underline_color = c.attrs.colored_underline ? c.attrs.underline_color : c.attrs.color;
+	int width = c.wide ? 2 : 1;
 	
 	// display a blue underline on hyperlinks (if they don't already have an underline)
-	if (c->attrs.link && !underline) {
+	if (c.attrs.link && !underline) {
 		underline = 1;
 		underline_color = (Color){.i=8+4}; //todo: maybe make a special palette entry for this purpose?
 	}
@@ -143,22 +138,16 @@ static void draw_char_overlays(XftDraw* draw, Px winx, Cell* c) {
 		XftColor col = make_color(underline_color);
 		XftDrawRect(draw, &col, winx, W.font_ascent+1, width*W.cw, underline);
 	}
-	if (c->attrs.strikethrough) {
-		XftDrawRect(draw, (XftColor[]){make_color(c->attrs.color)}, winx, W.font_ascent*2/3, width*W.cw, 1);
+	if (c.attrs.strikethrough) {
+		XftDrawRect(draw, (XftColor[]){make_color(c.attrs.color)}, winx, W.font_ascent*2/3, width*W.cw, 1);
 	}
 }
 
 static void draw_cursor(int x, int y) {
 	//xim_spot(T.c.x, T.c.y);
 	
-	if (x<0)
-		x = 0;
-	if (x>T.width-1) // this is the only one of these which is expected to happen under normal circumstances
-		x = T.width-1;
-	if (y<0)
-		y = 0;
-	if (y>T.height-1)
-		y = T.height-1;
+	x = limit(x, 0, drawn_width); // not -1
+	y = limit(y, 0, drawn_height-1);
 	
 	Row row = T.current->rows[y];
 	Cell temp;
@@ -182,7 +171,7 @@ static void draw_cursor(int x, int y) {
 			draw_char_spec(cursor_draw, 0, spec, make_color(temp.attrs.color));
 	}
 	
-	draw_char_overlays(cursor_draw, 0, &temp);
+	draw_char_overlays(cursor_draw, 0, temp);
 	
 	cursor_width = width;
 }
@@ -221,13 +210,13 @@ void draw_copy_rows(int src, int dest, int num) {
 }
 
 static bool draw_row(int y, Row row) {
-	if (!memcmp(row, rows[y].cells, sizeof(Cell)*T.width))
+	if (!memcmp(row, rows[y].cells, sizeof(Cell)*drawn_width))
 		return false;
 	
 	memcpy(rows[y].cells, row, drawn_width*sizeof(Cell));
 	
 	if (row==blank_row) {
-		XftDrawRect(rows[y].draw, (XftColor[]){make_color((Color){.truecolor=true,.rgb=T.background})}, W.border, 0, W.cw*T.width, W.ch);
+		XftDrawRect(rows[y].draw, (XftColor[]){make_color((Color){.truecolor=true,.rgb=T.background})}, 0, 0, W.w, W.ch );
 		return true;
 	}
 	
@@ -237,32 +226,31 @@ static bool draw_row(int y, Row row) {
 	XftColor prev_color = make_color(row[0].attrs.background);
 	int prev_start = 0;
 	int x;
-	for (x=1; x<T.width; x++) {
+	for (x=1; x<drawn_width; x++) {
 		XftColor bg = make_color(row[x].attrs.background);
 		if (!same_color(bg, prev_color)) {
-			XftDrawRect(rows[y].draw, &prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x), W.ch);
+			XftDrawRect(rows[y].draw, &prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x-1), W.ch);
 			prev_start = x;
 			prev_color = bg;
 		}
 	}
-	XftDrawRect(rows[y].draw, &prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x), W.ch);
+	XftDrawRect(rows[y].draw, &prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x-1), W.ch);
 	// draw right border background
-	XftDrawRect(rows[y].draw, (XftColor[]){make_color((Color){.i=-2})}, W.border+W.w, 0, W.border, W.ch);
+	XftDrawRect(rows[y].draw, (XftColor[]){make_color((Color){.i=-2})}, W.border+W.cw*drawn_width, 0, W.border, W.ch);
 	
 	// draw text
-	XftGlyphFontSpec specs[T.width];
-	int indexs[T.width];
-	int num = make_glyphs(T.width, specs, row, indexs, rows[y].glyphs);
+	XftGlyphFontSpec specs[drawn_width];
+	int indexs[drawn_width];
+	int num = make_glyphs(drawn_width, specs, row, indexs, rows[y].glyphs);
 	
 	for (int i=0; i<num; i++) {
 		int x = indexs[i];
-		Cell* c = &row[x];
-		draw_char_spec(rows[y].draw, W.border+x*W.cw, &specs[i], make_color(c->attrs.color));
+		draw_char_spec(rows[y].draw, W.border+x*W.cw, &specs[i], make_color(row[x].attrs.color));
 	}
 	
 	// draw strikethrough and underlines
-	for (int x=0; x<T.width; x++)
-		draw_char_overlays(rows[y].draw, W.border+x*W.cw, &row[x]);
+	for (int x=0; x<drawn_width; x++)
+		draw_char_overlays(rows[y].draw, W.border+x*W.cw, row[x]);
 	
 	return true;
 }
@@ -281,26 +269,17 @@ void repaint(void) {
 		paint_row(i);
 }
 
-// todo:
-// cursor system needs to be rewritten somewhat
-
 void draw(void) {
 	time_log(NULL);
 	print("dirty rows: [");
-	//for (int y=0; y<T.height; y++) {
-	//	print("%c", ".#"[T.dirty_rows[y]]);
-	//}
 	draw_cursor(T.c.x, T.c.y);
 	paint_row(cursor_y); // not ideal ehh
-	for (int y=0; y<T.height; y++) {
-		// todo: dirty_rows always corresponds to the rows in the actual screen buffer, NOT scrollback etc.
-		// remember that scrollback content never changes so never needs to be redrawn anyway.
-		// ugh this is.. hmm i need to think
+	for (int y=0; y<drawn_height; y++) {
 		Row row = blank_row;
 		int ry = y;
 		if (T.current == &T.buffers[0]) {
 			ry = y-T.scrollback.pos;
-			if (ry>=0 && ry<T.height) {
+			if (ry>=0 && ry<drawn_height) {
 				// row is in screen buffer
 				row = T.current->rows[ry];
 			} else if (ry<0 && T.scrollback.lines+ry>=0) {
@@ -317,9 +296,8 @@ void draw(void) {
 		} else {
 			print(".");
 		}
-		if (paint || T.c.y == y) {
+		if (paint || T.c.y == y)
 			paint_row(y);
-		}
 	}
 	print("] ");
 	time_log("redraw");
@@ -329,11 +307,14 @@ void draw_free(void) {
 	// whatever
 }
 
-// todo: display characters CENTERED within the cell rather than aligned to the left side.
+// call this when changing palette etc.
+void dirty_all(void) {
+	for (int y=0; y<drawn_height; y++) {
+		for (int x=0; x<drawn_width; x++) {
+			rows[y].glyphs[x] = (DrawnCell){0}; // mreh
+			rows[y].cells[x] = (Cell){0}; //ehnnnn
+		}
+	}
+}
 
-//so here's a better idea.
-// we keep track of what is ACTUALLY rendered on screen
-// then when rendering, we just need to umm
-// compare to that and only render the cells (and nearby b/c italics)
-// which differ.
-// it is worth going through a lot of effort to prevent unneeded renders because these are the slowest parts
+// todo: display characters CENTERED within the cell rather than aligned to the left side.

@@ -10,7 +10,7 @@
 #include "buffer.h"
 #include "ctlseqs.h"
 #include "settings.h"
-#include "draw.h" // this is just for draw_copy_row. there should maybe be a separate header(?) for functions designed for helping buffer.c communicate with draw.c
+#include "draw2.h"
 
 Term T;
 

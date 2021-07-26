@@ -120,5 +120,6 @@ typedef struct Term {
 void init_term(int width, int height);
 void term_resize(int width, int height);
 void set_scrollback(int pos);
+void dirty_all(void);
 
 extern Term T;

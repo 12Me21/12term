@@ -6,6 +6,7 @@
 #include "common.h"
 #include "ctlseqs.h"
 #include "ctlseqs2.h"
+#include "draw2.h"
 // messy
 extern RGBColor parse_x_color(const char* c);
 extern void set_title(char* c);
@@ -210,7 +211,7 @@ static void process_osc(void) {
 			s++;
 			char* se = strchr(s, ';');
 			T.palette[id] = parse_x_color(s);
-			//dirty_all();
+			dirty_all();
 			s = se;
 		}
 		break;
