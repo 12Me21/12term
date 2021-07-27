@@ -1,0 +1,35 @@
+!; xrdb -merge "$0"; exit
+
+! usually, ~/.Xresources (note: lowercase 'r') will be loaded automatically during boot
+! so you should put your settings there.
+! To update the database manually, run: xrdb -merge <filename>
+
+
+! these are the default values, as an example
+
+12term.faceName: comic mono:size=12
+
+12term.cursorColor: rgb:00/AA/00
+
+! normal text and background colors
+12term.foreground: rgb:FF/FF/FF
+12term.background: rgb:00/00/00
+
+! 16 color palette
+12term.color0: rgb:00/00/00 /* black */
+12term.color1: rgb:AA/00/00 /* red */
+12term.color2: rgb:00/AA/00 /* green */
+12term.color3: rgb:AA/55/00 /* yellow */
+12term.color4: rgb:00/00/AA /* blue */
+12term.color5: rgb:AA/00/AA /* magenta */
+12term.color6: rgb:00/AA/AA /* cyan */
+12term.color7: rgb:AA/AA/AA /* white */
+! "bright" colors
+12term.color8: rgb:55/55/55 /* black */
+12term.color9: rgb:FF/55/55 /* red */
+12term.color10: rgb:55/FF/55 /* green */
+12term.color11: rgb:FF/FF/55 /* yellow */
+12term.color12: rgb:55/55/FF /* blue */
+12term.color13: rgb:FF/55/FF /* magenta */
+12term.color14: rgb:55/FF/FF /* cyan */
+12term.color15: rgb:FF/FF/FF /* white */

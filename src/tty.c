@@ -26,6 +26,7 @@
 #include "common.h"
 #include "tty.h"
 #include "ctlseqs.h"
+#include "settings.h"
 void sleep_forever(bool hangup); // nnn where do these decs go...
 
 static Fd master_fd;
@@ -68,7 +69,7 @@ static void execsh(void) {
 	setenv("USER", pw->pw_name, 1);
 	setenv("SHELL", sh, 1);
 	setenv("HOME", pw->pw_dir, 1);
-	setenv("TERM", "xterm-12term", 1);
+	setenv("TERM", term_name, 1);
 	
 	signal(SIGCHLD, SIG_DFL);
 	signal(SIGHUP, SIG_DFL);

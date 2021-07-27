@@ -148,7 +148,7 @@ static void run(void) {
 		
 		if (redraw) {
 			redraw = false;
-			draw();
+			draw(false);
 		}
 		
 		tty_wait(xfd, XPending(W.d) ? 0 : 10000);
@@ -227,11 +227,12 @@ int main(int argc, char* argv[argc+1]) {
 	W.scr = XDefaultScreen(W.d);
 	W.vis = XDefaultVisual(W.d, W.scr);
 	if (W.vis->class!=TrueColor)
-		die("Cannot handle non true color visual ...\n");
-
+		die("Cannot handle non truecolor visual ...\n");
+	W.cmap = XDefaultColormap(W.d, W.scr);
+	
+	// init db
 	XrmInitialize();
-	XrmDatabase database = XrmGetDatabase(W.d);
-	print("database: %p\n", database);
+	load_settings();
 	
 	init_atoms();
 	
@@ -250,8 +251,6 @@ int main(int argc, char* argv[argc+1]) {
 	// messy messy
 	W.w = W.cw*w+W.border*2;
 	W.h = W.ch*h+W.border*2;
-	
-	W.cmap = XDefaultColormap(W.d, W.scr);
 	
 	// create the window
 	

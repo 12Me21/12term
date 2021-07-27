@@ -165,8 +165,7 @@ static void on_visibilitynotify(XEvent* ev) {
 static void on_expose(XEvent* e) {
 	(void)e;
 	//dirty_all();
-	draw();
-	repaint();
+	draw(true);
 }
 
 // when window is resized

@@ -92,6 +92,7 @@ static int load_font(Font* f, FcPattern* pattern) {
 	return 0;
 }
 
+// todo: defer loading fonts until needed?
 void init_fonts(const char* fontstr, double fontsize) {
 	FcPattern* pattern;
 		

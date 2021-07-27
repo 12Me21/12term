@@ -176,24 +176,12 @@ static void draw_cursor(int x, int y) {
 	cursor_width = width;
 }
 
-// todo: what we should do is,
-// when a scroll command is issued, keep track of that, and 
-// when a redraw happens, shift everything to the final scroll position and then redraw what needs to be done
-
-/*void shift_lines(int src, int dest, int count) {
-	erase_cursor();
-	XCopyArea(W.d, pix, pix, gc, W.border, W.border+W.ch*src, W.cw*T.width, W.ch*count, W.border, W.border+W.ch*dest);
-	if (T.show_cursor)
-		draw_cursor(T.c.x, T.c.y);
-		}*/
-
 static void copy_row_data(int src, int dest) {
 	rows[dest] = rows[src];
 }
 
 void draw_copy_rows(int src, int dest, int num) {
 	return;
-	// TODO: when window is being resized, the heights can desync..
 	print("copy %d rows, from %d to %d\n", num, src, dest);
 	if (num<=0)
 		return;
@@ -205,7 +193,6 @@ void draw_copy_rows(int src, int dest, int num) {
 			copy_row_data(src+i, dest+i);
 	} else
 		return;
-	//XftDrawSetClipRectangles(xft_draw, W.border, W.border, NULL, 0); //reset clipping (do we need to?)
 	//XCopyArea(W.d, pix, pix, W.gc, W.border, W.border+W.ch*src, W.cw*T.width, W.ch*num, W.border, W.border+W.ch*dest);
 }
 
@@ -263,17 +250,14 @@ static void paint_row(int y) {
 	}
 }
 
-void repaint(void) {
-	// todo: we need to clear the top/bottom borders here
-	for (int i=0; i<drawn_height; i++)
-		paint_row(i);
-}
-
-void draw(void) {
+void draw(bool repaint_all) {
 	time_log(NULL);
 	print("dirty rows: [");
-	draw_cursor(T.c.x, T.c.y);
-	paint_row(cursor_y); // not ideal ehh
+	draw_cursor(T.c.x, T.c.y); // todo: do we need this every time?
+	paint_row(cursor_y); // todo: not ideal ehh
+	if (repaint_all) {
+		// todo: erase the top/bottom borders here?
+	}
 	for (int y=0; y<drawn_height; y++) {
 		Row row = blank_row;
 		int ry = y;
@@ -296,7 +280,7 @@ void draw(void) {
 		} else {
 			print(".");
 		}
-		if (paint || T.c.y == y)
+		if (repaint_all || paint || T.c.y == y)
 			paint_row(y);
 	}
 	print("] ");

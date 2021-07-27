@@ -2,7 +2,7 @@
 
 #include "buffer.h"
 
-void draw(void);
+void draw(bool repaint_all);
 void repaint(void);
 void draw_free(void);
 void draw_resize(int width, int height, bool charsize);
