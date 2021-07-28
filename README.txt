@@ -1,9 +1,11 @@
+WORK IN PROGRESS!!
+
 Much of the X and pseudoterminal code is borrowed from st (https://st.suckless.org/)
 This probably complicates licensing, but fortunately I don't care :)
 
 the goal is to match the behavior of xterm (minus some complex features that aren't used much)
 
-I hope to perhaps add image support eventually, using the kitty graphics protocol.
+(I hope to perhaps add image support eventually, using the kitty graphics protocol.)
 
 Starting ~June 6th, i've been writing this terminal using itself (with emacs of course)
 
@@ -19,6 +21,10 @@ install with `sudo make install` (at your own risk!)
 |------------|------------|--------|
 | xft        | libxft-dev | libxft |
 (you also need x11, freetype2, and fontconfig, but these are all dependencies of xft)
+
+# Configuration
+
+See `xresources-example.ad`
 
 # References:
 
