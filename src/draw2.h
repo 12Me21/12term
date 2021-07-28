@@ -1,4 +1,4 @@
 #pragma once
 
-void draw_copy_rows(int src, int dest, int num);
+void draw_rotate_rows(int y1, int y2, int amount);
 void dirty_all(void);

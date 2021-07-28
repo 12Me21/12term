@@ -294,15 +294,15 @@ static void rotate(int count, int itemsize, unsigned char data[count][itemsize],
 // and clear the "new" lines
 static void shift_rows(int y1, int y2, int amount, bool bce) {
 	rotate(y2-y1, sizeof(Cell*), (void*)&T.current->rows[y1], amount);
+	draw_rotate_rows(y1, y2, amount);
 	if (amount>0) { // down
-		draw_copy_rows(y1, y1+amount, y2-y1-amount);
 		for (int y=y1; y<y1+amount; y++)
 			clear_row(T.current->rows[y], 0, bce);
 	} else { // up
-		draw_copy_rows(y1-amount, y1, y2-y1+amount);
 		for (int y=y2+amount; y<y2; y++)
 			clear_row(T.current->rows[y], 0, bce);
 	}
+	
 }
 
 // move text downwards

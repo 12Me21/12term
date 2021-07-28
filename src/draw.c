@@ -19,6 +19,7 @@ typedef struct DrawRow {
 	Cell* cells;
 	Pixmap pix;
 	XftDraw* draw;
+	bool redraw;
 } DrawRow;
 
 // atm it doesnt actually matter if this data is correct, it's basically just treated as a cache (so it WILL be used if correct)
@@ -88,6 +89,7 @@ void draw_resize(int width, int height, bool charsize) {
 		}
 		rows[y].pix = XCreatePixmap(W.d, W.win, W.w, W.ch, DefaultDepth(W.d, W.scr));
 		rows[y].draw = XftDrawCreate(W.d, rows[y].pix, W.vis, W.cmap);
+		rows[y].redraw = true;
 	}
 	
 	REALLOC(blank_row, drawn_width);
@@ -176,24 +178,30 @@ static void draw_cursor(int x, int y) {
 	cursor_width = width;
 }
 
-static void copy_row_data(int src, int dest) {
-	rows[dest] = rows[src];
+static void rotate(int amount, int length, DrawRow start[length]) {
+	while (amount<0)
+		amount += length;
+	amount %= length;
+	int a=0;
+	int b=0;
+	
+	for (int i=0; i<length; i++) {
+		b = (b+amount) % length;
+		if (b==a)
+			b = ++a;
+		if (b!=a) {
+			DrawRow temp;
+			temp = start[a];
+			start[a] = start[b];
+			start[b] = temp;
+		}
+	}
 }
 
-void draw_copy_rows(int src, int dest, int num) {
-	return;
-	print("copy %d rows, from %d to %d\n", num, src, dest);
-	if (num<=0)
-		return;
-	if (dest>src) {
-		for (int i=num-1; i>=0; i--)
-			copy_row_data(src+i, dest+i);
-	} else if (dest<src) {
-		for (int i=0; i<num; i++)
-			copy_row_data(src+i, dest+i);
-	} else
-		return;
-	//XCopyArea(W.d, pix, pix, W.gc, W.border, W.border+W.ch*src, W.cw*T.width, W.ch*num, W.border, W.border+W.ch*dest);
+void draw_rotate_rows(int y1, int y2, int amount) {
+	rotate(amount, y2-y1, &rows[y1]);
+	for (int y=y1; y<y2; y++)
+		rows[y].redraw = true;
 }
 
 static bool draw_row(int y, Row row) {
@@ -248,6 +256,7 @@ static void paint_row(int y) {
 		XCopyArea(W.d, cursor_pix, W.win, W.gc, 0, 0, W.cw*cursor_width, W.ch, W.border+T.c.x*W.cw, W.border+W.ch*y);
 		cursor_y = y;
 	}
+	rows[y].redraw = false;
 }
 
 void draw(bool repaint_all) {
@@ -281,7 +290,7 @@ void draw(bool repaint_all) {
 		} else {
 			print(".");
 		}
-		if (repaint_all || paint || T.c.y == y)
+		if (repaint_all || paint || T.c.y == y || rows[y].redraw)
 			paint_row(y);
 	}
 	print("] ");
@@ -294,12 +303,8 @@ void draw_free(void) {
 
 // call this when changing palette etc.
 void dirty_all(void) {
-	for (int y=0; y<drawn_height; y++) {
-		for (int x=0; x<drawn_width; x++) {
-			rows[y].glyphs[x] = (DrawnCell){0}; // mreh
-			rows[y].cells[x] = (Cell){0}; //ehnnnn
-		}
-	}
+	for (int y=0; y<drawn_height; y++)
+		rows[y].redraw = true;
 }
 
 // todo: display characters CENTERED within the cell rather than aligned to the left side.
