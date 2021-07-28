@@ -30,6 +30,8 @@ static bool get_resource_color(char* name, RGBColor* out) {
 	return false;
 }
 
+#define FIELD(path) ("12term." path)
+
 void load_settings(void) {
 	char* resource_manager = XResourceManagerString(W.d);//screen?
 	if (resource_manager) {
@@ -38,14 +40,14 @@ void load_settings(void) {
 		db = XrmGetStringDatabase(resource_manager);
 	}
 	
-	get_x_resource("12term.faceName", &default_font);
-	get_x_resource("12term.hyperlinkCommand", &hyperlink_command);
-	get_resource_color("12term.cursorColor", &default_cursor);
-	get_resource_color("12term.background", &default_background);
-	get_resource_color("12term.foreground", &default_foreground);
+	get_x_resource(FIELD("faceName"), &default_font);
+	get_x_resource(FIELD("hyperlinkCommand"), &hyperlink_command);
+	get_resource_color(FIELD("cursorColor"), &default_cursor);
+	get_resource_color(FIELD("background"), &default_background);
+	get_resource_color(FIELD("foreground"), &default_foreground);
 	for (int i=0; i<16; i++) {
 		char buf[100];
-		sprintf(buf, "12term.color%d", i);
+		sprintf(buf, FIELD("color%d"), i);
 		get_resource_color(buf, &default_palette[i]);
 	}
 }
