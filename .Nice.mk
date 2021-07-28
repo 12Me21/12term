@@ -50,7 +50,7 @@ $(junkdir)/%.o $(junkdir)/%.mk : $(srcdir)/%.c
 # this is a hack, and I'm not sure how safe it is...
 # (If this breaks, the next best option would be to strip
 #  certain entries from the dependency file, after it is generated)
-	@$(CC) $(CFLAGS:-I%=-isystem%) $(defines:%=-D%) -MMD -MF$(junkdir)/$*.mk -MQ$(junkdir)/$*.mk -MQ$(<:%.c=$(junkdir)/%.o) -c $< -o $(junkdir)/$*.o
+	@$(CC) $(CFLAGS:-I%=-isystem%) $(defines:%=-D%) -MMD -MP -MF$(junkdir)/$*.mk -MQ$(junkdir)/$*.mk -MQ$(<:%.c=$(junkdir)/%.o) -c $< -o $(junkdir)/$*.o
 
 .PHONY: clean
 clean:
