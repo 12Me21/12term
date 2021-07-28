@@ -41,7 +41,7 @@ terminfo:= $(terminfo)/x/xterm-12term
 .PHONY: terminfo
 terminfo: $(terminfo)
 # actual terminfo rule
-$(terminfo): 12term.term
+$(terminfo): terminfo.src
 	@$(call print,$@,,$^,)
 	@tic -x $<
 clean_extra+= $(terminfo)
