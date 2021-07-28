@@ -254,7 +254,8 @@ void draw(bool repaint_all) {
 	time_log(NULL);
 	print("dirty rows: [");
 	draw_cursor(T.c.x, T.c.y); // todo: do we need this every time?
-	paint_row(cursor_y); // todo: not ideal ehh
+	if (cursor_y>=0 && cursor_y<drawn_height)
+		paint_row(cursor_y); // todo: not ideal ehh
 	if (repaint_all) {
 		// todo: erase the top/bottom borders here?
 	}
