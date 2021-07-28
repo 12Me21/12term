@@ -31,7 +31,7 @@ CFLAGS+= -Werror=implicit-function-declaration -Werror=incompatible-pointer-type
 
 
 
-# Install the terminfo file LOCALLY
+# Install the terminfo file
 
 # call `tic -D` to figure out the location of terminfo files
 # todo: check if this fails?
