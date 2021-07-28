@@ -19,7 +19,7 @@ srcdir ?= .
 empty :=
 comma := ,
 printlist = [$1m$(subst $(empty) $(empty),[39m$(comma) [$1m,$(2:$3%=[$1m%))
-print = echo '[48;5;230m[K$(call printlist,33,$1,$2)	[37mfrom: $(call printlist,32,$3,$4)[m'
+print = echo '[48;5;230;0m[K$(call printlist,33,$1,$2)	[37mfrom: $(call printlist,32,$3,$4)[m'
 
 
 ifdef pkgs
