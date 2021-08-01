@@ -6,6 +6,7 @@
 #include <locale.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <time.h>
 #ifdef CATCH_SEGFAULT
 # include <signal.h>
 # define __USE_GNU
@@ -108,6 +109,12 @@ void force_redraw(void) {
 	redraw = true;
 }
 
+static long long timediff(struct timespec t1, struct timespec t2) {
+	return (t1.tv_sec-t2.tv_sec)*1000L*1000*1000 + (t1.tv_nsec-t2.tv_nsec);
+}
+
+static long long min_redraw = 10*1000*1000; // nanoseconds
+
 // todo: clean this up
 static void run(void) {
 	XMapWindow(W.d, W.win);
@@ -133,6 +140,8 @@ static void run(void) {
 	
 	Fd xfd = XConnectionNumber(W.d);
 	
+	struct timespec last_redraw = {0};
+	
 	while (1) {
 		if (tty_read()) {
 			redraw = true;
@@ -146,12 +155,24 @@ static void run(void) {
 				(HANDLERS[ev.type])(&ev);
 		}
 		
+		long long timeout = 10000L*1000*1000;
+		
 		if (redraw) {
-			redraw = false;
-			draw(false);
+			struct timespec now;
+			clock_gettime(CLOCK_MONOTONIC, &now);
+			long long since_last = timediff(now, last_redraw);
+			//print("since last: %lld", since_last/1000/1000);
+			if (since_last>=min_redraw) {
+				draw(false);
+				redraw = false;
+				last_redraw = now;
+			} else {
+				timeout = min_redraw - since_last + 1000;
+				//print("delaying redraw for %lld ms\n", timeout/1000/1000);
+			}
 		}
 		
-		tty_wait(xfd, XPending(W.d) ? 0 : 10000);
+		tty_wait(xfd, XPending(W.d) ? 0 : timeout);
 	}
 }
 
@@ -202,13 +223,11 @@ static void hecko(int signum, siginfo_t* si, ucontext_t* context) {
 }
 #endif
 
+
 int main(int argc, char* argv[argc+1]) {
 #ifdef CATCH_SEGFAULT
 	signal(SIGSEGV, (__sighandler_t)hecko);
 #endif
-	if (!(fcntl(2, F_GETFL)!=-1 || errno!=EBADF)) {
-		debug_enabled = false;
-	}
 	
 	time_log(NULL);
 	

@@ -366,7 +366,7 @@ static void process_csi_command(Char c) {
 				break;
 			case 3: // scollback
 				// ehhh todo
-				T.scrollback.lines = 0;
+				init_scrollback();
 				break;
 			}
 			break;

@@ -25,6 +25,7 @@ pkgs = xft x11 freetype2 fontconfig #lua$(lua_version) #//harfbuzz
 
 
 CFLAGS+= -g # include debug symbols
+CFLAGS+= -O2
 CFLAGS+= -Wall -Wextra -pedantic -std=c11 # turn on a bunch of warnings
 CFLAGS+= -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -Wno-parentheses -Wno-char-subscripts # disable these warnings
 CFLAGS+= -Werror=implicit-function-declaration -Werror=incompatible-pointer-types # make these warnings into errors

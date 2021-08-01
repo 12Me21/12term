@@ -151,6 +151,7 @@ void init_fonts(const char* fontstr, double fontsize) {
 
 // this is gross and I don't fully understand how it works
 static void find_fallback_font(Char chr, int style, XftFont** xfont, FT_UInt* glyph) {
+	print("searching for fallback font for: %s", char_name(chr));
 	// Fallback on font cache, search the font cache for match.
 	for (int f=0; f<frclen; f++) {
 		*glyph = XftCharIndex(W.d, frc[f].font, chr);

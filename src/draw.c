@@ -250,9 +250,18 @@ static bool draw_row(int y, Row row) {
 	return true;
 }
 
+int row_displayed_at(int y) {
+	if (T.current == &T.buffers[0]) {
+		return y-T.scrollback.pos;
+	}
+	return y;
+}
+
+// todo: keep better track of where cursor is rendered
+
 static void paint_row(int y) {
 	XCopyArea(W.d, rows[y].pix, W.win, W.gc, 0, 0, W.w, W.ch, 0, W.border+W.ch*y);
-	if (T.c.y == y && T.show_cursor) {
+	if (T.show_cursor && row_displayed_at(y)==T.c.y) {
 		XCopyArea(W.d, cursor_pix, W.win, W.gc, 0, 0, W.cw*cursor_width, W.ch, W.border+T.c.x*W.cw, W.border+W.ch*y);
 		cursor_y = y;
 	}
@@ -292,6 +301,10 @@ void draw(bool repaint_all) {
 		}
 		if (repaint_all || paint || T.c.y == y || rows[y].redraw)
 			paint_row(y);
+			//			print("P");
+			//		} else
+			//print(")");
+		//time_log("row");
 	}
 	print("] ");
 	time_log("redraw");

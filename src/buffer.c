@@ -40,6 +40,7 @@ static void init_palette(void) {
 }
 
 void init_scrollback(void) {
+	FREE(T.scrollback.rows);
 	T.scrollback.size = 0;
 	T.scrollback.lines = 0;
 	T.scrollback.pos = 0;
@@ -676,5 +677,8 @@ void set_scroll_region(int y1, int y2) {
 
 void set_scrollback(int pos) {
 	pos = limit(pos, 0, T.scrollback.lines);
+	int dist = pos-T.scrollback.pos;
+	if (abs(dist)<T.height)
+		draw_rotate_rows(0, T.height, dist);
 	T.scrollback.pos = pos;
 }

@@ -204,7 +204,7 @@ static int max(int a, int b) {
 
 //wait until data is recieved on either master_fd (the fd used to communicate with the child) OR xfd (notifies when x events are recieved)
 // returns true if data was recvd on master_fd
-bool tty_wait(Fd xfd, int timeout) {
+bool tty_wait(Fd xfd, long long timeout) {
 	fd_set rfd;
 	while (1) {
 		FD_ZERO(&rfd);
@@ -212,8 +212,8 @@ bool tty_wait(Fd xfd, int timeout) {
 		FD_SET(xfd, &rfd);
 		
 		struct timespec seltv = {
-			.tv_sec = timeout / 1000,
-			.tv_nsec = 1000000 * (timeout % 1000),
+			.tv_sec = timeout/(1000*1000*1000),
+			.tv_nsec = timeout % (1000*1000*1000),
 		};
 		struct timespec* tv = timeout>=0 ? &seltv : NULL;
 		
