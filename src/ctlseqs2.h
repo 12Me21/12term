@@ -8,11 +8,31 @@
 #include "buffer.h"
 #include "buffer2.h"
 
+enum parse_state {
+	NORMAL,
+	ESC,
+	CSI_START,
+	CSI,
+	CSI_2,
+	ESC_TEST,
+	UTF8,
+	ALTCHARSET,
+	STRING,
+	ST,
+};
+
+enum string_command {
+	DCS = 1,
+	APC,
+	PM,
+	OSC,
+};
+
 typedef struct ParseState {
-	int state;
+	enum parse_state state;
 	
 	char string[1030]; // bytes
-	int string_command;
+	enum string_command string_command;
 	int string_length;
 	
 	int argv[100];
@@ -27,26 +47,6 @@ typedef struct ParseState {
 } ParseState;
 
 extern ParseState P;
-
-enum parse_state {
-	NORMAL,
-	ESC,
-	CSI_START,
-	CSI,
-	CSI_2,
-	ESC_TEST,
-	UTF8,
-	ALTCHARSET,
-	STRING,
-};
-
-enum string_command {
-	DCS = 1,
-	APC,
-	PM,
-	OSC,
-	TITLE,
-};
 
 void process_csi_char(Char c);
 void process_csi_command_2(Char c);

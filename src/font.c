@@ -21,7 +21,7 @@ typedef struct {
 	FcPattern* pattern;
 } Font;
 
-static Font fonts[4]; // normal, bold, italic, bold+italic
+static Font fonts[4] = {0}; // normal, bold, italic, bold+italic
 
 // fonts loaded for fallback chars
 // todo: unify these structures to simplify things
@@ -40,6 +40,7 @@ static int ceildiv(int a, int b) {
 
 static int load_font(Font* f, FcPattern* pattern) {
 	FcPattern* configured = FcPatternDuplicate(pattern);
+	
 	if (!configured)
 		return 1;
 	
@@ -94,6 +95,8 @@ static int load_font(Font* f, FcPattern* pattern) {
 
 // todo: defer loading fonts until needed?
 void init_fonts(const char* fontstr, double fontsize) {
+	fonts_free();
+	
 	FcPattern* pattern;
 		
 	if (fontstr[0] == '-')
@@ -151,7 +154,6 @@ void init_fonts(const char* fontstr, double fontsize) {
 
 // this is gross and I don't fully understand how it works
 static void find_fallback_font(Char chr, int style, XftFont** xfont, FT_UInt* glyph) {
-	print("searching for fallback font for: %s", char_name(chr));
 	// Fallback on font cache, search the font cache for match.
 	for (int f=0; f<frclen; f++) {
 		*glyph = XftCharIndex(W.d, frc[f].font, chr);
@@ -265,8 +267,11 @@ int make_glyphs(int len, XftGlyphFontSpec specs[len], /*const*/ Cell cells[len],
 
 void fonts_free(void) {
 	for (int i=0; i<4; i++) {
-		FcPatternDestroy(fonts[i].pattern);
-		XftFontClose(W.d, fonts[i].match);
+		if (fonts[i].match) {
+			FcPatternDestroy(fonts[i].pattern);
+			XftFontClose(W.d, fonts[i].match);
+			fonts[i].match = NULL;
+		}
 	}
 	for (int i=0; i<frclen; i++)
 		XftFontClose(W.d, frc[i].font);

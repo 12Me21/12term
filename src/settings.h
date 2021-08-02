@@ -16,4 +16,6 @@ extern char* hyperlink_command;
 
 extern char* term_name;
 
+extern int scrollback_max;
+
 void load_settings(void);

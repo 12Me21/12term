@@ -8,7 +8,7 @@
 #include "ctlseqs2.h"
 #include "draw2.h"
 // messy
-extern RGBColor parse_x_color(const char* c);
+extern bool parse_x_color(const char* c, RGBColor* out);
 extern void set_title(char* c);
 extern void change_font(const char* name);
 
@@ -210,7 +210,7 @@ static void process_osc(void) {
 				goto invalid;
 			s++;
 			char* se = strchr(s, ';');
-			T.palette[id] = parse_x_color(s);
+			parse_x_color(s, &T.palette[id]);
 			dirty_all();
 			s = se;
 		}
@@ -244,19 +244,10 @@ static void process_osc(void) {
 	case 12:
 		while (s && *s==';') {
 			s++;
-			RGBColor col = parse_x_color(s);
-			switch (p) {
-			case 10:
-				T.foreground = col;
-				break;
-			case 11:
-				T.background = col;
-				break;
-			case 12:
-				T.cursor_color = col;
-				break;
-			}
-			p++;
+			parse_x_color(s, (RGBColor*[]){
+				&T.foreground, &T.background, &T.cursor_color
+			}[p-10]);
+			//p++; ???
 			//dirty_all();
 		}
 		break;
@@ -270,6 +261,31 @@ static void process_osc(void) {
 	return;
  invalid:
 	print("Invalid OSC command: %s\n", P.string);
+}
+
+static void end_string(void) {
+	P.string[P.string_length] = '\0';
+	switch (P.string_command) {
+	default:
+		print("unknown string command\n");
+		break;
+	case OSC:
+		process_osc();
+		break;
+	case APC:
+		process_apc();
+		break;
+	}
+	P.state = NORMAL;
+}
+
+static void push_string_byte(char c) {
+	// add char to string if possible
+	if (P.string_length < LEN(P.string)-1) {
+		P.string[P.string_length++] = c;
+	} else { //string too long!!
+		
+	}
 }
 
 static void process_char(Char c) {
@@ -315,6 +331,16 @@ static void process_char(Char c) {
 		P.state = NORMAL;
 		break;
 		// ???
+	case ST:
+		if (c=='\\') { // got ESC+backslash (end string)
+			end_string();
+		} else { // got ESC+<some other char> (add to string)
+			// todo: is this really the proper way to handle this
+			push_string_byte('\x1B');
+			push_string_byte(c);
+			P.state = STRING;
+		}
+		break;
 	default:
 		print("unknown parse state? (%d)\n", P.state);
 		P.state = NORMAL;
@@ -337,33 +363,15 @@ void process_chars(int len, const char cs[len]) {
 	for (int i=0; i<len; i++) {
 		Char c = (unsigned char)cs[i]; //important! we need to convert to unsigned before casting to int
 		if (P.state == STRING) {
-			// TODO: do we want to run the utf-8 decoder all the time or...
+			// start of ESC \ (string terminator)
+			if (c==0x1B)
+				P.state = ST;
 			// end of string
 			// todo: maybe check other characters here just in case
-			if (c==0x07 || c==0x18 || c==0x1A || c==0x1B || (c>=0x80 && c<=0x9F)) {
-				P.string[P.string_length] = '\0';
-				switch (P.string_command) {
-				default:
-					print("unknown string command\n");
-					break;
-				case OSC:
-					process_osc();
-					break;
-				case APC:
-					process_apc();
-					break;
-				}
-				// (then we want to process the string sequence)
-				// TODO
-				// and /sometimes/ also process the character itself
-				P.state = NORMAL;
+			else if (c==0x07 || c==0x18 || c==0x1A || (c>=0x80 && c<=0x9F)) {
+				end_string();
 			} else {
-				// add char to string if possible
-				if (P.string_length < LEN(P.string)-1) {
-					P.string[P.string_length++] = c;
-				} else { //string too long!!
-					
-				}
+				push_string_byte(c);
 			}
 		} else {
 			// outside of a string: start decoding utf-8

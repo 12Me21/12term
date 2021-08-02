@@ -4,8 +4,11 @@
 ! so you should put your settings there.
 ! To update the database manually, run: xrdb -merge <filename>
 
+! all settings use the same name as xterm's, when possible
 
 ! these are the default values, as an example
+
+12term.saveLines: 2000
 
 12term.faceName: comic mono:size=12
 

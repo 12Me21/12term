@@ -170,7 +170,7 @@ static void on_expose(XEvent* e) {
 
 // when window is resized
 static void on_configurenotify(XEvent* e) {
-	change_size(e->xconfigure.width, e->xconfigure.height, false);
+	change_size(e->xconfigure.width, e->xconfigure.height, false, false);
 }
 
 static void on_clientmessage(XEvent* e) {

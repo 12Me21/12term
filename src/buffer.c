@@ -421,7 +421,8 @@ static int add_combining_char(int x, int y, Char c) {
 	for (int i=0; i<LEN(dest->combining); i++) {
 		if (dest->combining[i]==0) {
 			dest->combining[i] = c;
-			dest->combining[i+1] = 0;
+			if (i+1<LEN(dest->combining))
+				dest->combining[i+1] = 0;
 			return 1;
 		}
 	}
@@ -681,4 +682,13 @@ void set_scrollback(int pos) {
 	if (abs(dist)<T.height)
 		draw_rotate_rows(0, T.height, dist);
 	T.scrollback.pos = pos;
+}
+
+// get a row from the current screen (if n ≥ 0) or the scrollback buffer (if n < 0). returns NULL if n is out of range
+Row get_row(int y) {
+	if (y>=0 && y<T.height)
+		return T.current->rows[y];
+	if (y<0 && T.scrollback.lines+y>=0)
+		return T.scrollback.rows[T.scrollback.lines+y];
+	return NULL;
 }

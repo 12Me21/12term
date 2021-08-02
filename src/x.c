@@ -32,15 +32,17 @@
 Xw W = {0};
 
 // hhhh
-// todo: output some kind of status for invalid?
-RGBColor parse_x_color(const char* c) {
+bool parse_x_color(const char* c, RGBColor* out) {
 	XColor ret;
-	XParseColor(W.d, W.cmap, c, &ret);
-	return (RGBColor){
-		ret.red*255/65535,
-		ret.green*255/65535,
-		ret.blue*255/65535,
-	};
+	if (XParseColor(W.d, W.cmap, c, &ret)) {
+		*out = (RGBColor){
+			ret.red*255/65535,
+			ret.green*255/65535,
+			ret.blue*255/65535,
+		};
+		return true;
+	}
+	return false;
 }
 
 // so we need to clean up these size change functions
@@ -57,7 +59,7 @@ RGBColor parse_x_color(const char* c) {
 
 // this is called when changing the window size
 // set `charsize` if W.cw or W.ch have changed.
-void change_size(Px w, Px h, bool charsize) {
+void change_size(Px w, Px h, bool charsize, bool resize) {
 	Px base = W.border*2;
 	int width = (w-base) / W.cw;
 	int height = (h-base) / W.ch;
@@ -77,6 +79,8 @@ void change_size(Px w, Px h, bool charsize) {
 			.min_width = base + W.cw*2,
 			.min_height = base + W.ch*2,
 		});
+		if (resize)
+			XResizeWindow(W.d, W.win, W.w, W.h);
 	}
 	tty_resize(width, height, width*W.cw, height*W.ch);
 	term_resize(width, height);
@@ -131,7 +135,7 @@ static void run(void) {
 		}
 	} while (ev.type != MapNotify);
 	
-	change_size(w, h, true);
+	change_size(w, h, true, false);
 	
 	time_log("window mapped");
 	
@@ -335,5 +339,7 @@ int main(int argc, char* argv[argc+1]) {
 
 void change_font(const char* name) {
 	init_fonts(name, 0);
-	change_size(W.w, W.h, true);
+	W.w = W.cw*T.width+W.border*2;
+	W.h = W.ch*T.height+W.border*2;
+	change_size(W.w, W.h, true, true);
 }

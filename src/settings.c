@@ -7,11 +7,11 @@
 #include "buffer.h"
 #include "settings.h"
 #include "x.h"
-extern RGBColor parse_x_color(const char* c);
+extern bool parse_x_color(const char* c, RGBColor* out);
 
 XrmDatabase	db = NULL;
 
-static bool get_x_resource(char* name, char** out) {
+static bool get_string(char* name, char** out) {
 	XrmValue ret;
 	char* type;
 	if (db && XrmGetResource(db, name, "String", &type, &ret)) {
@@ -21,11 +21,23 @@ static bool get_x_resource(char* name, char** out) {
 	return false;
 }
 
-static bool get_resource_color(char* name, RGBColor* out) {
+static bool get_color(char* name, RGBColor* out) {
 	char* str;
-	if (get_x_resource(name, &str)) {
-		*out = parse_x_color(str);
-		return true;
+	if (get_string(name, &str))
+		if (parse_x_color(str, out))
+			return true;
+	return false;
+}
+
+static bool get_number(char* name, int* out) {
+	char* str;
+	if (get_string(name, &str)) {
+		char* end;
+		int n = strtol(str, &end, 0);
+		if (str[0]!='\0' && *end=='\0') {
+			*out = n;
+			return true;
+		}
 	}
 	return false;
 }
@@ -40,15 +52,16 @@ void load_settings(void) {
 		db = XrmGetStringDatabase(resource_manager);
 	}
 	
-	get_x_resource(FIELD("faceName"), &default_font);
-	get_x_resource(FIELD("hyperlinkCommand"), &hyperlink_command);
-	get_resource_color(FIELD("cursorColor"), &default_cursor);
-	get_resource_color(FIELD("background"), &default_background);
-	get_resource_color(FIELD("foreground"), &default_foreground);
+	get_string(FIELD("faceName"), &default_font);
+	get_string(FIELD("hyperlinkCommand"), &hyperlink_command);
+	get_color(FIELD("cursorColor"), &default_cursor);
+	get_color(FIELD("background"), &default_background);
+	get_color(FIELD("foreground"), &default_foreground);
+	get_number(FIELD("saveLines"), &scrollback_max);
 	for (int i=0; i<16; i++) {
 		char buf[100];
 		sprintf(buf, FIELD("color%d"), i);
-		get_resource_color(buf, &default_palette[i]);
+		get_color(buf, &default_palette[i]);
 	}
 }
 
@@ -77,6 +90,7 @@ RGBColor default_cursor = {  0,192,  0};
 RGBColor default_foreground = {255,255,255};
 RGBColor default_background = {  0,  0,  0};
 int default_cursor_style = 2;
+int scrollback_max = 2000;
 
 int default_width = 80;
 int default_height = 24;
