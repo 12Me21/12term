@@ -15,6 +15,7 @@ static bool get_string(char* name, char** out) {
 	XrmValue ret;
 	char* type;
 	if (db && XrmGetResource(db, name, "String", &type, &ret)) {
+		// do we need to duplicate this 
 		*out = ret.addr;
 		return true;
 	}
@@ -58,6 +59,7 @@ void load_settings(void) {
 	get_color(FIELD("background"), &default_background);
 	get_color(FIELD("foreground"), &default_foreground);
 	get_number(FIELD("saveLines"), &scrollback_max);
+	get_string(FIELD("termName"), &term_name);
 	for (int i=0; i<16; i++) {
 		char buf[100];
 		sprintf(buf, FIELD("color%d"), i);

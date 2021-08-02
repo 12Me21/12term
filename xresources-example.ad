@@ -4,19 +4,21 @@
 ! so you should put your settings there.
 ! To update the database manually, run: xrdb -merge <filename>
 
-! all settings use the same name as xterm's, when possible
+! all settings use the same name as xterm, when possible
 
 ! these are the default values, as an example
 
 12term.saveLines: 2000
 
-12term.faceName: comic mono:size=12
+12term.faceName: cascadia code:size=12
 
 12term.cursorColor: rgb:00/AA/00
 
 ! normal text and background colors
 12term.foreground: rgb:FF/FF/FF
 12term.background: rgb:00/00/00
+
+12term.termName: xterm-12term
 
 ! 16 color palette
 12term.color0: rgb:00/00/00 /* black */
