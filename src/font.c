@@ -15,7 +15,6 @@ typedef struct {
 	Px ascent, descent;
 	//Px lbearing, rbearing;
 	
-	bool badslant, badweight;
 	XftFont* match;
 	FcFontSet* set;
 	FcPattern* pattern;
@@ -59,20 +58,6 @@ static int load_font(Font* f, FcPattern* pattern) {
 		FcPatternDestroy(configured);
 		FcPatternDestroy(match);
 		return 1;
-	}
-	
-	int wantattr, haveattr;
-	
-	// check slant/weight to see if
-	if (FcPatternGetInteger(pattern, "slant", 0, &wantattr) == FcResultMatch) {
-		if (FcPatternGetInteger(f->match->pattern, "slant", 0, &haveattr)!=FcResultMatch || haveattr<wantattr) {
-			f->badslant = true;
-		}
-	}
-	if (FcPatternGetInteger(pattern, "weight", 0, &wantattr) == FcResultMatch) {
-		if (FcPatternGetInteger(f->match->pattern, "weight", 0, &haveattr)!=FcResultMatch || haveattr != wantattr) {
-			f->badweight = true;
-		}
 	}
 	
 	// calculate the average char width
