@@ -4,23 +4,28 @@
 ! so you should put your settings there.
 ! To update the database manually, run: xrdb -merge <filename>
 
-! all settings use the same name as xterm, when possible
+! when possible, I use the same names as xterm
 
-! these are the default values, as an example
+! here are the default values, as an example:
 
-12term.saveLines: 2000
-
-12term.faceName: cascadia code:size=12
-
-12term.cursorColor: rgb:00/AA/00
-
-! normal text and background colors
-12term.foreground: rgb:FF/FF/FF
-12term.background: rgb:00/00/00
-
+! TERM environment variable
 12term.termName: xterm-12term
 
+! number of lines of history to store
+12term.saveLines: 2000
+
+! font
+12term.faceName: cascadia code
+! font size (in points)
+12term.faceSize: 12
+
+! colors
+12term.foreground: rgb:FF/FF/FF
+12term.background: rgb:00/00/00
+12term.cursorColor: rgb:00/AA/00
+
 ! 16 color palette
+! dark colors
 12term.color0: rgb:00/00/00 /* black */
 12term.color1: rgb:AA/00/00 /* red */
 12term.color2: rgb:00/AA/00 /* green */
@@ -29,7 +34,7 @@
 12term.color5: rgb:AA/00/AA /* magenta */
 12term.color6: rgb:00/AA/AA /* cyan */
 12term.color7: rgb:AA/AA/AA /* white */
-! "bright" colors
+! bright colors
 12term.color8: rgb:55/55/55 /* black */
 12term.color9: rgb:FF/55/55 /* red */
 12term.color10: rgb:55/FF/55 /* green */

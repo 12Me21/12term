@@ -269,7 +269,7 @@ int main(int argc, char* argv[argc+1]) {
 	
 	time_log("init xft");
 	
-	init_fonts(default_font, 0);
+	load_fonts(default_font, default_font_size);
 	
 	// messy messy
 	W.w = W.cw*w+W.border*2;
@@ -338,8 +338,8 @@ int main(int argc, char* argv[argc+1]) {
 }
 
 void change_font(const char* name) {
-	init_fonts(name, 0);
-	W.w = W.cw*T.width+W.border*2;
-	W.h = W.ch*T.height+W.border*2;
-	change_size(W.w, W.h, true, true);
+	load_fonts(name, default_font_size);
+	int w = W.cw*T.width+W.border*2;
+	int h = W.ch*T.height+W.border*2;
+	change_size(w, h, true, true);
 }

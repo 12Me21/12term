@@ -295,7 +295,7 @@ static void rotate(int count, int itemsize, unsigned char data[count][itemsize],
 // and clear the "new" lines
 static void shift_rows(int y1, int y2, int amount, bool bce) {
 	rotate(y2-y1, sizeof(Cell*), (void*)&T.current->rows[y1], amount);
-	draw_rotate_rows(y1, y2, amount);
+	draw_rotate_rows(y1, y2, amount, false);
 	if (amount>0) { // down
 		for (int y=y1; y<y1+amount; y++)
 			clear_row(T.current->rows[y], 0, bce);
@@ -680,8 +680,14 @@ void set_scrollback(int pos) {
 	pos = limit(pos, 0, T.scrollback.lines);
 	int dist = pos-T.scrollback.pos;
 	if (abs(dist)<T.height)
-		draw_rotate_rows(0, T.height, dist);
+		draw_rotate_rows(0, T.height, dist, true);
 	T.scrollback.pos = pos;
+}
+
+bool move_scrollback(int amount) {
+	int before = T.scrollback.pos;
+	set_scrollback(T.scrollback.pos+amount);
+	return before!=T.scrollback.pos;
 }
 
 // get a row from the current screen (if n ≥ 0) or the scrollback buffer (if n < 0). returns NULL if n is out of range

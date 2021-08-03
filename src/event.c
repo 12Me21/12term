@@ -143,12 +143,12 @@ static void on_buttonpress(XEvent* ev) {
 		}
 		break;
 	case 4: // scrollup
-		set_scrollback(T.scrollback.pos+2);
-		force_redraw();
+		if (move_scrollback(2))
+			force_redraw();
 		break;
 	case 5: // scroll down
-		set_scrollback(T.scrollback.pos-2);
-		force_redraw();
+		if (move_scrollback(-2))
+			force_redraw();
 		break;
 	}
 }

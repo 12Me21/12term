@@ -198,7 +198,15 @@ static void rotate(int amount, int length, DrawRow start[length]) {
 	}
 }
 
-void draw_rotate_rows(int y1, int y2, int amount) {
+void draw_rotate_rows(int y1, int y2, int amount, bool screen_space) {
+	if (!screen_space && T.current==&T.buffers[0]) {
+		y1 -= T.scrollback.pos;
+		y2 -= T.scrollback.pos;
+	}
+	y1 = limit(y1, 0, T.height-1);
+	y2 = limit(y2, y1, T.height);
+	if (y2<=y1)
+		return;
 	rotate(amount, y2-y1, &rows[y1]);
 	for (int y=y1; y<y2; y++)
 		rows[y].redraw = true;

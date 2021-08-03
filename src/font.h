@@ -11,6 +11,6 @@ typedef struct {
 	XftFont* font;
 } DrawnCell;
 
-void init_fonts(const char* fontstr, double fontsize);
+void load_fonts(const char* fontstr, double fontsize);
 int make_glyphs(int len, XftGlyphFontSpec specs[len], Cell cells[len], int indexs[len], DrawnCell old[len]);
 void fonts_free(void);

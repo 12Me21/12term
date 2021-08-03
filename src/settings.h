@@ -11,6 +11,7 @@ extern int default_width;
 extern int default_height;
 
 extern char* default_font;
+extern double default_font_size;
 
 extern char* hyperlink_command;
 

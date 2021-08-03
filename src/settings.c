@@ -30,15 +30,24 @@ static bool get_color(char* name, RGBColor* out) {
 	return false;
 }
 
-static bool get_number(char* name, int* out) {
+static bool get_number(char* name, double* out) {
 	char* str;
 	if (get_string(name, &str)) {
 		char* end;
-		int n = strtol(str, &end, 0);
+		double n = strtod(str, &end);
 		if (str[0]!='\0' && *end=='\0') {
 			*out = n;
 			return true;
 		}
+	}
+	return false;
+}
+
+static bool get_integer(char* name, int* out) {
+	double d;
+	if (get_number(name, &d)) {
+		*out = (int)d;
+		return true;
 	}
 	return false;
 }
@@ -54,11 +63,12 @@ void load_settings(void) {
 	}
 	
 	get_string(FIELD("faceName"), &default_font);
+	get_number(FIELD("faceSize"), &default_font_size);
 	get_string(FIELD("hyperlinkCommand"), &hyperlink_command);
 	get_color(FIELD("cursorColor"), &default_cursor);
 	get_color(FIELD("background"), &default_background);
 	get_color(FIELD("foreground"), &default_foreground);
-	get_number(FIELD("saveLines"), &scrollback_max);
+	get_integer(FIELD("saveLines"), &scrollback_max);
 	get_string(FIELD("termName"), &term_name);
 	for (int i=0; i<16; i++) {
 		char buf[100];
@@ -97,7 +107,8 @@ int scrollback_max = 2000;
 int default_width = 80;
 int default_height = 24;
 
-char* default_font = "comic mono:size=12";
+char* default_font = "comic mono";
+double default_font_size = 12;
 
 char* hyperlink_command = "xdg-open";
 

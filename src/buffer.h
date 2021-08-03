@@ -120,6 +120,7 @@ typedef struct Term {
 void init_term(int width, int height);
 void term_resize(int width, int height);
 void set_scrollback(int pos);
+bool move_scrollback(int amount);
 void dirty_all(void);
 Row get_row(int y);
 

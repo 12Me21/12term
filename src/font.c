@@ -13,35 +13,28 @@
 typedef struct {
 	Px width, height;
 	Px ascent, descent;
-	//Px lbearing, rbearing;
 	
-	XftFont* match;
+	XftFont* font;
 	FcFontSet* set;
 	FcPattern* pattern;
 } Font;
 
 static Font fonts[4] = {0}; // normal, bold, italic, bold+italic
 
-// fonts loaded for fallback chars
-// todo: unify these structures to simplify things
-typedef struct {
-	XftFont* font;
-	int style;
-	Char unicodep;
-} Fontcache;
-
-static Fontcache frc[100];
-static int frclen = 0;
-
 static int ceildiv(int a, int b) {
 	return (a+b-1)/b;
 }
 
-static int load_font(Font* f, FcPattern* pattern) {
+//load one font face
+static bool load_font(Font* f, FcPattern* pattern, bool bold, bool italic) {
 	FcPattern* configured = FcPatternDuplicate(pattern);
-	
 	if (!configured)
-		return 1;
+		return false;
+	
+	if (italic)
+		FcPatternAddInteger(configured, FC_SLANT, FC_SLANT_ITALIC);
+	if (bold)
+		FcPatternAddInteger(configured, FC_WEIGHT, FC_WEIGHT_BOLD);
 	
 	FcConfigSubstitute(NULL, configured, FcMatchPattern);
 	XftDefaultSubstitute(W.d, W.scr, configured);
@@ -50,36 +43,35 @@ static int load_font(Font* f, FcPattern* pattern) {
 	FcPattern* match = FcFontMatch(NULL, configured, &result);
 	if (!match) {
 		FcPatternDestroy(configured);
-		return 1;
+		return false;
 	}
 	
-	f->match = XftFontOpenPattern(W.d, match);
-	if (!f->match) {
+	f->font = XftFontOpenPattern(W.d, match);
+	if (!f->font) {
 		FcPatternDestroy(configured);
 		FcPatternDestroy(match);
-		return 1;
+		return false;
 	}
 	
 	// calculate the average char width
 	const char ascii_printable[] = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
 	int len = strlen(ascii_printable);
 	XGlyphInfo extents;
-	XftTextExtentsUtf8(W.d, f->match, (const FcChar8*)ascii_printable, len, &extents);
+	XftTextExtentsUtf8(W.d, f->font, (const FcChar8*)ascii_printable, len, &extents);
 	f->width = ceildiv(extents.xOff, len);
 	
 	f->set = NULL;
 	f->pattern = configured;
-	f->ascent = f->match->ascent;
-	f->descent = f->match->descent;
-	//f->lbearing = 0;
-	//f->rbearing = f->match->max_advance_width;
+	f->ascent = f->font->ascent;
+	f->descent = f->font->descent;
 	f->height = f->ascent + f->descent;
 	
-	return 0;
+	return true;
 }
 
-// todo: defer loading fonts until needed?
-void init_fonts(const char* fontstr, double fontsize) {
+// This frees any existing fonts and loads new ones, based on `fontstr`.
+// it also sets `W.cw` and `W.ch`.
+void load_fonts(const char* fontstr, double fontsize) {
 	fonts_free();
 	
 	FcPattern* pattern;
@@ -95,38 +87,14 @@ void init_fonts(const char* fontstr, double fontsize) {
 	if (fontsize) {
 		FcPatternDel(pattern, FC_PIXEL_SIZE);
 		FcPatternDel(pattern, FC_SIZE);
-		FcPatternAddDouble(pattern, FC_PIXEL_SIZE, fontsize);
-	} else {
-		if (FcPatternGetDouble(pattern, FC_PIXEL_SIZE, 0, &fontsize) == FcResultMatch) {
-			//
-		} else if (FcPatternGetDouble(pattern, FC_SIZE, 0, &fontsize) == FcResultMatch) {
-			//
-		} else {
-			FcPatternAddDouble(pattern, FC_PIXEL_SIZE, 12);
-			fontsize = 12;
-		}
+		FcPatternAddDouble(pattern, FC_SIZE, fontsize);
 	}
 	
-	load_font(&fonts[0], pattern);
-	
-	time_log("loaded font 0");
-	
-	// italic
-	FcPatternDel(pattern, FC_SLANT);
-	FcPatternAddInteger(pattern, FC_SLANT, FC_SLANT_ITALIC);
-	load_font(&fonts[2], pattern);
-	time_log("loaded font 2");
-	
-	// bold+italic
-	FcPatternDel(pattern, FC_WEIGHT);
-	FcPatternAddInteger(pattern, FC_WEIGHT, FC_WEIGHT_BOLD);
-	load_font(&fonts[3], pattern);
-	time_log("loaded font 3");
-	// bold
-	FcPatternDel(pattern, FC_SLANT);
-	FcPatternAddInteger(pattern, FC_SLANT, FC_SLANT_ROMAN);
-	load_font(&fonts[1], pattern);
-	time_log("loaded font 1");
+	for (int i=0; i<3; i++) {
+		if (!load_font(&fonts[i], pattern, i&1, i&2))
+			die("failed to load font");
+		time_log("loaded font");
+	}
 	
 	W.font_ascent = fonts[0].ascent;
 	
@@ -136,6 +104,16 @@ void init_fonts(const char* fontstr, double fontsize) {
 	
 	FcPatternDestroy(pattern);
 }
+
+// fonts loaded for fallback chars
+typedef struct {
+	XftFont* font;
+	int style;
+	Char unicodep;
+} Fontcache;
+
+static Fontcache frc[100];
+static int frclen = 0;
 
 // this is gross and I don't fully understand how it works
 static void find_fallback_font(Char chr, int style, XftFont** xfont, FT_UInt* glyph) {
@@ -171,7 +149,7 @@ static void find_fallback_font(Char chr, int style, XftFont** xfont, FT_UInt* gl
 		
 	FcPattern* fontpattern = FcFontSetMatch(NULL, (FcFontSet*[]){font->set}, 1, fcpattern, &fcres);
 	
-	if (frclen >= 100)
+	if (frclen >= LEN(frc))
 		die("too many fallback fonts aaaaaaa\n");
 	
 	frc[frclen].font = XftFontOpenPattern(W.d, fontpattern);
@@ -224,9 +202,9 @@ int make_glyphs(int len, XftGlyphFontSpec specs[len], /*const*/ Cell cells[len],
 			glyph = old[i].glyph;
 		} else {
 			Font* font = &fonts[style];
-			glyph = XftCharIndex(W.d, font->match, chr);
+			glyph = XftCharIndex(W.d, font->font, chr);
 			if (glyph)
-				xfont = font->match;
+				xfont = font->font;
 			else
 				find_fallback_font(chr, style, &xfont, &glyph);
 			if (old) {
@@ -252,10 +230,10 @@ int make_glyphs(int len, XftGlyphFontSpec specs[len], /*const*/ Cell cells[len],
 
 void fonts_free(void) {
 	for (int i=0; i<4; i++) {
-		if (fonts[i].match) {
+		if (fonts[i].font) {
 			FcPatternDestroy(fonts[i].pattern);
-			XftFontClose(W.d, fonts[i].match);
-			fonts[i].match = NULL;
+			XftFontClose(W.d, fonts[i].font);
+			fonts[i].font = NULL;
 		}
 	}
 	for (int i=0; i<frclen; i++)
