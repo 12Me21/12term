@@ -18,6 +18,8 @@ typedef struct Color {
 	};
 	bool truecolor;
 } __attribute__((packed)) Color;
+// RRRRRRRR GGGGGGGG BBBBBBBB 1.......
+// iiiiiiii iiiiiiii ........ 0.......
 
 // display attributes for characters
 typedef struct Attrs {
@@ -33,7 +35,7 @@ typedef struct Attrs {
 	// note: the renderer doesn't actually use the .reverse and .bold to determine color: these transformations are done when writing text to the screen.
 	bool strikethrough: 1;
 	
-	bool invisible: 1; // todo?
+	//bool invisible: 1; // todo?
 } Attrs;
 
 // single character cell
