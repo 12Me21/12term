@@ -41,4 +41,4 @@ void full_reset(void);
 void switch_buffer(bool alt);
 
 int new_link(char* url);
-void init_scrollback(void);
+void init_history(void);

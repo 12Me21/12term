@@ -37,11 +37,11 @@ static void init_palette(void) {
 	}
 }
 
-void init_scrollback(void) {
-	FREE(T.scrollback.rows);
-	T.scrollback.size = 0;
-	T.scrollback.lines = 0;
-	T.scrollback.pos = 0;
+void init_history(void) {
+	FREE(T.history.rows);
+	T.history.size = 0;
+	T.history.lines = 0;
+	T.history.scroll = 0;
 }
 
 static void clear_row(Row row, int start, bool bce) {
@@ -67,21 +67,21 @@ void term_free(void) {
 
 // idea: scroll lock support
 // todo: add a limit to the number of pushed lines, and then turn this into a ring buffer.
-static void push_scrollback(int y) {
+static void push_history(int y) {
 	if (y<0 || y>=T.height)
 		return;
-	// if scrollback is full, allocate more space
-	if (T.scrollback.lines >= T.scrollback.size) {
-		int length = T.scrollback.size + 1000;
-		REALLOC(T.scrollback.rows, length);
-		T.scrollback.size = length;
+	// if history is full, allocate more space
+	if (T.history.lines >= T.history.size) {
+		int length = T.history.size + 1000;
+		REALLOC(T.history.rows, length);
+		T.history.size = length;
 	}
 	// now insert the row
-	T.scrollback.rows[T.scrollback.lines++] = T.buffers[0].rows[y];
+	T.history.rows[T.history.lines++] = T.buffers[0].rows[y];
 	// remove the row from the buffer itself so it doesn't get freed later
 	T.buffers[0].rows[y] = NULL;
-	if (T.scrollback.pos)
-		T.scrollback.pos++;
+	if (T.history.scroll)
+		T.history.scroll++;
 }
 
 void term_resize(int width, int height) {
@@ -104,11 +104,11 @@ void term_resize(int width, int height) {
 		}
 		// update cursor position
 		T.c.x = limit(T.c.x, 0, T.width); //note this is NOT width-1, since cursor is allowed to be in the right margin
-		// resize scrollback rows
-		for (int i=0; i<T.scrollback.lines; i++) {
-			REALLOC(T.scrollback.rows[i], T.width);
+		// resize history rows
+		for (int i=0; i<T.history.lines; i++) {
+			REALLOC(T.history.rows[i], T.width);
 			if (T.width > old_width)
-				clear_row(T.scrollback.rows[i], old_width, true);
+				clear_row(T.history.rows[i], old_width, true);
 		}
 	}
 	
@@ -118,9 +118,9 @@ void term_resize(int width, int height) {
 		// alt buffer: free rows at bottom
 		for (int y=height; y<T.height; y++)
 			free(T.buffers[1].rows[y]);
-		// main buffer: put lines into scrollback and shift the rest up
+		// main buffer: put lines into history and shift the rest up
 		for (int y=0; y<diff; y++)
-			push_scrollback(y);
+			push_history(y);
 		for (int y=0; y<height; y++)
 			T.buffers[0].rows[y] = T.buffers[0].rows[y+diff];
 		// realloc lists of lines
@@ -141,7 +141,7 @@ void term_resize(int width, int height) {
 			clear_row(T.buffers[1].rows[y], 0, true);
 		}
 		// main buffer: also add rows at bottom
-		// todo: option to move lines out of scrollback instead?
+		// todo: option to move lines out of history instead?
 		for (int y=old_height; y<T.height; y++) {
 			ALLOC(T.buffers[0].rows[y], T.width);
 			clear_row(T.buffers[0].rows[y], 0, true);
@@ -251,7 +251,7 @@ void init_term(int width, int height) {
 	};
 	term_resize(width, height);
 	full_reset();
-	init_scrollback();
+	init_history();
 }
 
 // generic array rotate function
@@ -306,8 +306,8 @@ static void scroll_up_internal(int amount, bool bce) {
 	amount = limit(amount, 0, y2-y1);
 	if (y1==0 && T.current==&T.buffers[0])
 		for (int y=y1; y<y1+amount; y++) {
-		// if we are on the main screen, and the scroll region starts at the top of the screen, we add the lines to the scrollback list.
-			push_scrollback(y);
+		// if we are on the main screen, and the scroll region starts at the top of the screen, we add the lines to the history list.
+			push_history(y);
 			ALLOC(T.current->rows[y], T.width);
 		}
 	shift_rows(y1, y2, -amount, bce);
@@ -663,24 +663,24 @@ void set_scroll_region(int y1, int y2) {
 }
 
 void set_scrollback(int pos) {
-	pos = limit(pos, 0, T.scrollback.lines);
-	int dist = pos-T.scrollback.pos;
+	pos = limit(pos, 0, T.history.lines);
+	int dist = pos-T.history.scroll;
 	if (abs(dist)<T.height)
 		draw_rotate_rows(0, T.height, dist, true);
-	T.scrollback.pos = pos;
+	T.history.scroll = pos;
 }
 
 bool move_scrollback(int amount) {
-	int before = T.scrollback.pos;
-	set_scrollback(T.scrollback.pos+amount);
-	return before!=T.scrollback.pos;
+	int before = T.history.scroll;
+	set_scrollback(T.history.scroll+amount);
+	return before!=T.history.scroll;
 }
 
-// get a row from the current screen (if n ≥ 0) or the scrollback buffer (if n < 0). returns NULL if n is out of range
+// get a row from the current screen (if n ≥ 0) or the history buffer (if n < 0). returns NULL if n is out of range
 Row get_row(int y) {
 	if (y>=0 && y<T.height)
 		return T.current->rows[y];
-	if (y<0 && T.scrollback.lines+y>=0)
-		return T.scrollback.rows[T.scrollback.lines+y];
+	if (y<0 && T.history.lines+y>=0)
+		return T.history.rows[T.history.lines+y];
 	return NULL;
 }

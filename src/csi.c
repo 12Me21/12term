@@ -366,7 +366,7 @@ static void process_csi_command(Char c) {
 				break;
 			case 3: // scollback
 				// ehhh todo
-				init_scrollback();
+				init_history();
 				break;
 			}
 			break;

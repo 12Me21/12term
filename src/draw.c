@@ -201,8 +201,8 @@ static void rotate(int amount, int length, DrawRow start[length]) {
 // if `screen_space` is set, don't adjust for scrollback position
 void draw_rotate_rows(int y1, int y2, int amount, bool screen_space) {
 	if (!screen_space && T.current==&T.buffers[0]) {
-		y1 -= T.scrollback.pos;
-		y2 -= T.scrollback.pos;
+		y1 -= T.history.scroll;
+		y2 -= T.history.scroll;
 	}
 	y1 = limit(y1, 0, T.height-1);
 	y2 = limit(y2, y1, T.height);
@@ -261,7 +261,7 @@ static bool draw_row(int y, Row row) {
 
 static int row_displayed_at(int y) {
 	if (T.current == &T.buffers[0])
-		return y-T.scrollback.pos;
+		return y-T.history.scroll;
 	return y;
 }
 

@@ -35,7 +35,7 @@ typedef struct Attrs {
 	// note: the renderer doesn't actually use the .reverse and .bold to determine color: these transformations are done when writing text to the screen.
 	bool strikethrough: 1;
 	
-	//bool invisible: 1; // todo?
+	bool invisible: 1; // todo?
 } Attrs;
 
 // single character cell
@@ -46,12 +46,12 @@ typedef struct Cell {
 	char wide: 2; //0 = normal, 1 = left half of wide char, -1 = right half (chr=0)
 } Cell;
 
-// compressed version of cells, used for scrollback buffer (todo)
+// compressed version of cells, used for history buffer (todo)
 // combining chars will be stored as separate cells
-typedef struct ScrollbackCell {
+typedef struct HistoryCell {
 	Char chr;
 	Attrs attrs;
-} ScrollbackCell;
+} HistoryCell;
 
 typedef Cell* Row;
 
@@ -96,13 +96,13 @@ typedef struct Term {
 	
 	int charsets[4];
 	
-	struct scrollback {
+	struct history {
 		// these names are bad..
 		Row* rows; // array
 		int size; // length of array
 		int lines; // number of actual items stored in array
-		int pos; // visual scroll position
-	} scrollback;
+		int scroll; // visual scroll position
+	} history;
 	
 	struct links {
 		int length;
@@ -111,9 +111,6 @@ typedef struct Term {
 	
 	bool app_keypad, app_cursor;
 	bool bracketed_paste;
-	/*struct mouse_settings {
-		bool button, motion, sgr, many,
-		} mouse;*/ //to allow easy clearing
 	int mouse_mode;
 	int mouse_encoding;
 	bool report_focus; //todo
