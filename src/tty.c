@@ -58,6 +58,10 @@ static void execsh(void) {
 		else
 			die("who are you?\n");
 	}
+	// check, in this order:
+	// - SHELL env var
+	// - pw_shell
+	// - /bin/sh
 	char* sh = getenv("SHELL");
 	if (sh == NULL)
 		sh = pw->pw_shell[0] ? pw->pw_shell : "/bin/sh";
@@ -65,11 +69,11 @@ static void execsh(void) {
 	unsetenv("COLUMNS");
 	unsetenv("LINES");
 	unsetenv("TERMCAP");
-	setenv("LOGNAME", pw->pw_name, 1);
-	setenv("USER", pw->pw_name, 1);
-	setenv("SHELL", sh, 1);
-	setenv("HOME", pw->pw_dir, 1);
-	setenv("TERM", term_name, 1);
+	setenv("LOGNAME", pw->pw_name, true);
+	setenv("USER", pw->pw_name, true);
+	setenv("SHELL", sh, true);
+	setenv("HOME", pw->pw_dir, true);
+	setenv("TERM", settings.termName, true);
 	
 	signal(SIGCHLD, SIG_DFL);
 	signal(SIGHUP, SIG_DFL);

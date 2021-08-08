@@ -14,7 +14,7 @@
 #include "settings.h"
 
 void activate_hyperlink(const char* url) {
-	if (!hyperlink_command)
+	if (!settings.hyperlinkCommand)
 		return;
 	pid_t pid = fork();
 	if (pid<0) { // error
@@ -25,7 +25,7 @@ void activate_hyperlink(const char* url) {
 		close(0);
 		close(1);
 		close(2);
-		int err = execlp(hyperlink_command, hyperlink_command, url, NULL);
+		int err = execlp(settings.hyperlinkCommand, settings.hyperlinkCommand, url, NULL);
 		_exit(err);
 		return;
 	}

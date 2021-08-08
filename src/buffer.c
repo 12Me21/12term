@@ -13,13 +13,13 @@
 Term T;
 
 static void init_palette(void) {
-	T.foreground = default_foreground;
-	T.background = default_background;
-	T.cursor_color = default_cursor;
+	T.foreground = settings.foreground;
+	T.background = settings.background;
+	T.cursor_color = settings.cursorColor;
 	// normal 16 indexed colors
 	int p = 0;
 	for (int i=0; i<16; i++)
-		T.palette[p++] = default_palette[i];
+		T.palette[p++] = settings.palette[i];
 	// 6x6x6 rgb cube
 	const int brightness[6] = {0, 95, 135, 175, 215, 255};
 	for (int i=0; i<6*6*6; i++) {
@@ -156,7 +156,7 @@ void term_resize(int width, int height) {
 // todo: actually use this
 void set_cursor_style(int n) {
 	if (n==0)
-		n = default_cursor_style;
+		n = settings.cursorShape;
 	
 	if (n>0 && n<=6) {
 		T.cursor_shape = (n-1)/2;

@@ -1,22 +1,21 @@
 #pragma once
 #include "buffer.h"
 
-extern RGBColor default_palette[16];
-extern RGBColor default_cursor;
-extern RGBColor default_foreground;
-extern RGBColor default_background;
-extern int default_cursor_style;
+typedef struct Settings {
+	RGBColor palette[16];
+	RGBColor cursorColor;
+	RGBColor foreground;
+	RGBColor background;
+	int cursorShape;
+	int width;
+	int height;
+	char* faceName;
+	double faceSize;
+	char* hyperlinkCommand;
+	char* termName;
+	int saveLines;
+} Settings;
 
-extern int default_width;
-extern int default_height;
-
-extern char* default_font;
-extern double default_font_size;
-
-extern char* hyperlink_command;
-
-extern char* term_name;
-
-extern int scrollback_max;
+extern Settings settings;
 
 void load_settings(void);

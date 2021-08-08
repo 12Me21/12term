@@ -239,8 +239,8 @@ int main(int argc, char* argv[argc+1]) {
 	setlocale(LC_CTYPE, "");
 	XSetLocaleModifiers("");
 	
-	int w = default_width;
-	int h = default_height;
+	int w = settings.width;
+	int h = settings.height;
 	
 	W.border = 3;
 	
@@ -269,7 +269,7 @@ int main(int argc, char* argv[argc+1]) {
 	
 	time_log("init xft");
 	
-	load_fonts(default_font, default_font_size);
+	load_fonts(settings.faceName, settings.faceSize);
 	
 	// messy messy
 	W.w = W.cw*w+W.border*2;
@@ -277,7 +277,7 @@ int main(int argc, char* argv[argc+1]) {
 	
 	// create the window
 	
-	unsigned long bg_pixel = alloc_color((Color){.truecolor=true,.rgb=default_background}); // yuck
+	unsigned long bg_pixel = alloc_color((Color){.truecolor=true,.rgb=settings.background}); // yuck
 	
 	W.event_mask = FocusChangeMask | KeyPressMask | KeyReleaseMask | ExposureMask | VisibilityChangeMask | StructureNotifyMask | ButtonMotionMask | ButtonPressMask | ButtonReleaseMask;
 	
@@ -338,7 +338,7 @@ int main(int argc, char* argv[argc+1]) {
 }
 
 void change_font(const char* name) {
-	load_fonts(name, default_font_size);
+	load_fonts(name, settings.faceSize);
 	int w = W.cw*T.width+W.border*2;
 	int h = W.ch*T.height+W.border*2;
 	change_size(w, h, true, true);

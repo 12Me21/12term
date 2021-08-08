@@ -23,6 +23,16 @@
 12term.foreground: rgb:FF/FF/FF
 12term.background: rgb:00/00/00
 12term.cursorColor: rgb:00/AA/00
+! cursor shape (unused currently)
+12term.cursorShape: 2
+
+! default size
+12term.width: 80
+12term.height: 24
+
+! command used to open hyperlinks.
+! set to an empty string to disable
+12term.hyperlinkCommand: xdg-open
 
 ! 16 color palette
 ! dark colors
