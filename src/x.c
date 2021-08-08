@@ -239,12 +239,9 @@ int main(int argc, char* argv[argc+1]) {
 	
 	XtSetLanguageProc(NULL, NULL, "");
 	W.W = XtOpenApplication(NULL, "12term", NULL, 0, &argc, argv, NULL, sessionShellWidgetClass, NULL, 0);
-	
-	int w = settings.width;
-	int h = settings.height;
-	
-	W.border = 3;
-	
+	// hecking locale
+	///setlocale(LC_CTYPE, "");
+	//XSetLocaleModifiers("");
 	W.d = XtDisplay(W.W);
 	if (!W.d)
 		die("Could not connect to X server\n");
@@ -254,9 +251,14 @@ int main(int argc, char* argv[argc+1]) {
 		die("Cannot handle non truecolor visual ...\n");
 	W.cmap = XDefaultColormap(W.d, W.scr);
 	
-	// init db
-	XrmInitialize();
 	load_settings(&argc, argv);
+	
+	int w = settings.width;
+	int h = settings.height;
+	
+	W.border = 3;
+	
+	// init db
 	
 	init_atoms();
 	

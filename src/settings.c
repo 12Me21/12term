@@ -2,7 +2,8 @@
 // it just contains functions for loading settings, and their default values
 // see `xresources-example.ad` for more information
 
-#include <X11/Xresource.h>
+#include <X11/Intrinsic.h>
+#include <X11/StringDefs.h>
 
 #include "buffer.h"
 #include "settings.h"
@@ -88,7 +89,19 @@ static bool get_integer(char* name, int* out) {
 
 #define FIELD(name) "12term." #name, &settings.name
 
+XtResource rs[] = {
+	{"cursorColor", "CursorColor", "RGBColor", sizeof(RGBColor), XtOffsetOf(Settings, cursorColor)}
+};
+
+Boolean string_to_rgb(Display* display, XrmValue* args, Cardinal* num_args, XrmValue* from, XrmValue* to, XtPointer* converter_data) {
+	return parse_x_color((void*)from->addr, (void*)to->addr);
+}
+
 void load_settings(int* argc, char** argv) {
+	XtSetTypeConverter("String", "RGBColor", string_to_rgb, NULL, 0, XtCacheNone, NULL);
+	XtGetApplicationResources(W.W, (void*)&settings, rs, XtNumber(rs), NULL, 0);
+	//print("settings? %d\n", settings.width);
+	/*
 	char* resource_manager = XResourceManagerString(W.d);//screen?
 	if (resource_manager) {
 		//if (db)
@@ -119,5 +132,5 @@ void load_settings(int* argc, char** argv) {
 	get_string(FIELD(hyperlinkCommand));
 	if (settings.hyperlinkCommand[0]=='\0')
 		settings.hyperlinkCommand = NULL;
-	get_integer(FIELD(cursorShape));
+		get_integer(FIELD(cursorShape));*/
 }
