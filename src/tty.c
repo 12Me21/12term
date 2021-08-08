@@ -113,7 +113,6 @@ size_t tty_read(void) {
 	ssize_t len = read(master_fd, buf, LEN(buf));
 	//print("read %ld bytes\n", len);
 	if (len>0) {
-		// todo: move this stuff into x.c maybe so we don't need buffer.h in this file?
 		process_chars(len, buf);
 		return len;
 	} else if (len<0 && errno!=EAGAIN) {
@@ -204,7 +203,7 @@ static int max(int a, int b) {
 
 //wait until data is recieved on either master_fd (the fd used to communicate with the child) OR xfd (notifies when x events are recieved)
 // returns true if data was recvd on master_fd
-bool tty_wait(Fd xfd, long long timeout) {
+bool tty_wait(Fd xfd, Nanosec timeout) {
 	fd_set rfd;
 	while (1) {
 		FD_ZERO(&rfd);

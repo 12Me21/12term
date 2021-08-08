@@ -113,11 +113,11 @@ void force_redraw(void) {
 	redraw = true;
 }
 
-static long long timediff(struct timespec t1, struct timespec t2) {
+static Nanosec timediff(struct timespec t1, struct timespec t2) {
 	return (t1.tv_sec-t2.tv_sec)*1000L*1000*1000 + (t1.tv_nsec-t2.tv_nsec);
 }
 
-static long long min_redraw = 10*1000*1000; // nanoseconds
+static Nanosec min_redraw = 10*1000*1000;
 
 // todo: clean this up
 static void run(void) {
@@ -159,12 +159,12 @@ static void run(void) {
 				(HANDLERS[ev.type])(&ev);
 		}
 		
-		long long timeout = 10000L*1000*1000;
+		Nanosec timeout = 10000L*1000*1000;
 		
 		if (redraw) {
 			struct timespec now;
 			clock_gettime(CLOCK_MONOTONIC, &now);
-			long long since_last = timediff(now, last_redraw);
+			Nanosec since_last = timediff(now, last_redraw);
 			//print("since last: %lld", since_last/1000/1000);
 			if (since_last>=min_redraw) {
 				draw(false);

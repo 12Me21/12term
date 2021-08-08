@@ -24,4 +24,6 @@ typedef int32_t Char;
 
 typedef int Px;
 
+typedef long long Nanosec;
+
 #include "debug.h"
