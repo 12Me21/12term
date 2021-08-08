@@ -10,7 +10,7 @@ typedef struct Settings {
 	int width;
 	int height;
 	char* faceName;
-	double faceSize;
+	float faceSize;
 	char* hyperlinkCommand;
 	char* termName;
 	int saveLines;

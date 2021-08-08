@@ -238,7 +238,11 @@ int main(int argc, char* argv[argc+1]) {
 	time_log(NULL);
 	
 	XtSetLanguageProc(NULL, NULL, "");
-	W.W = XtOpenApplication(NULL, "12term", NULL, 0, &argc, argv, NULL, sessionShellWidgetClass, NULL, 0);
+	XrmOptionDescRec option_desc[] = {
+		{"-fa", ".faceName", XrmoptionSepArg}
+	};
+	W.W = XtOpenApplication(NULL, "12term", option_desc, XtNumber(option_desc), &argc, argv, NULL, sessionShellWidgetClass, NULL, 0);
+
 	// hecking locale
 	///setlocale(LC_CTYPE, "");
 	//XSetLocaleModifiers("");

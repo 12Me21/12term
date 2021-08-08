@@ -10,127 +10,51 @@
 #include "x.h"
 extern bool parse_x_color(const char* c, RGBColor* out);
 
-Settings settings = {
-	.palette = {
-	  // dark colors
-		{  0,  0,  0}, // dark black
-		{170,  0,  0}, // dark red
-		{  0,170,  0}, // dark green
-		{170, 85,  0}, // dark yellow
-		{  0,  0,170}, // dark blue
-		{170,  0,170}, // dark magenta
-		{  0,170,170}, // dark cyan
-		{170,170,170}, // dark white
-		// light colors
-		{ 85, 85, 85}, // light black
-		{255, 85, 85}, // light red
-		{ 85,255, 85}, // light green
-		{255,255, 85}, // light yellow
-		{ 85, 85,255}, // light blue
-		{255, 85,255}, // light magenta
-		{ 85,255,255}, // light cyan
-		{255,255,255}, // light white
-	},
-	.cursorColor = {  0,192,  0},
-	.foreground = {255,255,255},
-	.background = {  0,  0,  0},
-	.cursorShape = 2,
-	.saveLines = 2000,
-	.width = 80,
-	.height = 24,
-	.faceName = "comic mono",
-	.faceSize = 12,
-	.hyperlinkCommand = "xdg-open",
-	.termName = "xterm-12term",
-};
+Settings settings = {0};
 
-XrmDatabase	db = NULL;
-
-static bool get_string(char* name, char** out) {
-	XrmValue ret;
-	char* type;
-	if (db && XrmGetResource(db, name, "String", &type, &ret)) {
-		// do we need to duplicate this 
-		*out = ret.addr;
-		return true;
-	}
-	return false;
-}
-
-static bool get_color(char* name, RGBColor* out) {
-	char* str;
-	if (get_string(name, &str))
-		if (parse_x_color(str, out))
-			return true;
-	return false;
-}
-
-static bool get_number(char* name, double* out) {
-	char* str;
-	if (get_string(name, &str)) {
-		char* end;
-		double n = strtod(str, &end);
-		if (str[0]!='\0' && *end=='\0') {
-			*out = n;
-			return true;
-		}
-	}
-	return false;
-}
-
-static bool get_integer(char* name, int* out) {
-	double d;
-	if (get_number(name, &d)) {
-		*out = (int)d;
-		return true;
-	}
-	return false;
-}
-
-#define FIELD(name) "12term." #name, &settings.name
+// we could use _Generic here but gosh...
+#define F_COLOR(name, class, field, ...) {name, class, "RGBColor", sizeof(RGBColor), XtOffsetOf(Settings, field), "RGBColor", (XtPointer)&(RGBColor)__VA_ARGS__}
+#define F_INT(name, class, field, val) {name, class, "Int", sizeof(int), XtOffsetOf(Settings, field), "Int", (XtPointer)&(int){val}}
+#define F_STRING(name, class, field, val) {name, class, "String", sizeof(char*), XtOffsetOf(Settings, field), "String", (XtPointer)(val)}
+#define F_FLOAT(name, class, field, val) {name, class, "Float", sizeof(float), XtOffsetOf(Settings, field), "Float", (XtPointer)&(float){val}}
+#define F_PAL(n, sn, ...) {"color" sn, "Color" sn, "RGBColor", sizeof(RGBColor), XtOffsetOf(Settings, palette)+n*sizeof(RGBColor), "RGBColor", (XtPointer)&(RGBColor)__VA_ARGS__}
 
 XtResource rs[] = {
-	{"cursorColor", "CursorColor", "RGBColor", sizeof(RGBColor), XtOffsetOf(Settings, cursorColor)}
+	F_COLOR("cursorColor", "CursorColor", cursorColor, {  0,192,  0}),
+	F_COLOR("foreground", "Foreground", foreground, {  255, 255,255}),
+	F_COLOR("background", "Background", background, {  0, 0, 0}),
+	F_INT("cursorShape", "CursorShape", cursorShape, 2),
+	F_INT("height", "Height", height, 24), //todo: change these class names
+	F_INT("width", "Width", width, 80),
+	F_STRING("faceName", "FaceName", faceName, "monospace"),
+	F_FLOAT("faceSize", "faceSize", faceSize, 12.0),
+	F_INT("saveLines", "SaveLines", saveLines, 2000),
+	F_STRING("hyperlinkCommand", "HyperlinkCommand", hyperlinkCommand, "xdg-open"),
+	F_STRING("termName", "TermName", termName, "xterm-12term"),
+	F_PAL(0, "0", {  0,  0,  0}),
+	F_PAL(1, "1", {170,  0,  0}),
+	F_PAL(2, "2", {  0,170,  0}),
+	F_PAL(3, "3", {170, 85,  0}),
+	F_PAL(4, "4", {  0,  0,170}),
+	F_PAL(5, "5", {170,  0,170}),
+	F_PAL(6, "6", {  0,170,170}),
+	F_PAL(7, "7", {170,170,170}),
+	F_PAL(8, "8", { 85, 85, 85}),
+	F_PAL(9, "9", {255, 85, 85}),
+	F_PAL(10, "10", { 85,255, 85}),
+	F_PAL(11, "11", {255,255, 85}),
+	F_PAL(12, "12", { 85, 85,255}),
+	F_PAL(13, "13", {255, 85,255}),
+	F_PAL(14, "14", { 85,255,255}),
+	F_PAL(15, "15", {255,255,255}),
 };
 
 Boolean string_to_rgb(Display* display, XrmValue* args, Cardinal* num_args, XrmValue* from, XrmValue* to, XtPointer* converter_data) {
+	// this is bad, because it relies on values in the W struct etc.
 	return parse_x_color((void*)from->addr, (void*)to->addr);
 }
 
 void load_settings(int* argc, char** argv) {
 	XtSetTypeConverter("String", "RGBColor", string_to_rgb, NULL, 0, XtCacheNone, NULL);
 	XtGetApplicationResources(W.W, (void*)&settings, rs, XtNumber(rs), NULL, 0);
-	//print("settings? %d\n", settings.width);
-	/*
-	char* resource_manager = XResourceManagerString(W.d);//screen?
-	if (resource_manager) {
-		//if (db)
-		//	XrmDestroyDatabase(db);
-		db = XrmGetStringDatabase(resource_manager);
-	}
-	// todo: finish this
-	XrmOptionDescRec option_desc[] = {
-		{"-fa", ".faceName", XrmoptionSepArg}
-	};
-	XrmParseCommand(&db, option_desc, LEN(option_desc), "12term", argc, argv);
-	
-	get_string(FIELD(faceName));
-	get_number(FIELD(faceSize));
-	get_color(FIELD(cursorColor));
-	get_color(FIELD(background));
-	get_color(FIELD(foreground));
-	get_integer(FIELD(saveLines));
-	get_string(FIELD(termName));
-	for (int i=0; i<16; i++) {
-		char buf[100];
-		sprintf(buf, "12term.color%d", i);
-		get_color(buf, &settings.palette[i]);
-	}
-	// non-xterm
-	get_integer(FIELD(width));
-	get_integer(FIELD(height));	
-	get_string(FIELD(hyperlinkCommand));
-	if (settings.hyperlinkCommand[0]=='\0')
-		settings.hyperlinkCommand = NULL;
-		get_integer(FIELD(cursorShape));*/
 }
