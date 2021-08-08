@@ -10,13 +10,13 @@ srcs = x tty debug buffer ctlseqs keymap csi draw font event settings icon #lua
 lua_version = 5.2
 
 # libs to include with -l<name>
-libs = m rt util
+libs = m rt util 
 # m: math
 # rt: realtime extensions (do i need this?)
 # util: pty stuff
 
 # arguments for pkg-config
-pkgs = xft x11 freetype2 fontconfig #lua$(lua_version) #//harfbuzz
+pkgs = xft x11 freetype2 fontconfig xt #lua$(lua_version) #//harfbuzz
 # fontconfig: (loading fonts)
 # freetype2: (font rendering)
 # X11: X window system (graphics, input, etc.)

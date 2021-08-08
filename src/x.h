@@ -3,11 +3,14 @@
 #include <X11/Xlib.h>
 #include <X11/Xft/Xft.h>
 #include <X11/Xatom.h>
+#include <X11/Intrinsic.h>
 
 #include "common.h"
 
 // globals
 typedef struct Xw {
+	Widget W;
+	
 	Display* d;
 	int scr;
 	Visual* vis;

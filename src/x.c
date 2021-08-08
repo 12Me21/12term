@@ -17,6 +17,8 @@
 #include <X11/Xft/Xft.h>
 #include <X11/Xatom.h>
 #include <X11/Xresource.h>
+#include <X11/Intrinsic.h>
+#include <X11/Shell.h>
 
 #include "common.h"
 #include "tty.h"
@@ -235,16 +237,15 @@ int main(int argc, char* argv[argc+1]) {
 	
 	time_log(NULL);
 	
-	// hecking locale
-	setlocale(LC_CTYPE, "");
-	XSetLocaleModifiers("");
+	XtSetLanguageProc(NULL, NULL, "");
+	W.W = XtOpenApplication(NULL, "12term", NULL, 0, &argc, argv, NULL, sessionShellWidgetClass, NULL, 0);
 	
 	int w = settings.width;
 	int h = settings.height;
 	
 	W.border = 3;
 	
-	W.d = XOpenDisplay(NULL);
+	W.d = XtDisplay(W.W);
 	if (!W.d)
 		die("Could not connect to X server\n");
 	W.scr = XDefaultScreen(W.d);
