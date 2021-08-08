@@ -198,6 +198,8 @@ static void rotate(int amount, int length, DrawRow start[length]) {
 	}
 }
 
+// rotate rows around.
+// if `screen_space` is set, don't adjust for scrollback position
 void draw_rotate_rows(int y1, int y2, int amount, bool screen_space) {
 	if (!screen_space && T.current==&T.buffers[0]) {
 		y1 -= T.scrollback.pos;
