@@ -255,7 +255,7 @@ int main(int argc, char* argv[argc+1]) {
 	
 	// init db
 	XrmInitialize();
-	load_settings();
+	load_settings(&argc, argv);
 	
 	init_atoms();
 	

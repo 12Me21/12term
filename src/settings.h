@@ -18,4 +18,4 @@ typedef struct Settings {
 
 extern Settings settings;
 
-void load_settings(void);
+void load_settings(int* argc, char** argv);

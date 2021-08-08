@@ -19,7 +19,7 @@
 ! font size (in points)
 12term.faceSize: 12
 
-! colors
+! colors (see: XQueryColor(3))
 12term.foreground: rgb:FF/FF/FF
 12term.background: rgb:00/00/00
 12term.cursorColor: rgb:00/AA/00
