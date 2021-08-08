@@ -1,8 +1,5 @@
 // Drawing graphics
 
-// idea: rather than having one framebuffer, have separate ones for each row
-// that way, it's easy to shift rows around (i.e. when scrolling) and then copy that data onto the window in whatever order
-
 #include <X11/Xlib.h>
 #include <X11/Xft/Xft.h>
 
@@ -15,17 +12,17 @@
 #include "event.h"
 
 typedef struct DrawRow {
-	DrawnCell* glyphs;
+	// cache of the glyphs and cells
 	Cell* cells;
+	DrawnCell* glyphs;
+	// framebuffer
 	Pixmap pix;
 	XftDraw* draw;
+	// to force a redraw 
 	bool redraw;
 } DrawRow;
 
-// atm it doesnt actually matter if this data is correct, it's basically just treated as a cache (so it WILL be used if correct)
-DrawRow* rows = NULL;
-// todo: it's kinda messy having the size stored in multiple places.
-static int drawn_width = -1, drawn_height = -1;
+static DrawRow* rows = NULL;
 
 static Cell* blank_row = NULL;
 
@@ -68,6 +65,8 @@ unsigned long alloc_color(Color c) {
 	return x.pixel;
 }
 
+// these are only used to track the old size in this function
+static int drawn_width = -1, drawn_height = -1;
 void draw_resize(int width, int height, bool charsize) {
 	if (rows) {
 		for (int i=0; i<drawn_height; i++) {
@@ -80,10 +79,10 @@ void draw_resize(int width, int height, bool charsize) {
 	drawn_height = height;
 	drawn_width = width;
 	REALLOC(rows, height);
-	for (int y=0; y<drawn_height; y++) {
-		ALLOC(rows[y].glyphs, drawn_width);
-		ALLOC(rows[y].cells, drawn_width);
-		for (int x=0; x<drawn_width; x++) {
+	for (int y=0; y<T.height; y++) {
+		ALLOC(rows[y].glyphs, T.width);
+		ALLOC(rows[y].cells, T.width);
+		for (int x=0; x<T.width; x++) {
 			rows[y].glyphs[x] = (DrawnCell){0}; // mreh
 			rows[y].cells[x] = (Cell){0}; //ehnnnn
 		}
@@ -92,8 +91,8 @@ void draw_resize(int width, int height, bool charsize) {
 		rows[y].redraw = true;
 	}
 	
-	REALLOC(blank_row, drawn_width);
-	for (int x=0; x<drawn_width; x++)
+	REALLOC(blank_row, T.width);
+	for (int x=0; x<T.width; x++)
 		blank_row[x] = (Cell){.attrs={.background={.i=-2}}};
 	
 	// char size changing
@@ -148,12 +147,12 @@ static void draw_char_overlays(XftDraw* draw, Px winx, Cell c) {
 static void draw_cursor(int x, int y) {
 	//xim_spot(T.c.x, T.c.y);
 	
-	x = limit(x, 0, drawn_width); // not -1
-	y = limit(y, 0, drawn_height-1);
+	x = limit(x, 0, T.width); // not -1
+	y = limit(y, 0, T.height-1);
 	
 	Row row = T.current->rows[y];
 	Cell temp;
-	if (row)
+	if (row && x<T.width)
 		temp = row[x];
 	else
 		temp = (Cell){0};
@@ -215,10 +214,10 @@ void draw_rotate_rows(int y1, int y2, int amount, bool screen_space) {
 }
 
 static bool draw_row(int y, Row row) {
-	if (!memcmp(row, rows[y].cells, sizeof(Cell)*drawn_width))
+	if (!memcmp(row, rows[y].cells, sizeof(Cell)*T.width))
 		return false;
 	
-	memcpy(rows[y].cells, row, drawn_width*sizeof(Cell));
+	memcpy(rows[y].cells, row, T.width*sizeof(Cell));
 	
 	if (row==blank_row) {
 		XftDrawRect(rows[y].draw, (XftColor[]){make_color((Color){.truecolor=true,.rgb=T.background})}, 0, 0, W.w, W.ch );
@@ -231,7 +230,7 @@ static bool draw_row(int y, Row row) {
 	XftColor prev_color = make_color(row[0].attrs.background);
 	int prev_start = 0;
 	int x;
-	for (x=1; x<drawn_width; x++) {
+	for (x=1; x<T.width; x++) {
 		XftColor bg = make_color(row[x].attrs.background);
 		if (!same_color(bg, prev_color)) {
 			XftDrawRect(rows[y].draw, &prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x-1), W.ch);
@@ -241,12 +240,12 @@ static bool draw_row(int y, Row row) {
 	}
 	XftDrawRect(rows[y].draw, &prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x-1), W.ch);
 	// draw right border background
-	XftDrawRect(rows[y].draw, (XftColor[]){make_color((Color){.i=-2})}, W.border+W.cw*drawn_width, 0, W.border, W.ch);
+	XftDrawRect(rows[y].draw, (XftColor[]){make_color((Color){.i=-2})}, W.border+W.cw*T.width, 0, W.border, W.ch);
 	
 	// draw text
-	XftGlyphFontSpec specs[drawn_width];
-	int indexs[drawn_width];
-	int num = make_glyphs(drawn_width, specs, row, indexs, rows[y].glyphs);
+	XftGlyphFontSpec specs[T.width];
+	int indexs[T.width];
+	int num = make_glyphs(T.width, specs, row, indexs, rows[y].glyphs);
 	
 	for (int i=0; i<num; i++) {
 		int x = indexs[i];
@@ -254,7 +253,7 @@ static bool draw_row(int y, Row row) {
 	}
 	
 	// draw strikethrough and underlines
-	for (int x=0; x<drawn_width; x++)
+	for (int x=0; x<T.width; x++)
 		draw_char_overlays(rows[y].draw, W.border+x*W.cw, row[x]);
 	
 	return true;
@@ -280,12 +279,12 @@ void draw(bool repaint_all) {
 	time_log(NULL);
 	print("dirty rows: [");
 	draw_cursor(T.c.x, T.c.y); // todo: do we need this every time?
-	if (cursor_y>=0 && cursor_y<drawn_height)
+	if (cursor_y>=0 && cursor_y<T.height)
 		paint_row(cursor_y); // todo: not ideal ehh
 	if (repaint_all) {
 		// todo: erase the top/bottom borders here?
 	}
-	for (int y=0; y<drawn_height; y++) {
+	for (int y=0; y<T.height; y++) {
 		int ry = row_displayed_at(y);
 		Row row = get_row(ry);
 		if (!row)
@@ -311,7 +310,7 @@ void draw_free(void) {
 
 // call this when changing palette etc.
 void dirty_all(void) {
-	for (int y=0; y<drawn_height; y++)
+	for (int y=0; y<T.height; y++)
 		rows[y].redraw = true;
 }
 
