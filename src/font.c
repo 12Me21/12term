@@ -90,7 +90,7 @@ void load_fonts(const char* fontstr, double fontsize) {
 		FcPatternAddDouble(pattern, FC_SIZE, fontsize);
 	}
 	
-	for (int i=0; i<3; i++) {
+	for (int i=0; i<4; i++) {
 		if (!load_font(&fonts[i], pattern, i&1, i&2))
 			die("failed to load font");
 		time_log("loaded font");
