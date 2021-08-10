@@ -2,6 +2,9 @@
 
 #include "common.h"
 #include "ctlseqs2.h"
+#include "tty.h"
+#include "buffer.h"
+#include "buffer2.h"
 
 // csi sequence:
 // CSI [private] [arguments...] char [char2]

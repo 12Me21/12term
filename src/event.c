@@ -12,6 +12,7 @@
 #include "tty.h"
 #include "draw.h"
 #include "settings.h"
+#include "clipboard.h"
 
 void activate_hyperlink(const char* url) {
 	if (!settings.hyperlinkCommand)
@@ -178,84 +179,6 @@ static void on_clientmessage(XEvent* e) {
 		print("window closing\n");
 		sleep_forever(true);
 	}
-}
-
-void tty_paste_text(int len, const char text[len]) {
-	if (T.bracketed_paste)
-		tty_write(6, "\x1B[200~");
-	tty_write(len, text);
-	if (T.bracketed_paste)
-		tty_write(6, "\x1B[201~");
-}
-
-void on_selectionnotify(XEvent* e) {
-	Atom property = None;
-	if (e->type == SelectionNotify)
-		property = e->xselection.property;
-	else if (e->type == PropertyNotify)
-		property = e->xproperty.atom;
-	
-	if (property == None)
-		return;
-	
-	unsigned long ofs = 0;
-	unsigned long rem;
-	do {
-		unsigned long nitems;
-		int format;
-		unsigned char* data;
-		Atom type;
-		if (XGetWindowProperty(W.d, W.win, property, ofs, BUFSIZ/4, False, AnyPropertyType, &type, &format, &nitems, &rem, &data)) {
-			print("Clipboard allocation failed\n");
-			return;
-		}
-		
-		if (e->type == PropertyNotify && nitems == 0 && rem == 0) {
-			/*
-			 * If there is some PropertyNotify with no data, then
-			 * this is the signal of the selection owner that all
-			 * data has been transferred. We won't need to receive
-			 * PropertyNotify events anymore.
-			 */
-			W.event_mask &= ~PropertyChangeMask;
-			XChangeWindowAttributes(W.d, W.win, CWEventMask, &(XSetWindowAttributes){.event_mask = W.event_mask});
-		}
-		
-		if (type == W.atoms.incr) {
-			/*
-			 * Activate the PropertyNotify events so we receive
-			 * when the selection owner does send us the next
-			 * chunk of data.
-			 */
-			W.event_mask |= PropertyChangeMask;
-			XChangeWindowAttributes(W.d, W.win, CWEventMask, &(XSetWindowAttributes){.event_mask = W.event_mask});
-			
-			/*
-			 * Deleting the property is the transfer start signal.
-			 */
-			XDeleteProperty(W.d, W.win, property);
-			continue;
-		}
-		
-		// replace \n with \r
-		unsigned char* repl = data;
-		unsigned char* last = data + nitems*format/8;
-		while ((repl = memchr(repl, '\n', last - repl))) {
-			*repl++ = '\r';
-		}
-		
-		tty_paste_text(nitems*format/8, (char*)data);
-		
-		XFree(data);
-		/* number of 32-bit chunks returned */
-		ofs += nitems * format/32;
-	} while (rem > 0);
-	
-	/*
-	 * Deleting the property again tells the selection owner to send the
-	 * next data chunk in the property.
-	 */
-	XDeleteProperty(W.d, W.win, property);
 }
 
 struct Ime {
@@ -442,6 +365,8 @@ const HandlerFunc HANDLERS[LASTEvent] = {
 	[VisibilityNotify] = on_visibilitynotify,
 	[ConfigureNotify] = on_configurenotify,
 	[SelectionNotify] = on_selectionnotify,
+	[PropertyNotify] = on_propertynotify,
+	[SelectionRequest] = on_selectionrequest,
 	[KeyPress] = on_keypress,
 	[FocusIn] = on_focusin,
 	[FocusOut] = on_focusout,
@@ -451,5 +376,5 @@ const HandlerFunc HANDLERS[LASTEvent] = {
 };
 
 void clippaste(void) {
-	XConvertSelection(W.d, W.atoms.clipboard, W.atoms.utf8_string, W.atoms.clipboard, W.win, CurrentTime);
+	request_clipboard(W.atoms.clipboard);
 }

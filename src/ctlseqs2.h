@@ -3,11 +3,6 @@
 
 #include "common.h"
 
-// things used by files which include this
-#include "tty.h"
-#include "buffer.h"
-#include "buffer2.h"
-
 enum parse_state {
 	NORMAL,
 	ESC,
@@ -31,7 +26,8 @@ enum string_command {
 typedef struct ParseState {
 	enum parse_state state;
 	
-	char string[1030]; // bytes
+	char* string; // bytes
+	int string_size;
 	enum string_command string_command;
 	int string_length;
 	

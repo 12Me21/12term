@@ -37,6 +37,7 @@ typedef struct Xw {
 			Atom utf8_string;
 			Atom clipboard;
 			Atom incr;
+			Atom targets;
 		} atoms;
 	};
 } Xw;

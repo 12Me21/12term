@@ -182,7 +182,7 @@ static void run(void) {
 
 static void init_atoms(void) {
 	char* ATOM_NAMES[] = {
-		"_XEMBED", "WM_DELETE_WINDOW", "_NET_WM_NAME", "_NET_WM_ICON_NAME", "_NET_WM_PID", "UTF8_STRING", "CLIPBOARD", "INCR",
+		"_XEMBED", "WM_DELETE_WINDOW", "_NET_WM_NAME", "_NET_WM_ICON_NAME", "_NET_WM_PID", "UTF8_STRING", "CLIPBOARD", "INCR", "TARGETS",
 	};
 	XInternAtoms(W.d, ATOM_NAMES, LEN(ATOM_NAMES), False, &W.atoms_0);
 	if (!W.atoms.utf8_string) // is this even like, possible?

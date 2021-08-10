@@ -5,7 +5,7 @@ all: $(output) terminfo
 
 # all the .c files
 srcdir = src
-srcs = x tty debug buffer ctlseqs keymap csi draw font event settings icon #lua
+srcs = x tty debug buffer ctlseqs keymap csi draw font event settings icon clipboard #lua
 
 lua_version = 5.2
 

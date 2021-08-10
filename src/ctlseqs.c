@@ -1,13 +1,17 @@
 // Parsing control sequences
-
+#define _XOPEN_SOURCE 500
 #include <stdio.h>
 #include <string.h>
 
 #include "common.h"
 #include "ctlseqs.h"
 #include "ctlseqs2.h"
+#include "tty.h"
+#include "buffer.h"
+#include "buffer2.h"
 #include "draw2.h"
 // messy
+extern void own_clipboard(char* which, char* string);
 extern bool parse_x_color(const char* c, RGBColor* out);
 extern void set_title(char* c);
 extern void change_font(const char* name);
@@ -42,6 +46,8 @@ bool process_control_char(unsigned char c) {
 
 static void begin_string(int type) {
 	P.state = STRING;
+	P.string_size = 1030;
+	ALLOC(P.string, P.string_size);
 	P.string_command = type;
 	P.string_length = 0;
 }
@@ -257,6 +263,15 @@ static void process_osc(void) {
 			change_font(s);
 		}
 		break;
+	case 52:; // set clipboard
+		if (*s==';')
+			s++;
+		char* se = strchr(s, ';');
+		if (se) {
+			*se = '\0';
+			own_clipboard(s, strdup(&se[1]));
+		}
+		break;
 	}
 	return;
  invalid:
@@ -264,6 +279,9 @@ static void process_osc(void) {
 }
 
 static void end_string(void) {
+	P.state = NORMAL;
+	if (!P.string)
+		return;
 	P.string[P.string_length] = '\0';
 	switch (P.string_command) {
 	default:
@@ -276,16 +294,22 @@ static void end_string(void) {
 		process_apc();
 		break;
 	}
-	P.state = NORMAL;
+	FREE(P.string);
+	P.string_size = 0;
 }
 
 static void push_string_byte(char c) {
-	// add char to string if possible
-	if (P.string_length < LEN(P.string)-1) {
-		P.string[P.string_length++] = c;
-	} else { //string too long!!
-		
+	if (!P.string)
+		return;
+	if (P.string_length >= P.string_size-1) {
+		if (P.string_size >= 100000) {
+			FREE(P.string);
+			return;
+		}
+		P.string_size += 1024;
+		REALLOC(P.string, P.string_size);
 	}
+	P.string[P.string_length++] = c;
 }
 
 static void process_char(Char c) {
