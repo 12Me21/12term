@@ -12,7 +12,7 @@ lua_version = 5.2
 # libs to include with -l<name>
 libs = m rt util
 # m: math
-# rt: realtime extensions (do i need this?)
+# rt: realtime extensions
 # util: pty stuff
 
 # arguments for pkg-config

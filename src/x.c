@@ -107,7 +107,7 @@ void clipboard_copy() {
 	
 }
 
-bool redraw = false;
+static bool redraw = false;
 
 void force_redraw(void) {
 	redraw = true;
