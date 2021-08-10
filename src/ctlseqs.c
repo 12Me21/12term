@@ -188,6 +188,68 @@ static int parse_number(char** str) {
 	//return -1; // fail: found char other than ; or end of string
 }
 
+static char* base64_decode(int len, char input[len]) {
+	static const char base64_map[256] = {
+		['='] = 0,
+		['A'] = 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,
+		['a'] = 26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,
+		['0'] = 52,53,54,55,56,57,58,59,60,61,
+		['+'] = 62, ['-'] = 62,
+		['/'] = 62, ['_'] = 63,
+	};
+	char* out;
+	ALLOC(out, (len*6+7)/8+1);
+	char* p = out;
+	int buffer = 0;
+	int bits = 0;
+	for (int i=0; i<len; i++) {
+		buffer <<= 6;
+		buffer |= base64_map[(unsigned char)(input[i])];
+		bits += 6;
+		if (bits >= 8) {
+			*p++ = buffer>>bits-8 & 0xFF;
+			bits -= 8;
+		}
+	}
+	if (bits) {
+		// todo
+	}
+	*p = '\0';
+	return out;
+}
+
+static char* base64_encode(int len, char input[len]) {
+	static const char charset[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.*";
+	char* b64;
+	ALLOC(b64, (len*4+2)/3+1);
+	char* p = b64;
+	// (big endian bits)
+	// |000000|00 1111|1111 22|222222|
+	// |aaaaaa|bb bbbb|cccc cc|dddddd|
+	for (int i=0; i<len; i+=3) {
+		unsigned char b0=input[i];
+		*p++ = charset[b0>>2];
+		if (i+1>=len) {
+			*p++ = charset[(b0&3)<<4];
+			*p++ = '=';
+			*p++ = '=';
+			break;
+		}
+		unsigned char b1=input[i+1];
+		*p++ = charset[(b0&3)<<4 | b1>>4];
+		if (i+2>=len) {
+			*p++ = charset[(b1&15)<<2];
+			*p++ = '=';
+			break;
+		}
+		unsigned char b2=input[i+2];
+		*p++ = charset[(b1&15)<<2 | b2>>6];
+		*p++ = charset[b2&63];
+	}
+	*p++ = '\0';
+	return b64;
+}
+
 static void process_osc(void) {
 	char* s = P.string;
 	int p = parse_number(&s);
@@ -269,7 +331,9 @@ static void process_osc(void) {
 		char* se = strchr(s, ';');
 		if (se) {
 			*se = '\0';
-			own_clipboard(s, strdup(&se[1]));
+			se++;
+			int len = strlen(se);
+			own_clipboard(s, base64_decode(len, se));
 		}
 		break;
 	}
