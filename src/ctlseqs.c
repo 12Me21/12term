@@ -10,6 +10,7 @@
 #include "buffer.h"
 #include "buffer2.h"
 #include "draw2.h"
+#include "settings.h"
 // messy
 extern void own_clipboard(char* which, char* string);
 extern bool parse_x_color(const char* c, RGBColor* out);
@@ -315,9 +316,9 @@ static void process_osc(void) {
 			parse_x_color(s, (RGBColor*[]){
 				&T.foreground, &T.background, &T.cursor_color
 			}[p-10]);
-			//p++; ???
-			//dirty_all();
+			p++;
 		}
+		dirty_all();
 		break;
 	case 50: // change font
 		if (*s==';') {
@@ -335,6 +336,15 @@ static void process_osc(void) {
 			int len = strlen(se);
 			own_clipboard(s, base64_decode(len, se));
 		}
+		break;
+	case 110:; // reset fg color
+		T.foreground = settings.foreground;
+		break;
+	case 111:; // reset bg color
+		T.background = settings.background;
+		break;
+	case 112:; // reset cursor color
+		T.cursor_color = settings.cursorColor;
 		break;
 	}
 	return;
