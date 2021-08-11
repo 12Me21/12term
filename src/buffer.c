@@ -158,7 +158,7 @@ void set_cursor_style(int n) {
 	if (n==0)
 		n = settings.cursorShape;
 	
-	if (n>0 && n<=6) {
+	if (n>0 && n<=8) {
 		T.cursor_shape = (n-1)/2;
 		T.cursor_blink = (n-1)%2==0;
 	}

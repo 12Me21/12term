@@ -265,11 +265,37 @@ static int row_displayed_at(int y) {
 	return y;
 }
 
+void copy_cursor_part(Px x, Px y, Px w, Px h, int cx, int cy) {
+	XCopyArea(W.d, cursor_pix, W.win, W.gc,
+		x, y, w, h, W.border+cx*W.cw+x, W.border+W.ch*cy+y);
+}
+
+// todo: vary thickness of cursors and lines based on font size
+
 // todo: keep better track of where cursor is rendered
 static void paint_row(int y) {
 	XCopyArea(W.d, rows[y].pix, W.win, W.gc, 0, 0, W.w, W.ch, 0, W.border+W.ch*y);
 	if (T.show_cursor && row_displayed_at(y)==T.c.y) {
-		XCopyArea(W.d, cursor_pix, W.win, W.gc, 0, 0, W.cw*cursor_width, W.ch, W.border+T.c.x*W.cw, W.border+W.ch*y);
+		switch (T.cursor_shape) {
+		case 0: // filled box
+		default:
+			// todo: switch to empty box when unfocused
+			copy_cursor_part(0, 0, W.cw*cursor_width, W.ch, T.c.x, y);
+			break;
+		case 1: // underline
+			copy_cursor_part(0, W.ch-2, W.cw*cursor_width, 2, T.c.x, y);
+			break;
+		case 2: // vertical bar
+			copy_cursor_part(0, 0, 2, W.ch, T.c.x, y);
+			break;
+		case 3:; // empty box
+			int thick = 1;
+			copy_cursor_part(0, 0, W.cw*cursor_width, thick, T.c.x, y);
+			copy_cursor_part(0, W.ch-thick, W.cw*cursor_width, thick, T.c.x, y);
+			copy_cursor_part(0, thick, thick, W.ch-thick*2, T.c.x, y);
+			copy_cursor_part(W.cw*cursor_width-thick, thick, thick, W.ch-thick*2, T.c.x, y);
+			break;
+		}
 		cursor_y = y;
 	}
 	rows[y].redraw = false;
@@ -306,6 +332,10 @@ void draw(bool repaint_all) {
 
 void draw_free(void) {
 	// whatever
+}
+
+void dirty_cursor(void) {
+	
 }
 
 // call this when changing palette etc.
