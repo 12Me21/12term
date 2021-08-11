@@ -16,25 +16,7 @@ static void init_palette(void) {
 	T.foreground = settings.foreground;
 	T.background = settings.background;
 	T.cursor_color = settings.cursorColor;
-	// normal 16 indexed colors
-	int p = 0;
-	for (int i=0; i<16; i++)
-		T.palette[p++] = settings.palette[i];
-	// 6x6x6 rgb cube
-	const int brightness[6] = {0, 95, 135, 175, 215, 255};
-	for (int i=0; i<6*6*6; i++) {
-		T.palette[p++] = (RGBColor){
-			brightness[i/6/6 % 6],
-			brightness[i/6 % 6],
-			brightness[i % 6],
-		};
-	}
-	// fill the rest with grayscale
-	for (int i=0; i<256-16-6*6*6; i++) {
-		T.palette[p++] = (RGBColor) {
-			8 + 10*i, 8 + 10*i, 8 + 10*i,
-		};
-	}
+	memcpy(T.palette, settings.palette, sizeof(T.palette));
 }
 
 void init_history(void) {
@@ -238,6 +220,7 @@ int new_link(char* url) {
 	return -1;
 }
 
+// only call this ONCE
 void init_term(int width, int height) {
 	T = (Term){
 		// REMEMBER: this sets all the other fields to 0

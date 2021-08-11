@@ -2,7 +2,8 @@
 #include "buffer.h"
 
 typedef struct Settings {
-	RGBColor palette[16];
+	// only the first 16 colors can be customized; the rest are just included here for convenience and consistency.
+	RGBColor palette[256];
 	RGBColor cursorColor;
 	RGBColor foreground;
 	RGBColor background;

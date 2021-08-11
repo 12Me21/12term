@@ -337,6 +337,22 @@ static void process_osc(void) {
 			own_clipboard(s, base64_decode(len, se));
 		}
 		break;
+	case 104:; // reset palette color
+		// untested
+		if (*s!=';') {
+			// 0 params = reset entire palette
+			memcpy(T.palette, settings.palette, sizeof(T.palette));
+		} else {
+			while (s && *s==';') {
+				s++;
+				int id = parse_number(&s);
+				if (id<0 || id>=256)
+					goto invalid;
+				T.palette[id] = settings.palette[id];
+			}
+		}
+		dirty_all();
+		break;
 	case 110:; // reset fg color
 		T.foreground = settings.foreground;
 		break;

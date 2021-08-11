@@ -108,11 +108,30 @@ void load_settings(int* argc, char** argv) {
 	get_color(FIELD(foreground));
 	get_integer(FIELD(saveLines));
 	get_string(FIELD(termName));
+	// first 16 palette colors
 	for (int i=0; i<16; i++) {
 		char buf[100];
 		sprintf(buf, "12term.color%d", i);
 		get_color(buf, &settings.palette[i]);
 	}
+	// init the rest of the palette
+	int p = 16;
+	// 6x6x6 rgb cube
+	const int brightness[6] = {0, 95, 135, 175, 215, 255};
+	for (int i=0; i<6*6*6; i++) {
+		settings.palette[p++] = (RGBColor){
+			brightness[i/6/6 % 6],
+			brightness[i/6 % 6],
+			brightness[i % 6],
+		};
+	}
+	// fill the rest with grayscale
+	for (int i=0; i<256-16-6*6*6; i++) {
+		settings.palette[p++] = (RGBColor) {
+			8 + 10*i, 8 + 10*i, 8 + 10*i,
+		};
+	}
+	
 	// non-xterm
 	get_integer(FIELD(width));
 	get_integer(FIELD(height));	
@@ -120,4 +139,5 @@ void load_settings(int* argc, char** argv) {
 	if (settings.hyperlinkCommand[0]=='\0')
 		settings.hyperlinkCommand = NULL;
 	get_integer(FIELD(cursorShape));
+	
 }
