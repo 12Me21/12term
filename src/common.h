@@ -26,4 +26,7 @@ typedef int Px;
 
 typedef long long Nanosec;
 
+// this should be unsigned char, but for practical reasons I use char (since most functions take char)
+typedef char utf8;
+
 #include "debug.h"

@@ -10,7 +10,7 @@
 
 bool debug_enabled = true;
 
-__attribute__((noreturn)) void die(const char *errstr, ...) {
+__attribute__((noreturn)) void die(const utf8 *errstr, ...) {
 	va_list ap;
 	va_start(ap, errstr);
 	vfprintf(stderr, errstr, ap);
@@ -26,21 +26,21 @@ static long long timediff(struct timespec t1, struct timespec t2) {
 }
 
 // returns a string containing a readable name for a character
-const char* char_name(Char c) {
-	static char buf[20];
+const utf8* char_name(Char c) {
+	static utf8 buf[20];
 	if (c>' ' && c<'~') {
 		sprintf(buf, "'%c'", c);
 		return buf;
 	}
 	if (c>=0 && c<=' ')
-		return (char*[]){"NUL","SOH","STX","ETX","EOT","ENQ","ACK","BEL","BS","TAB","LF","VT","FF","CR","SO","SI","DLE","DC1","DC2","DC3","DC4","NAK","SYN","ETB","CAN","EM","SUB","ESC","FS","GS","RS","US","SP"}[c];
+		return (utf8*[]){"NUL","SOH","STX","ETX","EOT","ENQ","ACK","BEL","BS","TAB","LF","VT","FF","CR","SO","SI","DLE","DC1","DC2","DC3","DC4","NAK","SYN","ETB","CAN","EM","SUB","ESC","FS","GS","RS","US","SP"}[c];
 	if (c==0x7F)
 		return "DEL";
 	sprintf(buf, "U+%X", c);
 	return buf;
 }
 
-void print(const char* str, ...) {
+void print(const utf8* str, ...) {
 	if (!debug_enabled)
 		return;
 	va_list ap;
@@ -49,7 +49,7 @@ void print(const char* str, ...) {
 	va_end(ap);
 }
 
-void time_log(const char* str) {
+void time_log(const utf8* str) {
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	if (str) {

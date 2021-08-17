@@ -212,7 +212,7 @@ void full_reset(void) {
 	reset_parser();
 }
 
-int new_link(char* url) {
+int new_link(utf8* url) {
 	if (T.links.length < LEN(T.links.items))
 		if ((T.links.items[T.links.length] = strdup(url)))
 			return T.links.length++;
@@ -238,13 +238,13 @@ void init_term(int width, int height) {
 }
 
 // generic array rotate function
-static void memswap(int size, unsigned char a[size], unsigned char b[size]) {
-	unsigned char temp[size];
+static void memswap(int size, uint8_t a[size], uint8_t b[size]) {
+	uint8_t temp[size];
 	memcpy(temp, a, size);
 	memcpy(a, b, size);
 	memcpy(b, temp, size);
 }
-static void rotate(int count, int itemsize, unsigned char data[count][itemsize], int amount) {
+static void rotate(int count, int itemsize, uint8_t data[count][itemsize], int amount) {
 	while (amount<0)
 		amount += count;
 	amount %= count;
@@ -259,11 +259,12 @@ static void rotate(int count, int itemsize, unsigned char data[count][itemsize],
 			memswap(itemsize, data[a], data[b]);
 	}
 }
+#define ROTATE(array, length, amount) (rotate((length), sizeof(*(array)), (void*)(array), (amount)))
 
 // shift the rows in [`y1`,`y2`) by `amount` (negative = up, positive = down)
 // and clear the "new" lines
 static void shift_rows(int y1, int y2, int amount, bool bce) {
-	rotate(y2-y1, sizeof(Cell*), (void*)&T.current->rows[y1], amount);
+	ROTATE(&T.current->rows[y1], y2-y1, amount);
 	draw_rotate_rows(y1, y2, amount, false);
 	if (amount>0) { // down
 		for (int y=y1; y<y1+amount; y++)

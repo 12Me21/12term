@@ -324,10 +324,10 @@ static int xicdestroy(XIC xim, XPointer client, XPointer call) {
 	return 1;
 }
 
-static int ximopen(Display* d) {
+static bool ximopen(Display* d) {
 	ime.xim = XOpenIM(d, NULL, NULL, NULL);
-	if (ime.xim == NULL)
-		return 0;
+	if (!ime.xim)
+		return false;
 	
 	if (XSetIMValues(ime.xim, XNDestroyCallback, &(XIMCallback){.callback = ximdestroy}, NULL))
 		print("XSetIMValues: Could not set XNDestroyCallback.\n");
@@ -344,7 +344,7 @@ static int ximopen(Display* d) {
 	if (ime.xic == NULL)
 		print("XCreateIC: Could not create input context.\n");
 	
-	return 1;
+	return true;
 }
 
 static void ximinstantiate(Display* d, XPointer client, XPointer call) {

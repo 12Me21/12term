@@ -48,7 +48,9 @@ XrmDatabase	db = NULL;
 static bool get_string(char* name, char** out) {
 	XrmValue ret;
 	char* type;
-	if (db && XrmGetResource(db, name, "String", &type, &ret)) {
+	if (db && XrmGetResource(db, name, NULL, &type, &ret)) {
+		if (strcmp(type, "String"))
+			return false;
 		// do we need to duplicate this 
 		*out = ret.addr;
 		return true;
@@ -91,15 +93,15 @@ static bool get_integer(char* name, int* out) {
 void load_settings(int* argc, char** argv) {
 	char* resource_manager = XResourceManagerString(W.d);//screen?
 	if (resource_manager) {
-		//if (db)
-		//	XrmDestroyDatabase(db);
+		if (db)
+			XrmDestroyDatabase(db);
 		db = XrmGetStringDatabase(resource_manager);
 	}
 	// todo: finish this
-	XrmOptionDescRec option_desc[] = {
-		{"-fa", ".faceName", XrmoptionSepArg}
-	};
-	XrmParseCommand(&db, option_desc, LEN(option_desc), "12term", argc, argv);
+	//XrmOptionDescRec option_desc[] = {
+		//	{"-fa", ".faceName", XrmoptionSepArg}
+		//};
+	//XrmParseCommand(&db, option_desc, LEN(option_desc), "12term", argc, argv);
 	
 	get_string(FIELD(faceName));
 	get_number(FIELD(faceSize));

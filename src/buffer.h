@@ -6,7 +6,7 @@
 // todo: maybe make a separate cell.h file or something
 
 typedef struct RGBColor {
-	unsigned char r,g,b;
+	uint8_t r,g,b;
 } RGBColor;
 
 // if .truecolor is true, .rgb is the color.
@@ -14,7 +14,7 @@ typedef struct RGBColor {
 typedef struct Color {
 	union {
 		RGBColor rgb;
-		short i;
+		int16_t i;
 	};
 	bool truecolor;
 } __attribute__((packed)) Color;
@@ -24,11 +24,11 @@ typedef struct Color {
 // display attributes for characters
 typedef struct Attrs {
 	Color color, background, underline_color;
-	unsigned short link; // hyperlink. 0 = none, 1…max = T.links.items[n-1]
+	uint16_t link; // hyperlink. 0 = none, 1…max = T.links.items[n-1]
 	
-	char weight: 2; // 1 = bold, -1 = faint
+	int8_t weight: 2; // 1 = bold, -1 = faint
 	bool italic: 1;
-	unsigned char underline: 3; // 0 = none, 1-5 = normal,double,wavy,dotted,dashed (todo: support more of these)
+	uint8_t underline: 3; // 0 = none, 1-5 = normal,double,wavy,dotted,dashed (todo: support more of these)
 	bool colored_underline: 1; // whether to use special underline color
 	bool blink: 1;
 	bool reverse: 1;
@@ -43,7 +43,7 @@ typedef struct Cell {
 	Char chr;
 	Char combining[1]; //todo: (and make this like, 4 or something)
 	Attrs attrs;
-	char wide: 2; //0 = normal, 1 = left half of wide char, -1 = right half (chr=0)
+	int8_t wide: 2; //0 = normal, 1 = left half of wide char, -1 = right half (chr=0)
 } Cell;
 
 // compressed version of cells, used for history buffer (todo)
@@ -106,7 +106,7 @@ typedef struct Term {
 	
 	struct links {
 		int length;
-		char* items[32767];
+		utf8* items[32767];
 	} links;
 	
 	bool app_keypad, app_cursor;

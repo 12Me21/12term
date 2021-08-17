@@ -12,15 +12,15 @@
 #include "draw2.h"
 #include "settings.h"
 // messy
-extern void own_clipboard(char* which, char* string);
-extern bool parse_x_color(const char* c, RGBColor* out);
-extern void set_title(char* c);
-extern void change_font(const char* name);
+extern void own_clipboard(utf8* which, utf8* string);
+extern bool parse_x_color(const utf8* c, RGBColor* out);
+extern void set_title(utf8* c);
+extern void change_font(const utf8* name);
 
 ParseState P;
 
 // returns true if char was eaten
-bool process_control_char(unsigned char c) {
+bool process_control_char(utf8 c) {
 	switch (c) {
 	case '\a':
 		// bel
@@ -115,12 +115,12 @@ static void process_escape_char(Char c) {
 	P.state = NORMAL;
 }
 
-static void process_kitty(int args[128], int length, char data[length]) {
+static void process_kitty(int args[128], int length, utf8 data[length]) {
 	print("got kitty data\n");
 }
 
 static void process_apc(void) {
-	char* s = P.string;
+	utf8* s = P.string;
 	if (s[0]=='G') { // kitty graphics
 		s++;
 		int args[128] = {
@@ -128,8 +128,8 @@ static void process_apc(void) {
 			['f'] = 32,
 			['t'] = 'd',
 		};
-		char key;
-		char* valueStart;
+		utf8 key;
+		utf8* valueStart;
 		
 		while (1) {
 			if (*s==';') {// end of key=value parameters
@@ -172,9 +172,9 @@ static void process_apc(void) {
 	}
 }
 
-static int parse_number(char** str) {
+static int parse_number(utf8** str) {
 	int num = 0;
-	char* s = *str;
+	utf8* s = *str;
 	while (*s>='0' && *s<='9') {
 		num *= 10;
 		num += *s - '0';
@@ -189,8 +189,8 @@ static int parse_number(char** str) {
 	//return -1; // fail: found char other than ; or end of string
 }
 
-static char* base64_decode(int len, char input[len]) {
-	static const char base64_map[256] = {
+static utf8* base64_decode(int len, utf8 input[len]) {
+	static const int8_t base64_map[256] = {
 		['='] = 0,
 		['A'] = 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,
 		['a'] = 26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,
@@ -198,14 +198,14 @@ static char* base64_decode(int len, char input[len]) {
 		['+'] = 62, ['-'] = 62,
 		['/'] = 62, ['_'] = 63,
 	};
-	char* out;
+	utf8* out;
 	ALLOC(out, (len*6+7)/8+1);
-	char* p = out;
+	utf8* p = out;
 	int buffer = 0;
 	int bits = 0;
 	for (int i=0; i<len; i++) {
 		buffer <<= 6;
-		buffer |= base64_map[(unsigned char)(input[i])];
+		buffer |= base64_map[input[i]];
 		bits += 6;
 		if (bits >= 8) {
 			*p++ = buffer>>bits-8 & 0xFF;
@@ -219,40 +219,8 @@ static char* base64_decode(int len, char input[len]) {
 	return out;
 }
 
-static char* base64_encode(int len, char input[len]) {
-	static const char charset[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.*";
-	char* b64;
-	ALLOC(b64, (len*4+2)/3+1);
-	char* p = b64;
-	// (big endian bits)
-	// |000000|00 1111|1111 22|222222|
-	// |aaaaaa|bb bbbb|cccc cc|dddddd|
-	for (int i=0; i<len; i+=3) {
-		unsigned char b0=input[i];
-		*p++ = charset[b0>>2];
-		if (i+1>=len) {
-			*p++ = charset[(b0&3)<<4];
-			*p++ = '=';
-			*p++ = '=';
-			break;
-		}
-		unsigned char b1=input[i+1];
-		*p++ = charset[(b0&3)<<4 | b1>>4];
-		if (i+2>=len) {
-			*p++ = charset[(b1&15)<<2];
-			*p++ = '=';
-			break;
-		}
-		unsigned char b2=input[i+2];
-		*p++ = charset[(b1&15)<<2 | b2>>6];
-		*p++ = charset[b2&63];
-	}
-	*p++ = '\0';
-	return b64;
-}
-
 static void process_osc(void) {
-	char* s = P.string;
+	utf8* s = P.string;
 	int p = parse_number(&s);
 	//else if (*s!='\0') {// unexpected char
 	//	print("Invalid OSC command: %s\n", P.string);
@@ -278,7 +246,7 @@ static void process_osc(void) {
 			if (*s!=';')
 				goto invalid;
 			s++;
-			char* se = strchr(s, ';');
+			utf8* se = strchr(s, ';');
 			parse_x_color(s, &T.palette[id]);
 			dirty_all();
 			s = se;
@@ -329,7 +297,7 @@ static void process_osc(void) {
 	case 52:; // set clipboard
 		if (*s==';')
 			s++;
-		char* se = strchr(s, ';');
+		utf8* se = strchr(s, ';');
 		if (se) {
 			*se = '\0';
 			se++;
@@ -388,7 +356,7 @@ static void end_string(void) {
 	P.string_size = 0;
 }
 
-static void push_string_byte(char c) {
+static void push_string_byte(utf8 c) {
 	if (!P.string)
 		return;
 	if (P.string_length >= P.string_size-1) {
@@ -463,9 +431,9 @@ static void process_char(Char c) {
 
 static Char utf8_buffer = 0;
 static int utf8_remaining = 0;
-void process_chars(int len, const char cs[len]) {
+void process_chars(int len, const utf8 cs[len]) {
 	// 128, 192, 224, 240, 248
-	static const char utf8_type[32] = {
+	static const int8_t utf8_type[32] = {
 		// 0 - ascii byte
 		[16] = 1,1,1,1,1,1,1,1, // 1 - continuation byte
 		[24] = 2,2,2,2, // 2 - start of 2 byte sequence

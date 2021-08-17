@@ -42,7 +42,7 @@ $(output): $(srcs:%=$(junkdir)/%.o)
 # (this should be a grouped target ( &: instead of : ) but,
 #  that is only supported in newer versons of make,
 #  which most people don't have)
-$(junkdir)/%.o $(junkdir)/%.mk : $(srcdir)/%.c
+$(junkdir)/%.o $(junkdir)/%.mk : $(srcdir)/%
 	@mkdir -p $(@D)
 	@$(call print,$(junkdir)/$*.o,$(junkdir)/,$^,$(srcdir)/)
 # I replace `-I...` with `-isystem...` here, which will mark these
@@ -50,7 +50,7 @@ $(junkdir)/%.o $(junkdir)/%.mk : $(srcdir)/%.c
 # this is a hack, and I'm not sure how safe it is...
 # (If this breaks, the next best option would be to strip
 #  certain entries from the dependency file, after it is generated)
-	@$(CC) $(CFLAGS:-I%=-isystem%) $(defines:%=-D%) -MMD -MP -MF$(junkdir)/$*.mk -MQ$(junkdir)/$*.mk -MQ$(<:%.c=$(junkdir)/%.o) -c $< -o $(junkdir)/$*.o
+	@$(CC) $(CFLAGS:-I%=-isystem%) $(defines:%=-D%) -MMD -MP -MF$(junkdir)/$*.mk -MQ$(junkdir)/$*.mk -MQ$(<:%=$(junkdir)/%.o) -c $< -o $(junkdir)/$*.o
 
 .PHONY: clean
 clean:

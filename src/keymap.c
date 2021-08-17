@@ -147,6 +147,7 @@ KeyMap KEY_MAP[] = {
 	
 	// Ctrl+Shift+V -> paste clipboard
 	{XK_V, C|S, FUNCTION(clippaste)},
+	//{XK_R, C|S, FUNCTION(reload_settings)},
 	
 	// end
 	{0},

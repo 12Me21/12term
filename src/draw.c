@@ -145,10 +145,10 @@ static void draw_char_overlays(XftDraw* draw, Px winx, Cell c) {
 }
 
 static void draw_cursor(int x, int y) {
-	//xim_spot(T.c.x, T.c.y);
-	
 	x = limit(x, 0, T.width); // not -1
 	y = limit(y, 0, T.height-1);
+	
+	xim_spot(x, y);
 	
 	Row row = T.current->rows[y];
 	Cell temp;

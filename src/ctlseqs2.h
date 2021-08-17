@@ -26,7 +26,7 @@ enum string_command {
 typedef struct ParseState {
 	enum parse_state state;
 	
-	char* string; // bytes
+	utf8* string;
 	int string_size;
 	enum string_command string_command;
 	int string_length;
@@ -34,8 +34,8 @@ typedef struct ParseState {
 	int argv[100];
 	bool arg_colon[100];
 	int argc;
-	char csi_private;
-	char csi_char;
+	Char csi_private;
+	Char csi_char;
 	
 	int charset;
 	

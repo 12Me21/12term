@@ -32,7 +32,7 @@
 Xw W = {0};
 
 // hhhh
-bool parse_x_color(const char* c, RGBColor* out) {
+bool parse_x_color(const utf8* c, RGBColor* out) {
 	XColor ret;
 	if (XParseColor(W.d, W.cmap, c, &ret)) {
 		*out = (RGBColor){
@@ -181,7 +181,7 @@ static void run(void) {
 }
 
 static void init_atoms(void) {
-	char* ATOM_NAMES[] = {
+	utf8* ATOM_NAMES[] = {
 		"_XEMBED", "WM_DELETE_WINDOW", "_NET_WM_NAME", "_NET_WM_ICON_NAME", "_NET_WM_PID", "UTF8_STRING", "CLIPBOARD", "INCR", "TARGETS",
 	};
 	XInternAtoms(W.d, ATOM_NAMES, LEN(ATOM_NAMES), False, &W.atoms_0);
@@ -207,11 +207,11 @@ static void init_atoms(void) {
 // 7: initialize everything else
 // 8: start main loop
 
-void set_title(char* s) {
+void set_title(utf8* s) {
 	if (!s)
 		s = "12term"; // default title
 	XSetWMName(W.d, W.win, &(XTextProperty){
-		(unsigned char*)s, W.atoms.utf8_string, 8, strlen(s)
+			(void*)s, W.atoms.utf8_string, 8, strlen(s)
 	});
 }
 
@@ -305,7 +305,7 @@ int main(int argc, char* argv[argc+1]) {
 	// allow listening for window close event
 	XSetWMProtocols(W.d, W.win, &W.atoms.wm_delete_window, 1);
 	// set _NET_WM_PID property
-	XChangeProperty(W.d, W.win, W.atoms.net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (unsigned char*)&(pid_t){getpid()}, 1);
+	XChangeProperty(W.d, W.win, W.atoms.net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (void*)&(pid_t){getpid()}, 1);
 	
 	// set title
 	XSetClassHint(W.d, W.win, &(XClassHint){
@@ -316,7 +316,7 @@ int main(int argc, char* argv[argc+1]) {
 	
 	// set icon
 	Pixmap icon_pixmap = XCreatePixmap(W.d, W.win, ICON_SIZE, ICON_SIZE, 24);
-	XImage* icon_image = XCreateImage(W.d, W.vis, 24, ZPixmap, 0, (char*)ICON_DATA, ICON_SIZE, ICON_SIZE, 8, 0);
+	XImage* icon_image = XCreateImage(W.d, W.vis, 24, ZPixmap, 0, (void*)ICON_DATA, ICON_SIZE, ICON_SIZE, 8, 0);
 	icon_image->f.destroy_image = gosh_dang_destroy_image_function;
 	XPutImage(W.d, icon_pixmap, W.gc, icon_image, 0,0,0,0, icon_image->width, icon_image->height);
 	XDestroyImage(icon_image);
@@ -337,7 +337,7 @@ int main(int argc, char* argv[argc+1]) {
 	return 0;
 }
 
-void change_font(const char* name) {
+void change_font(const utf8* name) {
 	load_fonts(name, settings.faceSize);
 	int w = W.cw*T.width+W.border*2;
 	int h = W.ch*T.height+W.border*2;

@@ -40,5 +40,5 @@ void full_reset(void);
 
 void switch_buffer(bool alt);
 
-int new_link(char* url);
+int new_link(utf8* url);
 void init_history(void);
