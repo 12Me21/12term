@@ -6,7 +6,8 @@ all: $(output) terminfo
 # all the .c files
 srcdir = src
 srcs = x tty debug buffer ctlseqs keymap csi draw font event settings icon clipboard #lua
-srcs := $(srcs:=.c)
+srcs += xft/color xft/core xft/dbg xft/xftdpy xft/xftdraw xft/xftextent xft/xftfont xft/xftfreetype xft/xftglyphs xft/xftinit xft/xftlist xft/xftname xft/xftrender xft/xftstr xft/xftswap xft/xftxlfd
+srcs := $(srcs:=.c) 
 
 lua_version = 5.2
 
@@ -17,7 +18,7 @@ libs = m rt util
 # util: pty stuff
 
 # arguments for pkg-config
-pkgs = xft x11 freetype2 fontconfig #lua$(lua_version) #//harfbuzz
+pkgs = xrender x11 freetype2 fontconfig #lua$(lua_version) #//harfbuzz
 # fontconfig: (loading fonts)
 # freetype2: (font rendering)
 # X11: X window system (graphics, input, etc.)
@@ -26,7 +27,7 @@ pkgs = xft x11 freetype2 fontconfig #lua$(lua_version) #//harfbuzz
 
 
 CFLAGS+= -g # include debug symbols
-CFLAGS+= -O2
+#CFLAGS+= -O2
 CFLAGS+= -Wall -Wextra -pedantic -std=c11 # turn on a bunch of warnings
 CFLAGS+= -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -Wno-parentheses -Wno-char-subscripts # disable these warnings
 CFLAGS+= -Werror=implicit-function-declaration -Werror=incompatible-pointer-types # make these warnings into errors
@@ -85,4 +86,4 @@ include .Nice.mk
 
 
 # the compiler's dependency checker can't see assembly .incbin directives, so I have to add this manually.
-$(junkdir)/icon.o: icon.bin
+$(junkdir)/icon.c.o: icon.bin

@@ -2,7 +2,7 @@
 
 #include <errno.h>
 #include <math.h>
-#include <X11/Xft/Xft.h>
+#include "xft/Xft.h"
 
 #include "common.h"
 #include "font.h"
@@ -117,6 +117,7 @@ static int frclen = 0;
 
 // this is gross and I don't fully understand how it works
 static void find_fallback_font(Char chr, int style, XftFont** xfont, FT_UInt* glyph) {
+	print("finding fallback font for %d\n", chr);
 	// Fallback on font cache, search the font cache for match.
 	for (int f=0; f<frclen; f++) {
 		*glyph = XftCharIndex(W.d, frc[f].font, chr);
@@ -136,7 +137,7 @@ static void find_fallback_font(Char chr, int style, XftFont** xfont, FT_UInt* gl
 	FcResult fcres;
 	if (!font->set)
 		font->set = FcFontSort(NULL, font->pattern, true, NULL, &fcres);
-		
+	
 	FcPattern* fcpattern = FcPatternDuplicate(font->pattern);
 	FcCharSet* fccharset = FcCharSetCreate();
 		
@@ -171,63 +172,46 @@ static int cell_fontstyle(const Cell* c) {
 	return (c->attrs.weight==1) | (c->attrs.italic)<<1;
 }
 
-// todo: maybe cache the results for all ascii chars or something
-
-// this converts a row of cells into a row of glyphs+fonts
-// todo: the output is kinda messy. maybe just output into our own struct of .x, .glyph, .font instead (where .x is a cell coordinate)
-int make_glyphs(int len, XftGlyphFontSpec specs[len], /*const*/ Cell cells[len], int indexs[len], DrawnCell old[len]) {
-	int numspecs = 0;
-	
+void cells_to_glyphs(int len, Cell cells[len], Glyph glyphs[len], bool cache) {	
 	for (int i=0; i<len; i++) {
 		Char chr = cells[i].chr;
 		
 		// skip blank cells
 		if (cells[i].wide==-1 || chr==0 || chr==' ') {
-			if (old) {
-				old[i].chr = chr;
-				old[i].fontnum = -1;
-				old[i].font = NULL;
-				old[i].glyph = 0;
-			}
+			glyphs[i].chr = chr;
+			glyphs[i].font = NULL;
+			glyphs[i].glyph = 0;
 			continue;
 		}
 		
 		int style = cell_fontstyle(&cells[i]);
 		
-		XftFont* xfont;
-		FT_UInt glyph;
-		
-		if (old && chr==old[i].chr && style==old[i].fontnum) {
-			xfont = old[i].font;
-			glyph = old[i].glyph;
+		if (cache && glyphs[i].chr==chr && glyphs[i].style==style) {
+			// do nothing, cached data matches
 		} else {
-			Font* font = &fonts[style];
-			glyph = XftCharIndex(W.d, font->font, chr);
-			if (glyph)
-				xfont = font->font;
-			else
-				find_fallback_font(chr, style, &xfont, &glyph);
-			if (old) {
-				old[i].font = xfont;
-				old[i].glyph = glyph;
-				old[i].chr = chr;
-				old[i].fontnum = style;
-			}
+			XftFont* font = fonts[style].font;
+			FT_UInt glyph = XftCharIndex(W.d, font, chr);
+			if (!glyph)
+				find_fallback_font(chr, style, &font, &glyph);
+			//int width = cells[i].wide ? W.cw*2 : W.cw;
+			//XGlyphInfo extents;
+			//XftGlyphExtents(W.d, font, &glyph, 1, &extents);
+			glyphs[i] = (Glyph){
+				.font = font,
+				.glyph = glyph,
+				//.x = -extents.x, // todo: set this so the glyph is centered
+				.x = 0,
+				.y = W.font_ascent,//_font->ascent, //(xfont->ascent+xfont->descent-W.ch)/2+W.ch-xfont->descent, // todo: adjust this to minimize vertical clipping in tall fallback fonts, perhaps?
+				// really the char cell height should probably be ascent+descent, but idk uhh
+				.chr = chr,
+				.style = style,
+			};
 		}
-		
-		specs[numspecs] = (XftGlyphFontSpec){
-			.font = xfont,
-			.glyph = glyph,
-			.x = 0,
-			.y = W.font_ascent,//font->ascent,
-		};
-		indexs[numspecs] = i;
-		numspecs++;
 	}
-	
-	return numspecs;
 }
-
+// "_ascent"
+//_ascent
+ 
 void fonts_free(void) {
 	for (int i=0; i<4; i++) {
 		if (fonts[i].font) {

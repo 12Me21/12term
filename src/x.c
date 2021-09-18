@@ -14,7 +14,7 @@
 #endif
 
 #include <X11/Xlib.h>
-#include <X11/Xft/Xft.h>
+#include "xft/Xft.h"
 #include <X11/Xatom.h>
 #include <X11/Xresource.h>
 
@@ -232,7 +232,6 @@ int main(int argc, char* argv[argc+1]) {
 #ifdef CATCH_SEGFAULT
 	signal(SIGSEGV, (__sighandler_t)hecko);
 #endif
-	
 	time_log(NULL);
 	
 	// hecking locale
@@ -304,6 +303,7 @@ int main(int argc, char* argv[argc+1]) {
 	
 	// allow listening for window close event
 	XSetWMProtocols(W.d, W.win, &W.atoms.wm_delete_window, 1);
+	
 	// set _NET_WM_PID property
 	XChangeProperty(W.d, W.win, W.atoms.net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (void*)&(pid_t){getpid()}, 1);
 	

@@ -135,6 +135,7 @@ KeyMap KEY_MAP[] = {
 	// some more that aren't usually supported:
 	{XK_grave, C_ANY, GENERAL('`')},
 	{XK_asciitilde, C_ANY, GENERAL('~')},
+	{XK_equal, C_ANY, GENERAL('=')},
 	
 	// I extend this to make ctrl+i different from tab, and ctrl+m different from \r
 	// you will likely need to configure your editor to accept these

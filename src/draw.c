@@ -1,7 +1,7 @@
 // Drawing graphics
 
 #include <X11/Xlib.h>
-#include <X11/Xft/Xft.h>
+#include "xft/Xft.h"
 
 #include "common.h"
 #include "x.h"
@@ -14,7 +14,7 @@
 typedef struct DrawRow {
 	// cache of the glyphs and cells
 	Cell* cells;
-	DrawnCell* glyphs;
+	Glyph* glyphs;
 	// framebuffer
 	Pixmap pix;
 	XftDraw* draw;
@@ -83,7 +83,7 @@ void draw_resize(int width, int height, bool charsize) {
 		ALLOC(rows[y].glyphs, T.width);
 		ALLOC(rows[y].cells, T.width);
 		for (int x=0; x<T.width; x++) {
-			rows[y].glyphs[x] = (DrawnCell){0}; // mreh
+			rows[y].glyphs[x] = (Glyph){0}; // mreh
 			rows[y].cells[x] = (Cell){0}; //ehnnnn
 		}
 		rows[y].pix = XCreatePixmap(W.d, W.win, W.w, W.ch, DefaultDepth(W.d, W.scr));
@@ -111,15 +111,13 @@ static int same_color(XftColor a, XftColor b) {
 	return a.color.red==b.color.red && a.color.green==b.color.green && a.color.blue==b.color.blue && a.color.alpha==b.color.alpha;
 }
 
-// todo: allow drawing multiple at once for efficiency
-static void draw_char_spec(XftDraw* draw, Px x, XftGlyphFontSpec* spec, XftColor col) {
-	if (!spec)
+// todo: allow drawing multiple at once for efficiency?
+static void draw_glyph(XftDraw* draw, Px x, Px y, Glyph g, XftColor col) {
+	if (!g.font)
 		return;
-	
-	if (spec) {
-		spec->x += x;
-		XftDrawGlyphFontSpec(draw, &col, spec, 1);
-	}
+	Picture src = XftDrawSrcPicture(draw, &col);
+	XftGlyphRender1(XftDrawDisplay(draw), PictOpOver, src, g.font, XftDrawPicture(draw), 0, 0, x+g.x, y+g.y, g.glyph);
+	//XftGlyphFontSpecRender(XftDrawDisplay(draw), PictOpOver, src, XftDrawPicture(draw), 0, 0, spec, 1);
 }
 
 static void draw_char_overlays(XftDraw* draw, Px winx, Cell c) {
@@ -165,11 +163,9 @@ static void draw_cursor(int x, int y) {
 	
 	// draw char
 	if (temp.chr) {
-		XftGlyphFontSpec spec[1];
-		int indexs[1];
-		int num = make_glyphs(1, spec, &temp, indexs, NULL);
-		if (num)
-			draw_char_spec(cursor_draw, 0, spec, make_color(temp.attrs.color));
+		Glyph spec[1];
+		cells_to_glyphs(1, &temp, spec, false);
+		draw_glyph(cursor_draw, 0, 0, spec[0], make_color(temp.attrs.color));
 	}
 	
 	draw_char_overlays(cursor_draw, 0, temp);
@@ -243,13 +239,12 @@ static bool draw_row(int y, Row row) {
 	XftDrawRect(rows[y].draw, (XftColor[]){make_color((Color){.i=-2})}, W.border+W.cw*T.width, 0, W.border, W.ch);
 	
 	// draw text
-	XftGlyphFontSpec specs[T.width];
-	int indexs[T.width];
-	int num = make_glyphs(T.width, specs, row, indexs, rows[y].glyphs);
+	Glyph* specs = rows[y].glyphs;
+	cells_to_glyphs(T.width, row, specs, true);
 	
-	for (int i=0; i<num; i++) {
-		int x = indexs[i];
-		draw_char_spec(rows[y].draw, W.border+x*W.cw, &specs[i], make_color(row[x].attrs.color));
+	for (int i=0; i<T.width; i++) {
+		if (specs[i].font)
+			draw_glyph(rows[y].draw, W.border+i*W.cw, 0, specs[i], make_color(row[i].attrs.color));
 	}
 	
 	// draw strikethrough and underlines
@@ -345,3 +340,5 @@ void dirty_all(void) {
 }
 
 // todo: display characters CENTERED within the cell rather than aligned to the left side.
+
+
