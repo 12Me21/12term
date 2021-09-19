@@ -76,19 +76,23 @@ XftMemReport (void)
     XftFreeNotify = 0;
 }
 
-_X_HIDDEN void
-XftMemAlloc (int kind, int size)
-{
-    if (XftDebug() & XFT_DBG_MEMORY)
-    {
-	XftInUse[kind].alloc_count++;
-	XftInUse[kind].alloc_mem += size;
-	XftAllocCount++;
-	XftAllocMem += size;
-	XftAllocNotify += size;
-	if (XftAllocNotify > XftMemNotice)
-	    XftMemReport ();
-    }
+_X_HIDDEN void XftMemAlloc (int kind, int size) {
+	if (XftDebug() & XFT_DBG_MEMORY) {
+		XftInUse[kind].alloc_count++;
+		XftInUse[kind].alloc_mem += size;
+		XftAllocCount++;
+		XftAllocMem += size;
+		XftAllocNotify += size;
+		if (XftAllocNotify > XftMemNotice)
+			XftMemReport ();
+	}
+}
+
+_X_HIDDEN void* XftMalloc(int kind, size_t size) {
+	void* m = malloc(size);
+	if (m)
+		XftMemAlloc(kind, size);
+	return m;
 }
 
 _X_HIDDEN void

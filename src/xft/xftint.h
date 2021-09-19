@@ -163,10 +163,6 @@ struct _XftDraw {
 	struct {
 		Picture		pict;
 	} render;
-	struct {
-		GC		gc;
-		int		use_pixmap;
-	} core;
 };
 
 /*
@@ -273,37 +269,6 @@ FcObjectSet *XftObjectSetVaBuild (_Xconst char *first, va_list va);
 FcObjectSet *XftObjectSetBuild (_Xconst char *first, ...);
 FcFontSet *XftListFontSets (FcFontSet **sets, int nsets, FcPattern *p, FcObjectSet *os);
 
-/* xftcore.c */
-void
-XftRectCore (XftDraw		*draw,
-             _Xconst XftColor	*color,
-             int		x,
-             int		y,
-             unsigned int	width,
-             unsigned int	height);
-
-void
-XftGlyphCore (XftDraw		*draw,
-              _Xconst XftColor	*color,
-              XftFont		*public,
-              int		x,
-              int		y,
-              _Xconst FT_UInt	*glyphs,
-              int		nglyphs);
-
-void
-XftGlyphSpecCore (XftDraw		*draw,
-                  _Xconst XftColor	*color,
-                  XftFont		*public,
-                  _Xconst XftGlyphSpec	*glyphs,
-                  int			nglyphs);
-
-void
-XftGlyphFontSpecCore (XftDraw			*draw,
-                      _Xconst XftColor		*color,
-                      _Xconst XftGlyphFontSpec	*glyphs,
-                      int			nglyphs);
-
 /* xftdbg.c */
 int
 XftDebug (void);
@@ -364,6 +329,8 @@ XftMemReport (void);
 
 void
 XftMemAlloc (int kind, int size);
+
+void* XftMalloc(int kind, size_t size);
 
 void
 XftMemFree (int kind, int size);

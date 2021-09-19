@@ -35,3 +35,8 @@ See `xresources-example.ad`
 - foot terminal source code (https://codeberg.org/dnkl/foot/)
 - https://en.wikipedia.org/wiki/ANSI_escape_code (this page sucks but a lot of people probably read it so it's good to support the stuff listed there)
 n
+
+# notes on code style:
+I prefer `type* name` over `type *name`.
+I understand that the second form is technically correct, because of, ex: `int *a, *b`
+But, as long as you avoid those types of declarations, it won't matter, and I think the first form looks better.

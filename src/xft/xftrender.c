@@ -1,8 +1,5 @@
 #include "xftint.h"
 
-#define NUM_LOCAL	1024
-#define NUM_ELT_LOCAL	128
-
 // todo: move the loadGlyphs call out of here and put it like, right after the glyph lookup in font.c  sleepy 💤
 void XftGlyphRender1(Display* dpy, int	op, Picture src, XftFont* pub, Picture dst, int srcx, int srcy, int x, int y, FT_UInt g) {
 	XftFontInt* font = (XftFontInt*)pub;

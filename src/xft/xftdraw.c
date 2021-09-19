@@ -38,7 +38,7 @@ _XftDrawScreen (Display *dpy, Drawable drawable, Visual *visual)
 				}
 		}
 	/*
-	 * Otherwise, as the server for the drawable geometry and find
+	 * Otherwise, ask the server for the drawable geometry and find
 	 * the screen from the root window.
 	 * This takes a round trip.
 	 */
@@ -58,8 +58,7 @@ _XftDrawScreen (Display *dpy, Drawable drawable, Visual *visual)
 	return 0;
 }
 
-_X_HIDDEN unsigned int
-XftDrawDepth (XftDraw *draw)
+unsigned int XftDrawDepth (XftDraw *draw)
 {
 	if (!draw->depth)
 		{
@@ -74,31 +73,25 @@ XftDrawDepth (XftDraw *draw)
 	return draw->depth;
 }
 
-_X_HIDDEN unsigned int
-XftDrawBitsPerPixel (XftDraw	*draw)
-{
-	if (!draw->bits_per_pixel)
-		{
-			XPixmapFormatValues *formats;
-			int		    nformats;
-			unsigned int	    depth;
+unsigned int XftDrawBitsPerPixel(XftDraw *draw) {
+	if (!draw->bits_per_pixel) {
+		XPixmapFormatValues *formats;
+		int		    nformats;
+		unsigned int	    depth;
 
-			if ((depth = XftDrawDepth (draw)) &&
-			    (formats = XListPixmapFormats (draw->dpy, &nformats)))
-				{
-					int	i;
+		if ((depth = XftDrawDepth (draw)) &&
+		    (formats = XListPixmapFormats (draw->dpy, &nformats))) {
+			int	i;
 
-					for (i = 0; i < nformats; i++)
-						{
-							if (formats[i].depth == depth)
-								{
-									draw->bits_per_pixel = formats[i].bits_per_pixel;
-									break;
-								}
-						}
-					XFree (formats);
+			for (i = 0; i < nformats; i++) {
+				if (formats[i].depth == depth) {
+					draw->bits_per_pixel = formats[i].bits_per_pixel;
+					break;
 				}
+			}
+			XFree (formats);
 		}
+	}
 	return draw->bits_per_pixel;
 }
 
@@ -108,34 +101,30 @@ XftDrawCreate (Display   *dpy,
                Visual    *visual,
                Colormap  colormap)
 {
-	XftDraw	*draw;
-
-	draw = (XftDraw *) malloc (sizeof (XftDraw));
+	XftDraw* draw = malloc(sizeof(XftDraw));
+	
 	if (!draw)
 		return NULL;
-
-	draw->dpy = dpy;
-	draw->drawable = drawable;
-	draw->screen = _XftDrawScreen (dpy, drawable, visual);
-	draw->depth = 0;		/* don't find out unless we need to know */
-	draw->bits_per_pixel = 0;	/* don't find out unless we need to know */
-	draw->visual = visual;
-	draw->colormap = colormap;
-	draw->render.pict = 0;
-	draw->core.gc = NULL;
-	draw->core.use_pixmap = 0;
-	draw->clip_type = XftClipTypeNone;
-	draw->subwindow_mode = ClipByChildren;
-	XftMemAlloc (XFT_MEM_DRAW, sizeof (XftDraw));
+	
+	*draw = (XftDraw){
+		.dpy = dpy,
+		.drawable = drawable,
+		.screen = _XftDrawScreen (dpy, drawable, visual),
+		.depth = 0,	/* don't find out unless we need to know */
+		.bits_per_pixel = 0,	/* don't find out unless we need to know */
+		.visual = visual,
+		.colormap = colormap,
+		.render.pict = 0,
+		.clip_type = XftClipTypeNone,
+		.subwindow_mode = ClipByChildren,
+	};
+	XftMemAlloc(XFT_MEM_DRAW, sizeof(XftDraw));
 	return draw;
 }
 
-_X_EXPORT XftDraw *
-XftDrawCreateBitmap (Display	*dpy,
-                     Pixmap	bitmap)
-{
+XftDraw* XftDrawCreateBitmap(Display *dpy, Pixmap bitmap) {
 	XftDraw	*draw;
-
+	
 	draw = (XftDraw *) malloc (sizeof (XftDraw));
 	if (!draw)
 		return NULL;
@@ -147,8 +136,6 @@ XftDrawCreateBitmap (Display	*dpy,
 	draw->visual = NULL;
 	draw->colormap = 0;
 	draw->render.pict = 0;
-	draw->core.gc = NULL;
-	draw->core.use_pixmap = 0;
 	draw->clip_type = XftClipTypeNone;
 	draw->subwindow_mode = ClipByChildren;
 	XftMemAlloc (XFT_MEM_DRAW, sizeof (XftDraw));
@@ -173,8 +160,6 @@ XftDrawCreateAlpha (Display *dpy,
 	draw->visual = NULL;
 	draw->colormap = 0;
 	draw->render.pict = 0;
-	draw->core.gc = NULL;
-	draw->core.use_pixmap = 0;
 	draw->clip_type = XftClipTypeNone;
 	draw->subwindow_mode = ClipByChildren;
 	XftMemAlloc (XFT_MEM_DRAW, sizeof (XftDraw));
@@ -210,43 +195,27 @@ _XftDrawFormat (XftDraw	*draw)
 }
 
 _X_EXPORT void
-XftDrawChange (XftDraw	*draw,
-               Drawable	drawable)
-{
+XftDrawChange(XftDraw* draw, Drawable drawable) {
 	draw->drawable = drawable;
-	if (draw->render.pict)
-		{
-			XRenderFreePicture (draw->dpy, draw->render.pict);
-			draw->render.pict = 0;
-		}
-	if (draw->core.gc)
-		{
-			XFreeGC (draw->dpy, draw->core.gc);
-			draw->core.gc = NULL;
-		}
+	if (draw->render.pict) {
+		XRenderFreePicture (draw->dpy, draw->render.pict);
+		draw->render.pict = 0;
+	}
 }
 
-_X_EXPORT Display *
-XftDrawDisplay (XftDraw *draw)
-{
+Display* XftDrawDisplay(XftDraw* draw) {
 	return draw->dpy;
 }
 
-_X_EXPORT Drawable
-XftDrawDrawable (XftDraw *draw)
-{
+Drawable XftDrawDrawable(XftDraw* draw) {
 	return draw->drawable;
 }
 
-_X_EXPORT Colormap
-XftDrawColormap (XftDraw *draw)
-{
+Colormap XftDrawColormap(XftDraw* draw) {
 	return draw->colormap;
 }
 
-_X_EXPORT Visual *
-XftDrawVisual (XftDraw *draw)
-{
+Visual* XftDrawVisual(XftDraw* draw) {
 	return draw->visual;
 }
 
@@ -255,8 +224,6 @@ XftDrawDestroy (XftDraw	*draw)
 {
 	if (draw->render.pict)
 		XRenderFreePicture (draw->dpy, draw->render.pict);
-	if (draw->core.gc)
-		XFreeGC (draw->dpy, draw->core.gc);
 	switch (draw->clip_type) {
 	case XftClipTypeRegion:
 		XDestroyRegion (draw->clip.region);
@@ -271,9 +238,7 @@ XftDrawDestroy (XftDraw	*draw)
 	free (draw);
 }
 
-_X_EXPORT Picture
-XftDrawSrcPicture (XftDraw *draw, _Xconst XftColor *color)
-{
+Picture XftDrawSrcPicture(XftDraw* draw, const XftColor* color) {
 	Display	    *dpy = draw->dpy;
 	XftDisplayInfo  *info = _XftDisplayInfoGet (dpy, True);
 	int		    i;
@@ -282,22 +247,17 @@ XftDrawSrcPicture (XftDraw *draw, _Xconst XftColor *color)
 	if (!info || !info->solidFormat)
 		return 0;
 	
-	/*
-	 * Monochrome targets require special handling; the PictOp controls
-	 * the color, and the color must be opaque
-	 */
-	if (!draw->visual && draw->depth == 1)
-		{
-			bitmapColor.color.alpha = 0xffff;
-			bitmapColor.color.red   = 0xffff;
-			bitmapColor.color.green = 0xffff;
-			bitmapColor.color.blue  = 0xffff;
-			color = &bitmapColor;
-		}
+	// Monochrome targets require special handling; the PictOp controls
+	// the color, and the color must be opaque
+	if (!draw->visual && draw->depth == 1) {
+		bitmapColor.color.alpha = 0xffff;
+		bitmapColor.color.red   = 0xffff;
+		bitmapColor.color.green = 0xffff;
+		bitmapColor.color.blue  = 0xffff;
+		color = &bitmapColor;
+	}
 
-	/*
-	 * See if there's one already available
-	 */
+	// See if there's one already available
 	for (i = 0; i < XFT_NUM_SOLID_COLOR; i++)
 		{
 			if (info->colors[i].pict &&
@@ -360,122 +320,61 @@ XftDrawSrcPicture (XftDraw *draw, _Xconst XftColor *color)
 	return info->colors[i].pict;
 }
 
-static int
-_XftDrawOp (_Xconst XftDraw *draw, _Xconst XftColor *color)
-{
-	if (draw->visual || draw->depth != 1)
-		return PictOpOver;
-	if (color->color.alpha >= 0x8000)
-		return PictOpOver;
-	return PictOpOutReverse;
-}
+static FcBool _XftDrawRenderPrepare (XftDraw* draw) {
+	if (!draw->render.pict) {
+		XRenderPictFormat	    *format;
+		XRenderPictureAttributes    pa;
+		unsigned long		    mask = 0;
 
-static FcBool
-_XftDrawRenderPrepare (XftDraw	*draw)
-{
-	if (!draw->render.pict)
-		{
-			XRenderPictFormat	    *format;
-			XRenderPictureAttributes    pa;
-			unsigned long		    mask = 0;
+		format = _XftDrawFormat (draw);
+		if (!format)
+			return FcFalse;
 
-			format = _XftDrawFormat (draw);
-			if (!format)
-				return FcFalse;
-
-			if (draw->subwindow_mode == IncludeInferiors)
-				{
-					pa.subwindow_mode = IncludeInferiors;
-					mask |= CPSubwindowMode;
-				}
-			draw->render.pict = XRenderCreatePicture (draw->dpy, draw->drawable,
-			                                          format, mask, &pa);
-			if (!draw->render.pict)
-				return FcFalse;
-			switch (draw->clip_type) {
-			case XftClipTypeRegion:
-				XRenderSetPictureClipRegion (draw->dpy, draw->render.pict,
-				                             draw->clip.region);
-				break;
-			case XftClipTypeRectangles:
-				XRenderSetPictureClipRectangles (draw->dpy, draw->render.pict,
-				                                 draw->clip.rect->xOrigin,
-				                                 draw->clip.rect->yOrigin,
-				                                 XftClipRects(draw->clip.rect),
-				                                 draw->clip.rect->n);
-				break;
-			case XftClipTypeNone:
-				break;
-			}
+		if (draw->subwindow_mode == IncludeInferiors) {
+			pa.subwindow_mode = IncludeInferiors;
+			mask |= CPSubwindowMode;
 		}
+		draw->render.pict = XRenderCreatePicture (draw->dpy, draw->drawable, format, mask, &pa);
+		if (!draw->render.pict)
+			return FcFalse;
+		switch (draw->clip_type) {
+		case XftClipTypeRegion:
+			XRenderSetPictureClipRegion (draw->dpy, draw->render.pict,
+			                             draw->clip.region);
+			break;
+		case XftClipTypeRectangles:
+			XRenderSetPictureClipRectangles (draw->dpy, draw->render.pict,
+			                                 draw->clip.rect->xOrigin,
+			                                 draw->clip.rect->yOrigin,
+			                                 XftClipRects(draw->clip.rect),
+			                                 draw->clip.rect->n);
+			break;
+		case XftClipTypeNone:
+			break;
+		}
+	}
 	return FcTrue;
 }
 
-static FcBool
-_XftDrawCorePrepare (XftDraw *draw, _Xconst XftColor *color)
-{
-	if (!draw->core.gc)
-		{
-			XGCValues	gcv;
-			unsigned long	mask = 0;
-			if (draw->subwindow_mode == IncludeInferiors)
-				{
-					gcv.subwindow_mode = IncludeInferiors;
-					mask |= GCSubwindowMode;
-				}
-			draw->core.gc = XCreateGC (draw->dpy, draw->drawable, mask, &gcv);
-			if (!draw->core.gc)
-				return FcFalse;
-			switch (draw->clip_type) {
-			case XftClipTypeRegion:
-				XSetRegion (draw->dpy, draw->core.gc, draw->clip.region);
-				break;
-			case XftClipTypeRectangles:
-				XSetClipRectangles (draw->dpy, draw->core.gc,
-				                    draw->clip.rect->xOrigin,
-				                    draw->clip.rect->yOrigin,
-				                    XftClipRects (draw->clip.rect),
-				                    draw->clip.rect->n,
-				                    Unsorted);
-				break;
-			case XftClipTypeNone:
-				break;
-			}
-		}
-	XSetForeground (draw->dpy, draw->core.gc, color->pixel);
-	return FcTrue;
-}
-
-_X_EXPORT Picture
-XftDrawPicture (XftDraw *draw)
-{
-	if (!_XftDrawRenderPrepare (draw))
+Picture XftDrawPicture (XftDraw *draw) {
+	if (!_XftDrawRenderPrepare(draw))
 		return 0;
 	return draw->render.pict;
 }
 
 #define NUM_LOCAL   1024
 
-_X_EXPORT void
-XftDrawRect (XftDraw		*draw,
+void XftDrawRect (XftDraw		*draw,
              _Xconst XftColor	*color,
              int		x,
              int		y,
              unsigned int	width,
              unsigned int	height)
 {
-	if (_XftDrawRenderPrepare (draw))
-		{
-			XRenderFillRectangle (draw->dpy, PictOpSrc, draw->render.pict,
-			                      &color->color, x, y, width, height);
-		}
-	else if (_XftDrawCorePrepare (draw, color))
-		{
-			/* note: not XftRectCore() */
-			XSetForeground (draw->dpy, draw->core.gc, color->pixel);
-			XFillRectangle (draw->dpy, draw->drawable, draw->core.gc,
-			                x, y, width, height);
-		}
+	if (_XftDrawRenderPrepare (draw)) {
+		XRenderFillRectangle(draw->dpy, PictOpSrc, draw->render.pict,
+		                      &color->color, x, y, width, height);
+	}
 }
 
 _X_EXPORT Bool
@@ -500,18 +399,15 @@ XftDrawSetClip (XftDraw	*draw,
 	/*
 	 * Duplicate the region so future changes can be short circuited
 	 */
-	if (r)
-		{
-			n = XCreateRegion ();
-			if (n)
-				{
-					if (!XUnionRegion (n, r, n))
-						{
-							XDestroyRegion (n);
-							return False;
-						}
-				}
+	if (r) {
+		n = XCreateRegion ();
+		if (n) {
+			if (!XUnionRegion (n, r, n)) {
+				XDestroyRegion (n);
+				return False;
+			}
 		}
+	}
 
 	/*
 	 * Destroy existing clip
@@ -553,13 +449,6 @@ XftDrawSetClip (XftDraw	*draw,
 					XRenderChangePicture (draw->dpy, draw->render.pict,
 					                      CPClipMask, &pa);
 				}
-		}
-	if (draw->core.gc)
-		{
-			if (n)
-				XSetRegion (draw->dpy, draw->core.gc, draw->clip.region);
-			else
-				XSetClipMask (draw->dpy, draw->core.gc, None);
 		}
 	return True;
 }
@@ -627,15 +516,6 @@ XftDrawSetClipRectangles (XftDraw		*draw,
 			                                 XftClipRects(new),
 			                                 new->n);
 		}
-	if (draw->core.gc)
-		{
-			XSetClipRectangles (draw->dpy, draw->core.gc,
-			                    new->xOrigin,
-			                    new->yOrigin,
-			                    XftClipRects (new),
-			                    new->n,
-			                    Unsorted);
-		}
 	return True;
 }
 
@@ -653,6 +533,4 @@ XftDrawSetSubwindowMode (XftDraw *draw, int mode)
 			XRenderChangePicture (draw->dpy, draw->render.pict,
 			                      CPSubwindowMode, &pa);
 		}
-	if (draw->core.gc)
-		XSetSubwindowMode (draw->dpy, draw->core.gc, mode);
 }
