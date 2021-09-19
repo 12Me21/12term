@@ -6,9 +6,7 @@
 
 #include FT_GLYPH_H
 
-/*
- * Validate the memory info for a font
- */
+// Validate the memory info for a font
 static void _XftFontValidateMemory (Display* dpy, XftFont* public) {
 	XftFontInt* font = (XftFontInt*)public;
 	unsigned long glyph_memory = 0;
@@ -67,16 +65,15 @@ static int _compute_xrender_bitmap_size(
 	}
 	int pitch = (width+3) & ~3;
 
-	switch ( ftbit->pixel_mode ) {
+	switch (ftbit->pixel_mode) {
 	case FT_PIXEL_MODE_MONO:
-		if ( mode == FT_RENDER_MODE_MONO ) {
+		if (mode == FT_RENDER_MODE_MONO) {
 			pitch = (((width+31) & ~31) >> 3);
 			break;
 		}
 		/* fall-through */
 	case FT_PIXEL_MODE_GRAY:
-		if ( mode == FT_RENDER_MODE_LCD ||
-		     mode == FT_RENDER_MODE_LCD_V ) {
+		if (mode == FT_RENDER_MODE_LCD || mode == FT_RENDER_MODE_LCD_V) {
 			/* each pixel is replicated into a 32-bit ARGB value */
 			pitch = width*4;
 		}
@@ -85,20 +82,20 @@ static int _compute_xrender_bitmap_size(
 		pitch = width * 4;
 		break;
 	case FT_PIXEL_MODE_LCD:
-		if ( mode != FT_RENDER_MODE_LCD )
+		if (mode != FT_RENDER_MODE_LCD)
 			return -1;
 		/* horz pixel triplets are packed into 32-bit ARGB values */
 		width /= 3;
 		pitch = width*4;
 		break;
 	case FT_PIXEL_MODE_LCD_V:
-		if ( mode != FT_RENDER_MODE_LCD_V )
+		if (mode != FT_RENDER_MODE_LCD_V)
 			return -1;
 		/* vert pixel triplets are packed into 32-bit ARGB values */
 		height /= 3;
 		pitch = width*4;
 		break;
-	default:  /* unsupported source format */
+	default: /* unsupported source format */
 		return -1;
 	}
 	target->width = width;
@@ -798,7 +795,7 @@ FT_UInt XftCharIndex(Display* dpy, XftFont* pub, FcChar32 ucs4) {
 
 // Pick a random glyph from the font and remove it from the cache
 // hey uh this is not a valid function name!!!!
-static void _XftFontUncacheGlyph (Display *dpy, XftFont *pub) {
+void _XftFontUncacheGlyph(Display* dpy, XftFont* pub) {
 	XftFontInt* font = (XftFontInt*)pub;
 	if (!font->glyph_memory)
 		return;
