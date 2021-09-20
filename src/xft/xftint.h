@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <ctype.h>
 
 #include <X11/Xlib.h>
@@ -188,7 +189,6 @@ typedef struct _XftDisplayInfo {
 	Display		    *display;
 	XExtCodes		    *codes;
 	FcPattern		    *defaults;
-	FcBool		    hasRender;
 	FcBool		    hasSolid;
 	XftFont		    *fonts;
 	XRenderPictFormat	    *solidFormat;
@@ -260,7 +260,7 @@ FcResult XftPatternGetBool (FcPattern *p, _Xconst char *object, int id, FcBool *
 FcPattern *XftPatternDuplicate (FcPattern *orig);
 FcPattern *XftPatternVaBuild (FcPattern *orig, va_list va);
 FcPattern *XftPatternBuild (FcPattern *orig, ...);
-FcBool XftNameUnparse (FcPattern *pat, char *dest, int len);
+bool XftNameUnparse (FcPattern *pat, char *dest, int len);
 FcBool XftGlyphExists (Display *dpy, XftFont *font, FcChar32 ucs4);
 FcObjectSet *XftObjectSetCreate (void);
 Bool XftObjectSetAdd (FcObjectSet *os, _Xconst char *object);

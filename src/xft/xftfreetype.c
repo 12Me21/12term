@@ -380,18 +380,15 @@ static FcBool XftFontInfoFill(Display* dpy, const FcPattern* pattern, XftFontInf
 	                 fi->matrix.yx != 0 || fi->matrix.yy != 0x10000);
 
 	// Get render value, set to false if no Render extension present
-	if (info->hasRender) {
-		switch (FcPatternGetBool(pattern, XFT_RENDER, 0, &fi->render)) {
-		case FcResultNoMatch:
-			fi->render = info->hasRender;
-			break;
-		case FcResultMatch:
-			break;
-		default:
-			goto bail1;
-		}
-	} else
-		fi->render = FcFalse;
+	switch (FcPatternGetBool(pattern, XFT_RENDER, 0, &fi->render)) {
+	case FcResultNoMatch:
+		fi->render = true;
+		break;
+	case FcResultMatch:
+		break;
+	default:
+		goto bail1;
+	}
 	
 	// Compute glyph load flags
 	fi->load_flags = FT_LOAD_DEFAULT | FT_LOAD_COLOR;

@@ -4,15 +4,12 @@
  * Ok, this is a pain.  To share source pictures across multiple destinations,
  * the screen for each drawable must be discovered.
  */
-
 static int _XftDrawScreen(Display* dpy, Drawable drawable, Visual* visual) {
 	/* Special case the most common environment */
 	if (ScreenCount(dpy)==1)
 		return 0;
-	/*
-	 * If we've got a visual, look for the screen that points at it.
-	 * This requires no round trip.
-	 */
+	// If we've got a visual, look for the screen that points at it.
+	// This requires no round trip.
 	if (visual) {
 		for (int s=0; s < ScreenCount(dpy); s++) {
 			XVisualInfo	template, *ret;
@@ -138,7 +135,7 @@ XftDraw* XftDrawCreateAlpha(Display* dpy, Pixmap pixmap, int depth) {
 static XRenderPictFormat* _XftDrawFormat(XftDraw* draw) {
 	XftDisplayInfo* info = _XftDisplayInfoGet(draw->dpy, True);
 	
-	if (!info || !info->hasRender)
+	if (!info)
 		return NULL;
 	
 	if (draw->visual == NULL) {
@@ -232,38 +229,29 @@ Picture XftDrawSrcPicture(XftDraw* draw, const XftColor* color) {
 	if (info->hasSolid) {
 		// Free any existing entry
 		if (info->colors[i].pict)
-			XRenderFreePicture (dpy, info->colors[i].pict);
+			XRenderFreePicture(dpy, info->colors[i].pict);
 		// Create picture
-		info->colors[i].pict = XRenderCreateSolidFill (draw->dpy, &color->color);
+		info->colors[i].pict = XRenderCreateSolidFill(draw->dpy, &color->color);
 	} else {
-		if (info->colors[i].screen != draw->screen && info->colors[i].pict) {
-			XRenderFreePicture (dpy, info->colors[i].pict);
+		if (info->colors[i].screen!=draw->screen && info->colors[i].pict) {
+			XRenderFreePicture(dpy, info->colors[i].pict);
 			info->colors[i].pict = 0;
 		}
-		/*
-		 * Create picture if necessary
-		 */
+		// Create picture if necessary
 		if (!info->colors[i].pict) {
-			Pixmap			    pix;
-			XRenderPictureAttributes    pa;
-
-			pix = XCreatePixmap (dpy, RootWindow (dpy, draw->screen), 1, 1,
-			                     info->solidFormat->depth);
-			pa.repeat = True;
-			info->colors[i].pict = XRenderCreatePicture (draw->dpy,
-			                                             pix,
-			                                             info->solidFormat,
-			                                             CPRepeat, &pa);
-			XFreePixmap (dpy, pix);
+			Pixmap pix = XCreatePixmap(
+				dpy, RootWindow(dpy, draw->screen),
+				1, 1, info->solidFormat->depth);
+			info->colors[i].pict = XRenderCreatePicture(
+				draw->dpy, pix,
+				info->solidFormat,
+				CPRepeat, &(XRenderPictureAttributes){.repeat=True});
+			XFreePixmap(dpy, pix);
 		}
-		/*
-		 * Set to the new color
-		 */
+		// Set to the new color
 		info->colors[i].color = color->color;
 		info->colors[i].screen = draw->screen;
-		XRenderFillRectangle (dpy, PictOpSrc,
-		                      info->colors[i].pict,
-		                      &color->color, 0, 0, 1, 1);
+		XRenderFillRectangle(dpy, PictOpSrc, info->colors[i].pict, &color->color, 0, 0, 1, 1);
 	}
 	info->colors[i].color = color->color;
 	info->colors[i].screen = draw->screen;
@@ -306,7 +294,7 @@ static FcBool _XftDrawRenderPrepare (XftDraw* draw) {
 	return FcTrue;
 }
 
-Picture XftDrawPicture (XftDraw *draw) {
+Picture XftDrawPicture(XftDraw* draw) {
 	if (!_XftDrawRenderPrepare(draw))
 		return 0;
 	return draw->render.pict;
@@ -315,9 +303,10 @@ Picture XftDrawPicture (XftDraw *draw) {
 #define NUM_LOCAL   1024
 
 void XftDrawRect(XftDraw* draw, const XftColor* color, int x, int y, unsigned int width, unsigned int height) {
-	if (_XftDrawRenderPrepare (draw)) {
-		XRenderFillRectangle(draw->dpy, PictOpSrc, draw->render.pict,
-		                      &color->color, x, y, width, height);
+	if (_XftDrawRenderPrepare(draw)) {
+		XRenderFillRectangle(
+			draw->dpy, PictOpSrc, draw->render.pict,
+			&color->color, x, y, width, height);
 	}
 }
 
@@ -327,10 +316,10 @@ Bool XftDrawSetClip(XftDraw* draw, Region r) {
 	// Check for quick exits
 	if (!r && draw->clip_type == XftClipTypeNone)
 		return True;
-
+	
 	if (r &&
 	    draw->clip_type == XftClipTypeRegion &&
-	    XEqualRegion (r, draw->clip.region)) {
+	    XEqualRegion(r, draw->clip.region)) {
 		return True;
 	}
 	
@@ -356,7 +345,7 @@ Bool XftDrawSetClip(XftDraw* draw, Region r) {
 	case XftClipTypeNone:
 		break;
 	}
-
+	
 	// Set the clip
 	if (n) {
 		draw->clip_type = XftClipTypeRegion;
@@ -378,11 +367,7 @@ Bool XftDrawSetClip(XftDraw* draw, Region r) {
 	return True;
 }
 
-Bool XftDrawSetClipRectangles(XftDraw* draw,
-                              int			xOrigin,
-                              int			yOrigin,
-                              _Xconst XRectangle	*rects,
-                              int			n) {
+Bool XftDrawSetClipRectangles(XftDraw* draw, int xOrigin, int yOrigin, const XRectangle* rects, int n) {
 	XftClipRect	*new = NULL;
 	
 	// Check for quick exit
@@ -421,11 +406,11 @@ Bool XftDrawSetClipRectangles(XftDraw* draw,
 	draw->clip.rect = new;
 	// Apply new clip to existing objects
 	if (draw->render.pict) {
-		XRenderSetPictureClipRectangles (draw->dpy, draw->render.pict,
-		                                 new->xOrigin,
-		                                 new->yOrigin,
-		                                 XftClipRects(new),
-		                                 new->n);
+		XRenderSetPictureClipRectangles(
+			draw->dpy, draw->render.pict,
+			new->xOrigin, new->yOrigin,
+			XftClipRects(new),
+			new->n);
 	}
 	return True;
 }

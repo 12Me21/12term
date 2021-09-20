@@ -248,8 +248,15 @@ int main(int argc, char* argv[argc+1]) {
 		die("Could not connect to X server\n");
 	W.scr = XDefaultScreen(W.d);
 	W.vis = XDefaultVisual(W.d, W.scr);
+	// check if user has modern display (otherwise nnnnnnnn sorry i dont want to deal with this)
 	if (W.vis->class!=TrueColor)
 		die("Cannot handle non truecolor visual ...\n");
+	int event_base, error_base;
+	if (!XRenderQueryExtension(W.d, &event_base, &error_base))
+		die("No Xrender ...\n");
+	if (!XRenderFindVisualFormat(W.d, W.vis))
+		die("cant find visual format ...\n");
+	
 	W.cmap = XDefaultColormap(W.d, W.scr);
 	
 	// init db
@@ -264,7 +271,8 @@ int main(int argc, char* argv[argc+1]) {
 	
 	time_log("init stuff 1");
 	
-	XftInit(NULL);
+	if (!FcInit())
+		die("fontconfig init failed");
 	
 	time_log("init xft");
 	

@@ -54,10 +54,12 @@ static bool load_font(Font* f, FcPattern* pattern, bool bold, bool italic) {
 	}
 	
 	// calculate the average char width
-	const utf8 ascii_printable[] = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
-	int len = strlen(ascii_printable);
+	int len = 95;
+	Char ascii_printable[len];
+	for (int i=0; i<len; i++)
+		ascii_printable[i] = ' '+i;
 	XGlyphInfo extents;
-	XftTextExtentsUtf8(W.d, f->font, (const FcChar8*)ascii_printable, len, &extents);
+	XftTextExtents32(W.d, f->font, (FcChar32*)ascii_printable, len, &extents);
 	f->width = ceildiv(extents.xOff, len);
 	
 	f->set = NULL;
@@ -74,12 +76,7 @@ static bool load_font(Font* f, FcPattern* pattern, bool bold, bool italic) {
 void load_fonts(const utf8* fontstr, double fontsize) {
 	fonts_free();
 	
-	FcPattern* pattern;
-		
-	if (fontstr[0] == '-')
-		pattern = XftXlfdParse(fontstr, False, False);
-	else
-		pattern = FcNameParse((const FcChar8*)fontstr);
+	FcPattern* pattern = FcNameParse((const FcChar8*)fontstr);
 	
 	if (!pattern)
 		die("can't open font %s\n", fontstr);

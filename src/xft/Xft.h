@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdarg.h>
+#include <stdbool.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include <fontconfig/fontconfig.h>
@@ -52,19 +53,22 @@ typedef struct _XftGlyphFontSpec {
 	short	x, y;
 } XftGlyphFontSpec;
 
+// ghhh
+typedef struct _XftGlyphFont {
+	XftFont* font;
+	FT_UInt glyph;
+} XftGlyphFont;
+
 /* xftcolor.c */
 Bool XftColorAllocName(Display* dpy, const Visual* visual, Colormap cmap, const char* name, XftColor* result);
 Bool XftColorAllocValue(Display* dpy, Visual* visual, Colormap cmap, const XRenderColor* color, XftColor* result);
-void XftColorFree(Display* dpy, Visual* visual, Colormap cmap, XftColor* color);
 
 /* xftdpy.c */
 Bool XftDefaultHasRender(Display* dpy);
 
-Bool
-XftDefaultSet(Display* dpy, FcPattern* defaults);
+Bool XftDefaultSet(Display* dpy, FcPattern* defaults);
 
-void
-XftDefaultSubstitute(Display* dpy, int screen, FcPattern* pattern);
+void XftDefaultSubstitute(Display* dpy, int screen, FcPattern* pattern);
 
 /* xftdraw.c */
 
@@ -120,25 +124,6 @@ XftDrawString32(XftDraw* draw,
  int x,
  int y,
  const FcChar32* string,
- int len);
-
-void
-XftDrawStringUtf8(XftDraw* draw,
- const XftColor* color,
- XftFont* pub,
- int x,
- int y,
- const FcChar8* string,
- int len);
-
-void
-XftDrawStringUtf16(XftDraw* draw,
- const XftColor* color,
- XftFont* pub,
- int x,
- int y,
- const FcChar8* string,
- FcEndian endian,
  int len);
 
 void
@@ -202,38 +187,9 @@ XftGlyphExtents(Display* dpy,
  XGlyphInfo* extents);
 
 void
-XftTextExtents8(Display* dpy,
- XftFont* pub,
- const FcChar8* string,
- int len,
- XGlyphInfo* extents);
-
-void
-XftTextExtents16(Display* dpy,
- XftFont* pub,
- const FcChar16* string,
- int len,
- XGlyphInfo* extents);
-
-void
 XftTextExtents32(Display* dpy,
  XftFont* pub,
  const FcChar32* string,
- int len,
- XGlyphInfo* extents);
-
-void
-XftTextExtentsUtf8(Display* dpy,
- XftFont* pub,
- const FcChar8* string,
- int len,
- XGlyphInfo* extents);
-
-void
-XftTextExtentsUtf16(Display* dpy,
- XftFont* pub,
- const FcChar8* string,
- FcEndian endian,
  int len,
  XGlyphInfo* extents);
 
@@ -294,7 +250,7 @@ XftInitFtLibrary(void);
 void
 XftFontLoadGlyphs(Display * dpy,
  XftFont* pub,
- FcBool need_bitmaps,
+ bool need_bitmaps,
  const FT_UInt* glyphs,
  int nglyph);
 
@@ -306,15 +262,15 @@ XftFontUnloadGlyphs(Display* dpy,
 
 #define XFT_NMISSING 256
 
-FcBool
+bool
 XftFontCheckGlyph(Display* dpy,
  XftFont* pub,
- FcBool need_bitmaps,
+ bool need_bitmaps,
  FT_UInt glyph,
  FT_UInt* missing,
  int* nmissing);
 
-FcBool
+bool
 XftCharExists(Display* dpy,
  XftFont* pub,
  FcChar32 ucs4);
@@ -323,9 +279,6 @@ FT_UInt
 XftCharIndex(Display* dpy,
  XftFont* pub,
  FcChar32 ucs4);
-
-/* xftinit.c */
-FcBool XftInit(const char* config);
 
 /* xftlist.c */
 
@@ -461,10 +414,6 @@ XftTextRender32(Display* dpy,
 void XftTextRender32BE(Display* dpy, int op, Picture src, XftFont* pub, Picture dst, int srcx, int srcy, int x, int y, const FcChar8* string, int len);
 
 void XftTextRender32LE(Display* dpy, int op, Picture src, XftFont* pub, Picture dst, int srcx, int srcy, int x, int y, const FcChar8* string, int len);
-
-void XftTextRenderUtf8(Display* dpy, int op, Picture src, XftFont* pub, Picture dst, int srcx, int srcy, int x, int y, const FcChar8* string, int len);
-
-void XftTextRenderUtf16(Display* dpy, int op, Picture src, XftFont* pub, Picture dst, int srcx, int srcy, int x, int y, const FcChar8* string, FcEndian endian, int len);
 
 /* xftxlfd.c */
 FcPattern* XftXlfdParse(const char* xlfd_orig, Bool ignore_scalable, Bool complete);
