@@ -419,4 +419,4 @@ void XftTextRender32LE(Display* dpy, int op, Picture src, XftFont* pub, Picture 
 FcPattern* XftXlfdParse(const char* xlfd_orig, Bool ignore_scalable, Bool complete);
 
 // eee
-void XftGlyphRender1(Display* dpy, int	op, Picture src, XftFont* pub, Picture dst, int srcx, int srcy, int x, int y, const FT_UInt g);
+void XftGlyphRender1(Display* dpy, int	op, Picture src, XftFont* pub, Picture dst, int srcx, int srcy, int x, int y, const FT_UInt g, int cw);

@@ -112,11 +112,11 @@ static int same_color(XftColor a, XftColor b) {
 }
 
 // todo: allow drawing multiple at once for efficiency?
-static void draw_glyph(XftDraw* draw, Px x, Px y, Glyph g, XftColor col) {
+static void draw_glyph(XftDraw* draw, Px x, Px y, Glyph g, XftColor col, int w) {
 	if (!g.font)
 		return;
 	Picture src = XftDrawSrcPicture(draw, &col);
-	XftGlyphRender1(XftDrawDisplay(draw), PictOpOver, src, g.font, XftDrawPicture(draw), 0, 0, x+g.x, y+g.y, g.glyph);
+	XftGlyphRender1(XftDrawDisplay(draw), PictOpOver, src, g.font, XftDrawPicture(draw), 0, 0, x+g.x, y+g.y, g.glyph, W.cw*w);
 	//XftGlyphFontSpecRender(XftDrawDisplay(draw), PictOpOver, src, XftDrawPicture(draw), 0, 0, spec, 1);
 }
 
@@ -165,7 +165,7 @@ static void draw_cursor(int x, int y) {
 	if (temp.chr) {
 		Glyph spec[1];
 		cells_to_glyphs(1, &temp, spec, false);
-		draw_glyph(cursor_draw, 0, 0, spec[0], make_color(temp.attrs.color));
+		draw_glyph(cursor_draw, 0, 0, spec[0], make_color(temp.attrs.color), width);
 	}
 	
 	draw_char_overlays(cursor_draw, 0, temp);
@@ -244,7 +244,7 @@ static bool draw_row(int y, Row row) {
 	
 	for (int i=0; i<T.width; i++) {
 		if (specs[i].font)
-			draw_glyph(rows[y].draw, W.border+i*W.cw, 0, specs[i], make_color(row[i].attrs.color));
+			draw_glyph(rows[y].draw, W.border+i*W.cw, 0, specs[i], make_color(row[i].attrs.color), row[i].wide==1 ? 2 : 1);
 	}
 	
 	// draw strikethrough and underlines

@@ -54,6 +54,7 @@ static bool load_font(Font* f, FcPattern* pattern, bool bold, bool italic) {
 	}
 	
 	// calculate the average char width
+	// (this also serves to load all ascii glyphs immediately)
 	int len = 95;
 	Char ascii_printable[len];
 	for (int i=0; i<len; i++)
@@ -74,6 +75,8 @@ static bool load_font(Font* f, FcPattern* pattern, bool bold, bool italic) {
 // This frees any existing fonts and loads new ones, based on `fontstr`.
 // it also sets `W.cw` and `W.ch`.
 void load_fonts(const utf8* fontstr, double fontsize) {
+	print("loading pattern: %s\n", fontstr);
+	
 	fonts_free();
 	
 	FcPattern* pattern = FcNameParse((const FcChar8*)fontstr);

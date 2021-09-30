@@ -147,18 +147,12 @@ void load_glyph(Display* dpy, Xft2Font* font, FcBool need_bitmaps, const FT_UInt
 
 		glyphslot = face->glyph;
 
-		/*
-		 * Embolden if required
-		 */
+		// Embolden if required
 		if (font->info.embolden) FT_GlyphSlot_Embolden(glyphslot);
-
-		/*
-		 * Compute glyph metrics from FreeType information
-		 */
+		
+		// Compute glyph metrics from FreeType information
 		if (transform) {
-			/*
-			 * calculate the true width by transforming all four corners.
-			 */
+			// calculate the true width by transforming all four corners.
 			int xc, yc;
 			left = right = top = bottom = 0;
 			for(xc = 0; xc <= 1; xc ++) {
@@ -197,10 +191,8 @@ void load_glyph(Display* dpy, Xft2Font* font, FcBool need_bitmaps, const FT_UInt
 		width = TRUNC(right - left);
 		height = TRUNC( top - bottom );
 
-		/*
-		 * Clip charcell glyphs to the bounding box
-		 * XXX transformed?
-		 */
+		// Clip charcell glyphs to the bounding box
+		// XXX transformed?
 		if (font->info.spacing >= FC_CHARCELL && !transform) {
 			if (font->info.load_flags & FT_LOAD_VERTICAL_LAYOUT) {
 				if (TRUNC(bottom) > font->public.max_advance_width) {
@@ -329,10 +321,8 @@ p			xftg->metrics.xOff = TRUNC(ROUND(glyphslot->advance.x));
 			xftg->metrics.y =   glyphslot->bitmap_top;
 		}
 
-		/*
-		 * If the glyph is relatively large (> 1% of server memory),
-		 * don't send it until necessary.
-		 */
+		// If the glyph is relatively large (> 1% of server memory),
+		// don't send it until necessary.
 		if (!need_bitmaps && size > info->max_glyph_memory / 100)
 			continue;
 

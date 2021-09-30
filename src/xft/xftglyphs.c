@@ -42,10 +42,7 @@ static void _XftFontValidateMemory(Display* dpy, XftFont* public) {
  * it also returns -1 in case of error (e.g. incompatible arguments,
  * like trying to convert a gray bitmap into a monochrome one)
  */
-static int _compute_xrender_bitmap_size(
-	FT_Bitmap* target, FT_GlyphSlot slot,
-	FT_Render_Mode mode, FT_Matrix* matrix
-) {
+static int _compute_xrender_bitmap_size(FT_Bitmap* target, FT_GlyphSlot slot, FT_Render_Mode mode, FT_Matrix* matrix) {
 	if (slot->format != FT_GLYPH_FORMAT_BITMAP)
 		return -1;
 	
@@ -78,9 +75,11 @@ static int _compute_xrender_bitmap_size(
 			pitch = width*4;
 		}
 		break;
+		
 	case FT_PIXEL_MODE_BGRA:
 		pitch = width * 4;
 		break;
+		
 	case FT_PIXEL_MODE_LCD:
 		if (mode != FT_RENDER_MODE_LCD)
 			return -1;
@@ -88,6 +87,7 @@ static int _compute_xrender_bitmap_size(
 		width /= 3;
 		pitch = width*4;
 		break;
+		
 	case FT_PIXEL_MODE_LCD_V:
 		if (mode != FT_RENDER_MODE_LCD_V)
 			return -1;
@@ -95,9 +95,11 @@ static int _compute_xrender_bitmap_size(
 		height /= 3;
 		pitch = width*4;
 		break;
+		
 	default: /* unsupported source format */
 		return -1;
 	}
+	
 	target->width = width;
 	target->rows = height;
 	target->pitch = pitch;
@@ -133,16 +135,14 @@ static void _scaled_fill_xrender_bitmap(
 	const FT_Matrix* matrix
 ) {
 	unsigned char* src_buf = source->buffer;
-	unsigned char* dst_line = target->buffer;
 	int src_pitch = source->pitch;
-	
 	if (src_pitch<0)
 		src_buf -= src_pitch*(source->rows-1);
 	
 	FT_Matrix inverse = *matrix;
 	FT_Matrix_Invert(&inverse);
 	
-	/* compute how many source pixels a target pixel spans */
+	// compute how many source pixels a target pixel spans
 	FT_Vector vector;
 	vector.x = 1;
 	vector.y = 1;
@@ -154,11 +154,12 @@ static void _scaled_fill_xrender_bitmap(
 	int width = target->width;
 	int height = target->rows;
 	int pitch = target->pitch;
+	unsigned char* dst_line = target->buffer;
 	for (int h=height; h>0; h--, dst_line+=pitch) {
 		for (int x=0; x<width; x++) {
 			unsigned char* src;
 			
-			/* compute target pixel location in source space */
+			// compute target pixel location in source space
 			vector.x = (x            * 0x10000) + 0x10000 / 2;
 			vector.y = ((height - h) * 0x10000) + 0x10000 / 2;
 			FT_Vector_Transform(&vector, &inverse);
@@ -218,17 +219,16 @@ static unsigned int pack(unsigned char a, unsigned char b, unsigned char c, unsi
  */
 static void _fill_xrender_bitmap(FT_Bitmap* target, FT_GlyphSlot slot, FT_Render_Mode mode, int bgr) {
 	FT_Bitmap* ftbit = &slot->bitmap;
-	unsigned char*	srcLine	= ftbit->buffer;
-	unsigned char*	dstLine	= target->buffer;
 	int src_pitch = ftbit->pitch;
-	int width = target->width;
-	int height = target->rows;
-	int pitch = target->pitch;
-	int subpixel = (mode==FT_RENDER_MODE_LCD || mode==FT_RENDER_MODE_LCD_V );
-	
+	unsigned char*	srcLine = ftbit->buffer;
 	if (src_pitch < 0)
 		srcLine -= src_pitch*(ftbit->rows-1);
 	
+	int width = target->width;
+	int height = target->rows;
+	int pitch = target->pitch;
+	unsigned char*	dstLine = target->buffer;
+	int subpixel = (mode==FT_RENDER_MODE_LCD || mode==FT_RENDER_MODE_LCD_V );
 	switch (ftbit->pixel_mode) {
 	case FT_PIXEL_MODE_MONO:
 		if (subpixel) { // convert mono to ARGB32 values
@@ -321,21 +321,15 @@ static void _fill_xrender_bitmap(FT_Bitmap* target, FT_GlyphSlot slot, FT_Render
 	}
 }
 
-void XftFontLoadGlyphs(
-	Display* dpy,
-	XftFont* pub,
-	bool need_bitmaps,
-	const FT_UInt* glyphs,
-	int nglyph
-) {
-	XftDisplayInfo  *info = _XftDisplayInfoGet(dpy, True);
+void XftFontLoadGlyphs(Display* dpy, XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, int nglyph) {
+	XftDisplayInfo* info = _XftDisplayInfoGet(dpy, True);
 	if (!info)
 		return;
 	
-	XftFontInt	    *font = (XftFontInt *) pub;
+	XftFontInt* font = (XftFontInt*)pub;
 	
-	FT_Bitmap	    local;
-	FT_Vector	    vector;
+	FT_Bitmap local;
+	FT_Vector vector;
 	
 	FT_Face face = XftLockFace(&font->public);
 	if (!face)
@@ -360,7 +354,7 @@ void XftFontLoadGlyphs(
 	}
 	
 	bool transform = font->info.transform && mode != FT_RENDER_MODE_MONO;
-
+	
 	while (nglyph--) {
 		FT_UInt glyphindex = *glyphs++;
 		XftGlyph* xftg = font->glyphs[glyphindex];
@@ -381,15 +375,12 @@ void XftFontLoadGlyphs(
 		
 		FT_Error	error = FT_Load_Glyph(face, glyphindex, font->info.load_flags);
 		if (error) {
-			/*
-			 * If anti-aliasing or transforming glyphs and
-			 * no outline version exists, fallback to the
-			 * bitmap and let things look bad instead of
-			 * missing the glyph
-			 */
+			// If anti-aliasing or transforming glyphs and
+			// no outline version exists, fallback to the
+			// bitmap and let things look bad instead of
+			// missing the glyph
 			if (font->info.load_flags & FT_LOAD_NO_BITMAP)
-				error = FT_Load_Glyph(face, glyphindex,
-				                      font->info.load_flags & ~FT_LOAD_NO_BITMAP);
+				error = FT_Load_Glyph(face, glyphindex, font->info.load_flags & ~FT_LOAD_NO_BITMAP);
 			if (error)
 				continue;
 		}
@@ -499,8 +490,7 @@ void XftFontLoadGlyphs(
 				if (font->info.load_flags & FT_LOAD_VERTICAL_LAYOUT) {
 					xftg->metrics.xOff = 0;
 					xftg->metrics.yOff = -font->public.max_advance_width;
-				}
-				else {
+				} else {
 					xftg->metrics.xOff = font->public.max_advance_width;
 					xftg->metrics.yOff = 0;
 				}
@@ -553,7 +543,7 @@ void XftFontLoadGlyphs(
 		
 		xftg->metrics.width  = local.width;
 		xftg->metrics.height = local.rows;
-		if (transform) {
+		if (0&&transform) {
 			vector.x = - glyphslot->bitmap_left;
 			vector.y =   glyphslot->bitmap_top;
 			
@@ -566,10 +556,8 @@ void XftFontLoadGlyphs(
 			xftg->metrics.y =   glyphslot->bitmap_top;
 		}
 		
-		/*
-		 * If the glyph is relatively large (> 1% of server memory),
-		 * don't send it until necessary.
-		 */
+		// If the glyph is relatively large (> 1% of server memory),
+		// don't send it until necessary.
 		if (!need_bitmaps && size>info->max_glyph_memory/100)
 			continue;
 		
@@ -581,9 +569,7 @@ void XftFontLoadGlyphs(
 		if (mode == FT_RENDER_MODE_NORMAL && glyph_transform)
 			_scaled_fill_xrender_bitmap(&local, &glyphslot->bitmap, &font->info.matrix);
 		else
-			_fill_xrender_bitmap( &local, glyphslot, mode,
-			                      (font->info.rgba == FC_RGBA_BGR ||
-			                       font->info.rgba == FC_RGBA_VBGR ) );
+			_fill_xrender_bitmap(&local, glyphslot, mode, font->info.rgba==FC_RGBA_BGR || font->info.rgba==FC_RGBA_VBGR);
 		
 		// Copy or convert into local buffer.
 		
@@ -637,9 +623,7 @@ void XftFontLoadGlyphs(
 				XFreeGC(dpy, gc);
 				XFreePixmap(dpy, pixmap);
 			} else
-				XRenderAddGlyphs(dpy, font->glyphset, &glyph,
-				                  &xftg->metrics, 1,
-				                  (char*)bufBitmap, size);
+				XRenderAddGlyphs(dpy, font->glyphset, &glyph, &xftg->metrics, 1, (char*)bufBitmap, size);
 		} else {
 			if (size) {
 				xftg->bitmap = malloc(size);
@@ -654,8 +638,7 @@ void XftFontLoadGlyphs(
 		if (XftDebug() & XFT_DBG_CACHE)
 			_XftFontValidateMemory (dpy, pub);
 		if (XftDebug() & XFT_DBG_CACHEV)
-			printf ("Caching glyph 0x%x size %ld\n", glyphindex,
-			        xftg->glyph_memory);
+			printf("Caching glyph 0x%x size %ld\n", glyphindex, xftg->glyph_memory);
 	}
 	XftUnlockFace(&font->public);
 }
@@ -694,7 +677,7 @@ void XftFontUnloadGlyphs(Display* dpy, XftFont* pub, const FT_UInt* glyphs, int 
 		font->glyphs[glyphindex] = NULL;
 	}
 	if (font->glyphset && nused)
-		XRenderFreeGlyphs (dpy, font->glyphset, glyphBuf, nused);
+		XRenderFreeGlyphs(dpy, font->glyphset, glyphBuf, nused);
 }
 
 bool XftFontCheckGlyph(Display* dpy, XftFont* pub, bool need_bitmaps, FT_UInt glyph, FT_UInt* missing, int* nmissing) {
@@ -705,10 +688,9 @@ bool XftFontCheckGlyph(Display* dpy, XftFont* pub, bool need_bitmaps, FT_UInt gl
 	XftGlyph* xftg = font->glyphs[glyph];
 	if (!xftg || (need_bitmaps && !xftg->glyph_memory)) {
 		if (!xftg) {
-			xftg = malloc(sizeof(XftGlyph));
+			xftg = XftMalloc(XFT_MEM_GLYPH, sizeof(XftGlyph));
 			if (!xftg)
 				return false;
-			XftMemAlloc(XFT_MEM_GLYPH, sizeof(XftGlyph));
 			xftg->bitmap = NULL;
 			xftg->glyph_memory = 0;
 			font->glyphs[glyph] = xftg;
@@ -731,16 +713,14 @@ bool XftCharExists(Display* dpy, XftFont* pub, FcChar32 ucs4) {
 	return false;
 }
 
-#define Missing	    ((FT_UInt) ~0)
-
 FT_UInt XftCharIndex(Display* dpy, XftFont* pub, FcChar32 ucs4) {
-	XftFontInt *font = (XftFontInt*)pub;
+	XftFontInt* font = (XftFontInt*)pub;
 	if (!font->hash_value)
 		return 0;
 	FcChar32	ent = ucs4 % font->hash_value;
 	FcChar32	offset = 0;
 	while (font->hash_table[ent].ucs4 != ucs4) {
-		if (font->hash_table[ent].ucs4 == (FcChar32) ~0) {
+		if (font->hash_table[ent].ucs4 == (FcChar32)~0) {
 			if (!XftCharExists(dpy, pub, ucs4))
 				return 0;
 			FT_Face face = XftLockFace(pub);
@@ -775,7 +755,7 @@ void _XftFontUncacheGlyph(Display* dpy, XftFont* pub) {
 		glyph_memory = rand() % font->glyph_memory;
 	} else {
 		if (font->glyphset) {
-			XRenderFreeGlyphSet (dpy, font->glyphset);
+			XRenderFreeGlyphSet(dpy, font->glyphset);
 			font->glyphset = 0;
 		}
 		glyph_memory = 0;
@@ -788,8 +768,7 @@ void _XftFontUncacheGlyph(Display* dpy, XftFont* pub) {
 		if (xftg) {
 			if (xftg->glyph_memory > glyph_memory) {
 				if (XftDebug() & XFT_DBG_CACHEV)
-					printf("Uncaching glyph 0x%x size %ld\n",
-					        glyphindex, xftg->glyph_memory);
+					printf("Uncaching glyph 0x%x size %ld\n", glyphindex, xftg->glyph_memory);
 				XftFontUnloadGlyphs(dpy, pub, &glyphindex, 1);
 				if (!font->use_free_glyphs)
 					continue;
