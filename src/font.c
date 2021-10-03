@@ -37,7 +37,7 @@ static bool load_font(Font* f, FcPattern* pattern, bool bold, bool italic) {
 		FcPatternAddInteger(configured, FC_WEIGHT, FC_WEIGHT_BOLD);
 	
 	FcConfigSubstitute(NULL, configured, FcMatchPattern);
-	XftDefaultSubstitute(W.d, W.scr, configured);
+	XftDefaultSubstitute(W.scr, configured);
 	
 	FcResult result;
 	FcPattern* match = FcFontMatch(NULL, configured, &result);
@@ -46,7 +46,7 @@ static bool load_font(Font* f, FcPattern* pattern, bool bold, bool italic) {
 		return false;
 	}
 	
-	f->font = XftFontOpenPattern(W.d, match);
+	f->font = XftFontOpenPattern(match);
 	if (!f->font) {
 		FcPatternDestroy(configured);
 		FcPatternDestroy(match);
@@ -60,7 +60,7 @@ static bool load_font(Font* f, FcPattern* pattern, bool bold, bool italic) {
 	for (int i=0; i<len; i++)
 		ascii_printable[i] = ' '+i;
 	XGlyphInfo extents;
-	XftTextExtents32(W.d, f->font, (FcChar32*)ascii_printable, len, &extents);
+	XftTextExtents32(f->font, (FcChar32*)ascii_printable, len, &extents);
 	f->width = ceildiv(extents.xOff, len);
 	
 	f->set = NULL;
@@ -120,7 +120,7 @@ static void find_fallback_font(Char chr, int style, XftFont** xfont, FT_UInt* gl
 	print("finding fallback font for %d\n", chr);
 	// Fallback on font cache, search the font cache for match.
 	for (int f=0; f<frclen; f++) {
-		*glyph = XftCharIndex(W.d, frc[f].font, chr);
+		*glyph = XftCharIndex(frc[f].font, chr);
 		
 		if (*glyph && frc[f].style==style) {
 			*xfont = frc[f].font;
@@ -153,13 +153,13 @@ static void find_fallback_font(Char chr, int style, XftFont** xfont, FT_UInt* gl
 	if (frclen >= LEN(frc))
 		die("too many fallback fonts aaaaaaa\n");
 	
-	frc[frclen].font = XftFontOpenPattern(W.d, fontpattern);
+	frc[frclen].font = XftFontOpenPattern(fontpattern);
 	if (!frc[frclen].font)
 		die("XftFontOpenPattern failed seeking fallback font: %s\n", strerror(errno));
 	frc[frclen].style = style;
 	frc[frclen].unicodep = chr;
 	
-	*glyph = XftCharIndex(W.d, frc[frclen].font, chr);
+	*glyph = XftCharIndex(frc[frclen].font, chr);
 	
 	*xfont = frc[frclen].font;
 	frclen++;
@@ -190,7 +190,7 @@ void cells_to_glyphs(int len, Cell cells[len], Glyph glyphs[len], bool cache) {
 			// do nothing, cached data matches
 		} else {
 			XftFont* font = fonts[style].font;
-			FT_UInt glyph = XftCharIndex(W.d, font, chr);
+			FT_UInt glyph = XftCharIndex(font, chr);
 			if (!glyph)
 				find_fallback_font(chr, style, &font, &glyph);
 			//int width = cells[i].wide ? W.cw*2 : W.cw;
@@ -216,10 +216,10 @@ void fonts_free(void) {
 	for (int i=0; i<4; i++) {
 		if (fonts[i].font) {
 			FcPatternDestroy(fonts[i].pattern);
-			XftFontClose(W.d, fonts[i].font);
+			XftFontClose(fonts[i].font);
 			fonts[i].font = NULL;
 		}
 	}
 	for (int i=0; i<frclen; i++)
-		XftFontClose(W.d, frc[i].font);
+		XftFontClose(frc[i].font);
 }

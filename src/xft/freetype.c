@@ -1,6 +1,6 @@
 #include "xftint.h"
 
-_X_HIDDEN FT_Library  _XftFTlibrary;
+_X_HIDDEN FT_Library _XftFTlibrary;
 
 #define FT_Matrix_Equal(a,b)	((a)->xx == (b)->xx && \
 				 (a)->yy == (b)->yy && \
@@ -10,7 +10,7 @@ _X_HIDDEN FT_Library  _XftFTlibrary;
  * List of all open files (each face in a file is managed separately)
  */
 
-static XftFtFile *_XftFtFiles;
+static XftFtFile* _XftFtFiles;
 static int XftMaxFreeTypeFiles = 5;
 
 static XftFtFile* _XftGetFile(const FcChar8* file, int id) {
@@ -272,8 +272,8 @@ void XftUnlockFace(XftFont* public) {
 	_XftUnlockFile (font->info.file);
 }
 
-static bool XftFontInfoFill(Display* dpy, const FcPattern* pattern, XftFontInfo* fi) {
-	XftDisplayInfo* info = _XftDisplayInfoGet(dpy, True);
+static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
+	XftDisplayInfo* info = _XftDisplayInfoGet(True);
 	if (!info)
 		return FcFalse;
 	
@@ -559,17 +559,17 @@ static bool XftFontInfoFill(Display* dpy, const FcPattern* pattern, XftFontInfo*
 	return FcFalse;
 }
 
-static void XftFontInfoEmpty(Display* dpy, XftFontInfo* fi) {
+static void XftFontInfoEmpty(XftFontInfo* fi) {
 	if (fi->file)
 		_XftReleaseFile(fi->file);
 }
 
-XftFontInfo* XftFontInfoCreate(Display* dpy, const FcPattern* pattern) {
+XftFontInfo* XftFontInfoCreate(const FcPattern* pattern) {
 	XftFontInfo* fi = XftMalloc(XFT_MEM_FONT, sizeof(XftFontInfo));
 	if (!fi)
 		return NULL;
 
-	if (!XftFontInfoFill(dpy, pattern, fi)) {
+	if (!XftFontInfoFill(pattern, fi)) {
 		free(fi);
 		XftMemFree(XFT_MEM_FONT, sizeof(XftFontInfo));
 		fi = NULL;
@@ -577,8 +577,8 @@ XftFontInfo* XftFontInfoCreate(Display* dpy, const FcPattern* pattern) {
 	return fi;
 }
 
-void XftFontInfoDestroy(Display* dpy, XftFontInfo* fi) {
-	XftFontInfoEmpty(dpy, fi);
+void XftFontInfoDestroy(XftFontInfo* fi) {
+	XftFontInfoEmpty(fi);
 	XftMemFree(XFT_MEM_FONT, sizeof(XftFontInfo));
 	free(fi);
 }
@@ -591,8 +591,8 @@ bool XftFontInfoEqual(const XftFontInfo* a, const XftFontInfo* b) {
 	return memcmp(a, b, sizeof(XftFontInfo))==0;
 }
 
-XftFont* XftFontOpenInfo(Display* dpy, FcPattern* pattern, XftFontInfo* fi) {
-	XftDisplayInfo	*info = _XftDisplayInfoGet(dpy, True);
+XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
+	XftDisplayInfo	*info = _XftDisplayInfoGet(true);
 	if (!info)
 		return NULL;
 	
@@ -643,21 +643,21 @@ XftFont* XftFontOpenInfo(Display* dpy, FcPattern* pattern, XftFontInfo* fi) {
 	XRenderPictFormat* format;
 	// Find the appropriate picture format
 	if (color)
-		format = XRenderFindStandardFormat(dpy, PictStandardARGB32);
+		format = XRenderFindStandardFormat(W.d, PictStandardARGB32);
 	else if (antialias) {
 		switch (fi->rgba) {
 		case FC_RGBA_RGB:
 		case FC_RGBA_BGR:
 		case FC_RGBA_VRGB:
 		case FC_RGBA_VBGR:
-			format = XRenderFindStandardFormat(dpy, PictStandardARGB32);
+			format = XRenderFindStandardFormat(W.d, PictStandardARGB32);
 			break;
 		default:
-			format = XRenderFindStandardFormat(dpy, PictStandardA8);
+			format = XRenderFindStandardFormat(W.d, PictStandardA8);
 			break;
 		}
 	} else
-		format = XRenderFindStandardFormat(dpy, PictStandardA1);
+		format = XRenderFindStandardFormat(W.d, PictStandardA1);
 	if (!format)
 		goto bail2;
 	
@@ -792,35 +792,35 @@ XftFont* XftFontOpenInfo(Display* dpy, FcPattern* pattern, XftFontInfo* fi) {
 	return NULL;
 }
 
-XftFont* XftFontOpenPattern(Display* dpy, FcPattern* pattern) {
+XftFont* XftFontOpenPattern(FcPattern* pattern) {
 	XftFontInfo info;
-	if (!XftFontInfoFill(dpy, pattern, &info))
+	if (!XftFontInfoFill(pattern, &info))
 		return NULL;
 	
-	XftFont* font = XftFontOpenInfo(dpy, pattern, &info);
-	XftFontInfoEmpty(dpy, &info);
+	XftFont* font = XftFontOpenInfo(pattern, &info);
+	XftFontInfoEmpty(&info);
 	return font;
 }
 
-XftFont* XftFontCopy(Display* dpy, XftFont* public) {
+XftFont* XftFontCopy(XftFont* public) {
 	XftFontInt* font = (XftFontInt*)public;
 	
 	font->ref++;
 	return public;
 }
 
-static void XftFontDestroy(Display* dpy, XftFont* public) {
-	XftDisplayInfo* info = _XftDisplayInfoGet(dpy, False);
+static void XftFontDestroy(XftFont* public) {
+	XftDisplayInfo* info = _XftDisplayInfoGet(False);
 	XftFontInt* font = (XftFontInt*)public;
 	
 	/* note reduction in memory use */
 	if (info)
 		info->glyph_memory -= font->glyph_memory;
 	/* Clean up the info */
-	XftFontInfoEmpty(dpy, &font->info);
+	XftFontInfoEmpty(&font->info);
 	/* Free the glyphset */
 	if (font->glyphset)
-		XRenderFreeGlyphSet(dpy, font->glyphset);
+		XRenderFreeGlyphSet(W.d, font->glyphset);
 	/* Free the glyphs */
 	for (int i=0; i<font->num_glyphs; i++) {
 		XftGlyph* xftg = font->glyphs[i];
@@ -853,8 +853,8 @@ static XftFont* XftFontFindNthUnref(XftDisplayInfo* info, int n) {
 	return public;
 }
 
-void XftFontManageMemory(Display* dpy) {
-	XftDisplayInfo* info = _XftDisplayInfoGet(dpy, False);
+void XftFontManageMemory(void) {
+	XftDisplayInfo* info = _XftDisplayInfoGet(false);
 	
 	if (!info)
 		return;
@@ -885,13 +885,13 @@ void XftFontManageMemory(Display* dpy) {
 			}
 		}
 		/* Destroy the font */
-		XftFontDestroy(dpy, public);
+		XftFontDestroy(public);
 		--info->num_unref_fonts;
 	}
 }
 
-void XftFontClose(Display* dpy, XftFont* public) {
-	XftDisplayInfo* info = _XftDisplayInfoGet(dpy, False);
+void XftFontClose(XftFont* public) {
+	XftDisplayInfo* info = _XftDisplayInfoGet(False);
 	XftFontInt* font = (XftFontInt*)public;
 	
 	if (--font->ref != 0)
@@ -899,9 +899,9 @@ void XftFontClose(Display* dpy, XftFont* public) {
 	
 	if (info) {
 		++info->num_unref_fonts;
-		XftFontManageMemory(dpy);
+		XftFontManageMemory();
 	} else {
-		XftFontDestroy(dpy, public);
+		XftFontDestroy(public);
 	}
 }
 

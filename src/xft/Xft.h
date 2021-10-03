@@ -57,15 +57,15 @@ typedef struct XftGlyphFont {
 } XftGlyphFont;
 
 /* xftcolor.c */
-Bool XftColorAllocName(Display* dpy, const Visual* visual, Colormap cmap, const char* name, XftColor* result);
-Bool XftColorAllocValue(Display* dpy, Visual* visual, Colormap cmap, const XRenderColor* color, XftColor* result);
+Bool XftColorAllocName(const Visual* visual, Colormap cmap, const char* name, XftColor* result);
+Bool XftColorAllocValue(Visual* visual, Colormap cmap, const XRenderColor* color, XftColor* result);
 
 /* xftdpy.c */
-Bool XftDefaultSet(Display* dpy, FcPattern* defaults);
-void XftDefaultSubstitute(Display* dpy, int screen, FcPattern* pattern);
+Bool XftDefaultSet(FcPattern* defaults);
+void XftDefaultSubstitute(int screen, FcPattern* pattern);
 
 /* xftdraw.c */
-XftDraw* XftDrawCreate(Display* dpy, Drawable drawable, Visual* visual, Colormap colormap);
+XftDraw* XftDrawCreate(Drawable drawable, Visual* visual, Colormap colormap);
 void XftDrawChange(XftDraw* draw, Drawable drawable);
 
 Display* XftDrawDisplay(XftDraw* draw);
@@ -88,16 +88,16 @@ void XftDrawSetSubwindowMode(XftDraw* draw, int mode);
 
 /* xftextent.c */
 
-void XftGlyphExtents(Display* dpy, XftFont* pub, const FT_UInt* glyphs, int nglyphs, XGlyphInfo* extents);
+void XftGlyphExtents(XftFont* pub, const FT_UInt* glyphs, int nglyphs, XGlyphInfo* extents);
 
-void XftTextExtents32(Display* dpy, XftFont* pub, const FcChar32* string, int len, XGlyphInfo* extents);
+void XftTextExtents32(XftFont* pub, const FcChar32* string, int len, XGlyphInfo* extents);
 
 /* xftfont.c */
-FcPattern* XftFontMatch(Display* dpy, int screen, const FcPattern* pattern, FcResult* result);
+FcPattern* XftFontMatch(int screen, const FcPattern* pattern, FcResult* result);
 
-XftFont* XftFontOpen(Display* dpy, int screen, ...) _X_SENTINEL(0);
+XftFont* XftFontOpen(int screen, ...) _X_SENTINEL(0);
 
-XftFont* XftFontOpenName(Display* dpy, int screen, const char* name);
+XftFont* XftFontOpenName(int screen, const char* name);
 
 /* xftfreetype.c */
 
@@ -105,38 +105,38 @@ FT_Face XftLockFace(XftFont* pub);
 
 void XftUnlockFace(XftFont* pub);
 
-XftFontInfo* XftFontInfoCreate(Display* dpy, const FcPattern* pattern);
+XftFontInfo* XftFontInfoCreate(const FcPattern* pattern);
 
-void XftFontInfoDestroy(Display* dpy, XftFontInfo* fi);
+void XftFontInfoDestroy(XftFontInfo* fi);
 
 FcChar32 XftFontInfoHash(const XftFontInfo* fi);
 
 bool XftFontInfoEqual(const XftFontInfo* a, const XftFontInfo* b);
 
-XftFont* XftFontOpenInfo(Display* dpy, FcPattern* pattern, XftFontInfo* fi);
+XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi);
 
-XftFont* XftFontOpenPattern(Display* dpy, FcPattern* pattern);
+XftFont* XftFontOpenPattern(FcPattern* pattern);
 
-XftFont* XftFontCopy(Display* dpy, XftFont* pub);
+XftFont* XftFontCopy(XftFont* pub);
 
-void XftFontClose(Display* dpy, XftFont* pub);
+void XftFontClose(XftFont* pub);
 
 bool XftInitFtLibrary(void);
 
 /* xftglyphs.c */
-void XftFontLoadGlyphs(Display* dpy, XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, int nglyph);
+void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, int nglyph);
 
-void XftFontUnloadGlyphs(Display* dpy, XftFont* pub, const FT_UInt* glyphs, int nglyph);
+void XftFontUnloadGlyphs(XftFont* pub, const FT_UInt* glyphs, int nglyph);
 
 #define XFT_NMISSING 256
 
-bool XftFontCheckGlyph(Display* dpy, XftFont* pub, bool need_bitmaps, FT_UInt glyph, FT_UInt* missing, int* nmissing);
+bool XftFontCheckGlyph(XftFont* pub, bool need_bitmaps, FT_UInt glyph, FT_UInt* missing, int* nmissing);
 
-bool XftCharExists(Display* dpy, XftFont* pub, FcChar32 ucs4);
+bool XftCharExists(XftFont* pub, FcChar32 ucs4);
 
-FT_UInt XftCharIndex(Display* dpy, XftFont* pub, FcChar32 ucs4);
+FT_UInt XftCharIndex(XftFont* pub, FcChar32 ucs4);
 
 /* xftrender.c */
 
 // eee
-void XftGlyphRender1(Display* dpy, int	op, Picture src, XftFont* pub, Picture dst, int srcx, int srcy, int x, int y, const FT_UInt g, int cw);
+void XftGlyphRender1(int op, Picture src, XftFont* pub, Picture dst, int srcx, int srcy, int x, int y, const FT_UInt g, int cw);

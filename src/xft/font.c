@@ -1,6 +1,6 @@
 #include "xftint.h"
 
-_X_EXPORT FcPattern* XftFontMatch(Display* dpy, int screen, const FcPattern* pattern, FcResult* result) {
+_X_EXPORT FcPattern* XftFontMatch(int screen, const FcPattern* pattern, FcResult* result) {
 	
 	FcPattern* new = FcPatternDuplicate (pattern);
 	if (!new)
@@ -15,7 +15,7 @@ _X_EXPORT FcPattern* XftFontMatch(Display* dpy, int screen, const FcPattern* pat
 		printf ("XftFontMatch after FcConfig substitutions ");
 		FcPatternPrint (new);
 	}
-	XftDefaultSubstitute (dpy, screen, new);
+	XftDefaultSubstitute (screen, new);
 	if (XftDebug () & XFT_DBG_OPENV) {
 		printf ("XftFontMatch after X resource substitutions ");
 		FcPatternPrint (new);
@@ -30,7 +30,7 @@ _X_EXPORT FcPattern* XftFontMatch(Display* dpy, int screen, const FcPattern* pat
 	return match;
 }
 
-_X_EXPORT XftFont* XftFontOpen (Display *dpy, int screen, ...) {
+_X_EXPORT XftFont* XftFontOpen(int screen, ...) {
 	va_list va;
 	va_start(va, screen);
 	FcPattern* pat = FcPatternVaBuild(NULL, va);
@@ -41,7 +41,7 @@ _X_EXPORT XftFont* XftFontOpen (Display *dpy, int screen, ...) {
 		return NULL;
 	}
 	FcResult result;
-	FcPattern* match = XftFontMatch (dpy, screen, pat, &result);
+	FcPattern* match = XftFontMatch (screen, pat, &result);
 	if (XftDebug () & XFT_DBG_OPEN) {
 		printf ("Pattern ");
 		FcPatternPrint (pat);
@@ -55,7 +55,7 @@ _X_EXPORT XftFont* XftFontOpen (Display *dpy, int screen, ...) {
 	if (!match)
 		return NULL;
 	
-	XftFont* font = XftFontOpenPattern (dpy, match);
+	XftFont* font = XftFontOpenPattern (match);
 	if (!font) {
 		if (XftDebug () & XFT_DBG_OPEN)
 			printf ("No Font\n");
@@ -65,7 +65,7 @@ _X_EXPORT XftFont* XftFontOpen (Display *dpy, int screen, ...) {
 	return font;
 }
 
-_X_EXPORT XftFont* XftFontOpenName (Display *dpy, int screen, const char *name) {
+_X_EXPORT XftFont* XftFontOpenName (int screen, const char *name) {
 	FcPattern	    *pat;
 	FcPattern	    *match;
 	FcResult	    result;
@@ -82,7 +82,7 @@ _X_EXPORT XftFont* XftFontOpenName (Display *dpy, int screen, const char *name) 
 
 	if (!pat)
 		return NULL;
-	match = XftFontMatch (dpy, screen, pat, &result);
+	match = XftFontMatch (screen, pat, &result);
 	if (XftDebug () & XFT_DBG_OPEN) {
 		if (match) {
 			printf ("Match ");
@@ -94,7 +94,7 @@ _X_EXPORT XftFont* XftFontOpenName (Display *dpy, int screen, const char *name) 
 	if (!match)
 		return NULL;
 
-	font = XftFontOpenPattern (dpy, match);
+	font = XftFontOpenPattern (match);
 	if (!font) {
 		if (XftDebug () & XFT_DBG_OPEN)
 			printf ("No Font\n");

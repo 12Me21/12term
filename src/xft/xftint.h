@@ -15,6 +15,8 @@
 #include <fontconfig/fcprivate.h>
 #include <fontconfig/fcfreetype.h>
 
+#include "../x.h"
+
 /*
  * Glyphs are stored in this structure
  */
@@ -125,7 +127,6 @@ typedef union XftClip {
 } XftClip;
 
 struct XftDraw {
-	Display* dpy;
 	int screen;
 	unsigned int bits_per_pixel;
 	unsigned int depth;
@@ -202,15 +203,15 @@ extern XftDisplayInfo* _XftDisplayInfo;
 int XftDebug(void);
 
 /* xftdpy.c */
-XftDisplayInfo* _XftDisplayInfoGet(Display* dpy, bool createIfNecessary);
-void _XftDisplayManageMemory(Display* dpy);
+XftDisplayInfo* _XftDisplayInfoGet(bool createIfNecessary);
+void _XftDisplayManageMemory(void);
 
 /* xftfreetype.c */
-void XftFontManageMemory(Display* dpy);
+void XftFontManageMemory(void);
 
 /* xftglyph.c */
-void _XftFontUncacheGlyph(Display* dpy, XftFont* public);
-void _XftFontManageMemory(Display* dpy, XftFont* public);
+void _XftFontUncacheGlyph(XftFont* public);
+void _XftFontManageMemory(XftFont* public);
 
 /* xftinit.c */
 void XftMemReport(void);

@@ -16,7 +16,7 @@
 //  this gives me a bunch of glyphs (i.e. font+glyph id) which are known to be loaded
 // these can then be rendered without checking
 
-_X_EXPORT void XftGlyphExtents(Display* dpy, XftFont* pub, const FT_UInt* glyphs, int nglyphs, XGlyphInfo* extents) {
+void XftGlyphExtents(XftFont* pub, const FT_UInt* glyphs, int nglyphs, XGlyphInfo* extents) {
 	XftFontInt* font = (XftFontInt*)pub;
 	FT_UInt missing[XFT_NMISSING];
 	
@@ -25,10 +25,10 @@ _X_EXPORT void XftGlyphExtents(Display* dpy, XftFont* pub, const FT_UInt* glyphs
 	int nmissing = 0;
 	bool glyphs_loaded = false;
 	while (n--)
-		if (XftFontCheckGlyph(dpy, pub, false, *g++, missing, &nmissing))
+		if (XftFontCheckGlyph(pub, false, *g++, missing, &nmissing))
 			glyphs_loaded = true;
 	if (nmissing)
-		XftFontLoadGlyphs(dpy, pub, false, missing, nmissing);
+		XftFontLoadGlyphs(pub, false, missing, nmissing);
 	g = glyphs;
 	n = nglyphs;
 	XftGlyph* xftg = NULL;
@@ -80,12 +80,12 @@ _X_EXPORT void XftGlyphExtents(Display* dpy, XftFont* pub, const FT_UInt* glyphs
 		extents->yOff = y;
 	}
 	if (glyphs_loaded)
-		_XftFontManageMemory(dpy, pub);
+		_XftFontManageMemory(pub);
 }
 
-_X_EXPORT void XftTextExtents32(Display* dpy, XftFont* pub, const FcChar32* string, int len, XGlyphInfo* extents) {
+void XftTextExtents32(XftFont* pub, const FcChar32* string, int len, XGlyphInfo* extents) {
 	FT_UInt glyphs[len];
 	for (int i=0; i<len; i++)
-		glyphs[i] = XftCharIndex(dpy, pub, string[i]);
-	XftGlyphExtents(dpy, pub, glyphs, len, extents);
+		glyphs[i] = XftCharIndex(pub, string[i]);
+	XftGlyphExtents(pub, glyphs, len, extents);
 }

@@ -1,15 +1,14 @@
 #include "xftint.h"
 
 _X_EXPORT Bool
-XftColorAllocName (Display  *dpy,
-                   _Xconst Visual   *visual,
+XftColorAllocName (_Xconst Visual   *visual,
                    Colormap cmap,
                    _Xconst char	    *name,
                    XftColor *result)
 {
 	XColor  screen, exact;
 
-	if (!XAllocNamedColor (dpy, cmap, name, &screen, &exact)) {
+	if (!XAllocNamedColor (W.d, cmap, name, &screen, &exact)) {
 		/* XXX stick standard colormap stuff here */
 		return False;
 	}
@@ -41,8 +40,7 @@ static short masklen (unsigned long m) {
 }
 
 _X_EXPORT Bool
-XftColorAllocValue (Display	    *dpy,
-                    Visual	    *visual,
+XftColorAllocValue (Visual	    *visual,
                     Colormap	    cmap,
                     _Xconst XRenderColor    *color,
                     XftColor	    *result) {

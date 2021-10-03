@@ -61,7 +61,7 @@ static XftColor make_color(Color c) {
 
 unsigned long alloc_color(Color c) {
 	XftColor x = make_color(c);
-	XftColorAllocValue(W.d, W.vis, W.cmap, &x.color, &x);
+	XftColorAllocValue(W.vis, W.cmap, &x.color, &x);
 	return x.pixel;
 }
 
@@ -87,7 +87,7 @@ void draw_resize(int width, int height, bool charsize) {
 			rows[y].cells[x] = (Cell){0}; //ehnnnn
 		}
 		rows[y].pix = XCreatePixmap(W.d, W.win, W.w, W.ch, DefaultDepth(W.d, W.scr));
-		rows[y].draw = XftDrawCreate(W.d, rows[y].pix, W.vis, W.cmap);
+		rows[y].draw = XftDrawCreate(rows[y].pix, W.vis, W.cmap);
 		rows[y].redraw = true;
 	}
 	
@@ -103,7 +103,7 @@ void draw_resize(int width, int height, bool charsize) {
 		if (cursor_draw)
 			XftDrawChange(cursor_draw, cursor_pix);
 		else
-			cursor_draw = XftDrawCreate(W.d, cursor_pix, W.vis, W.cmap);
+			cursor_draw = XftDrawCreate(cursor_pix, W.vis, W.cmap);
 	}
 }
 
@@ -116,7 +116,7 @@ static void draw_glyph(XftDraw* draw, Px x, Px y, Glyph g, XftColor col, int w) 
 	if (!g.font)
 		return;
 	Picture src = XftDrawSrcPicture(draw, &col);
-	XftGlyphRender1(XftDrawDisplay(draw), PictOpOver, src, g.font, XftDrawPicture(draw), 0, 0, x+g.x, y+g.y, g.glyph, W.cw*w);
+	XftGlyphRender1(PictOpOver, src, g.font, XftDrawPicture(draw), 0, 0, x+g.x, y+g.y, g.glyph, W.cw*w);
 	//XftGlyphFontSpecRender(XftDrawDisplay(draw), PictOpOver, src, XftDrawPicture(draw), 0, 0, spec, 1);
 }
 
