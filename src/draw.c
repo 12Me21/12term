@@ -61,7 +61,7 @@ static XftColor make_color(Color c) {
 
 unsigned long alloc_color(Color c) {
 	XftColor x = make_color(c);
-	XftColorAllocValue(W.vis, W.cmap, &x.color, &x);
+	XftColorAllocValue(&x.color, &x);
 	return x.pixel;
 }
 
@@ -87,7 +87,7 @@ void draw_resize(int width, int height, bool charsize) {
 			rows[y].cells[x] = (Cell){0}; //ehnnnn
 		}
 		rows[y].pix = XCreatePixmap(W.d, W.win, W.w, W.ch, DefaultDepth(W.d, W.scr));
-		rows[y].draw = XftDrawCreate(rows[y].pix, W.vis, W.cmap);
+		rows[y].draw = XftDrawCreate(rows[y].pix);
 		rows[y].redraw = true;
 	}
 	
@@ -103,7 +103,7 @@ void draw_resize(int width, int height, bool charsize) {
 		if (cursor_draw)
 			XftDrawChange(cursor_draw, cursor_pix);
 		else
-			cursor_draw = XftDrawCreate(cursor_pix, W.vis, W.cmap);
+			cursor_draw = XftDrawCreate(cursor_pix);
 	}
 }
 

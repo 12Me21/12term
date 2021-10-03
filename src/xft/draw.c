@@ -29,7 +29,7 @@ unsigned int XftDrawBitsPerPixel(XftDraw *draw) {
 	return draw->bits_per_pixel;
 }
 
-XftDraw* XftDrawCreate(Drawable drawable, Visual* visual, Colormap colormap) {
+XftDraw* XftDrawCreate(Drawable drawable) {
 	XftDraw* draw = malloc(sizeof(XftDraw));
 	
 	if (!draw)
@@ -39,8 +39,6 @@ XftDraw* XftDrawCreate(Drawable drawable, Visual* visual, Colormap colormap) {
 		.drawable = drawable,
 		.depth = 0,
 		.bits_per_pixel = 0,
-		.visual = visual,
-		.colormap = colormap,
 		.pict = 0,
 		.clip_type = XftClipTypeNone,
 		.subwindow_mode = ClipByChildren,
@@ -55,22 +53,7 @@ static XRenderPictFormat* _XftDrawFormat(XftDraw* draw) {
 	if (!info)
 		return NULL;
 	
-	if (draw->visual == NULL) {
-		unsigned int depth = XftDrawDepth(draw);
-		return XRenderFindFormat(
-			W.d,
-			PictFormatType | PictFormatDepth | PictFormatAlpha | PictFormatAlphaMask,
-			&(XRenderPictFormat){
-				.type = PictTypeDirect,
-				.depth = depth,
-				.direct = {
-					.alpha = 0,
-					.alphaMask = (1<<depth)-1,
-				},
-			},
-			0);
-	} else
-		return XRenderFindVisualFormat(W.d, draw->visual);
+	return XRenderFindVisualFormat(W.d, W.vis);
 }
 
 void XftDrawChange(XftDraw* draw, Drawable drawable) {
@@ -81,20 +64,8 @@ void XftDrawChange(XftDraw* draw, Drawable drawable) {
 	}
 }
 
-Display* XftDrawDisplay(XftDraw* draw) {
-	return W.d;
-}
-
 Drawable XftDrawDrawable(XftDraw* draw) {
 	return draw->drawable;
-}
-
-Colormap XftDrawColormap(XftDraw* draw) {
-	return draw->colormap;
-}
-
-Visual* XftDrawVisual(XftDraw* draw) {
-	return draw->visual;
 }
 
 void XftDrawDestroy(XftDraw* draw) {
@@ -124,7 +95,7 @@ Picture XftDrawSrcPicture(XftDraw* draw, const XftColor* color) {
 	XftColor bitmapColor;
 	// Monochrome targets require special handling; the PictOp controls
 	// the color, and the color must be opaque
-	if (!draw->visual && draw->depth==1) {
+	if (!W.vis && draw->depth==1) {
 		bitmapColor.color.alpha = 0xffff;
 		bitmapColor.color.red   = 0xffff;
 		bitmapColor.color.green = 0xffff;

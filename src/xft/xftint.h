@@ -130,8 +130,6 @@ struct XftDraw {
 	unsigned int bits_per_pixel;
 	unsigned int depth;
 	Drawable drawable;
-	Visual* visual;	/* NULL for bitmaps */
-	Colormap colormap;
 	XftClipType clip_type;
 	XftClip clip;
 	int subwindow_mode;

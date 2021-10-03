@@ -57,21 +57,18 @@ typedef struct XftGlyphFont {
 } XftGlyphFont;
 
 /* xftcolor.c */
-Bool XftColorAllocName(const Visual* visual, Colormap cmap, const char* name, XftColor* result);
-Bool XftColorAllocValue(Visual* visual, Colormap cmap, const XRenderColor* color, XftColor* result);
+Bool XftColorAllocName(const char* name, XftColor* result);
+Bool XftColorAllocValue(const XRenderColor* color, XftColor* result);
 
 /* xftdpy.c */
 Bool XftDefaultSet(FcPattern* defaults);
 void XftDefaultSubstitute(FcPattern* pattern);
 
 /* xftdraw.c */
-XftDraw* XftDrawCreate(Drawable drawable, Visual* visual, Colormap colormap);
+XftDraw* XftDrawCreate(Drawable drawable);
 void XftDrawChange(XftDraw* draw, Drawable drawable);
 
-Display* XftDrawDisplay(XftDraw* draw);
 Drawable XftDrawDrawable(XftDraw* draw);
-Colormap XftDrawColormap(XftDraw* draw);
-Visual* XftDrawVisual(XftDraw* draw);
 
 void XftDrawDestroy(XftDraw* draw);
 

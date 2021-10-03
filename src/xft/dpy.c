@@ -119,10 +119,9 @@ XftDisplayInfo* _XftDisplayInfoGet(bool createIfNecessary) {
 			.direct.alphaMask = 0xFF,
 		}, 0);
 	if (XftDebug() & XFT_DBG_RENDER) {
-		Visual* visual = W.vis;
-		XRenderPictFormat* format = XRenderFindVisualFormat(W.d, visual);
+		XRenderPictFormat* format = XRenderFindVisualFormat(W.d, W.vis);
 		
-		printf ("XftDisplayInfoGet Default visual 0x%x ", (int)visual->visualid);
+		printf ("XftDisplayInfoGet Default visual 0x%x ", (int)W.vis->visualid);
 		if (format) {
 			if (format->type == PictTypeDirect) {
 				printf("format %d,%d,%d,%d\n",

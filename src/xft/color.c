@@ -1,14 +1,13 @@
 #include "xftint.h"
 
 _X_EXPORT Bool
-XftColorAllocName (_Xconst Visual   *visual,
-                   Colormap cmap,
+XftColorAllocName (
                    _Xconst char	    *name,
                    XftColor *result)
 {
 	XColor screen, exact;
 
-	if (!XAllocNamedColor(W.d, cmap, name, &screen, &exact)) {
+	if (!XAllocNamedColor(W.d, W.cmap, name, &screen, &exact)) {
 		/* XXX stick standard colormap stuff here */
 		return False;
 	}
@@ -40,16 +39,15 @@ static short masklen (unsigned long m) {
 }
 
 _X_EXPORT Bool
-XftColorAllocValue (Visual	    *visual,
-                    Colormap	    cmap,
+XftColorAllocValue (
                     _Xconst XRenderColor    *color,
                     XftColor	    *result) {
-	int red_shift = maskbase(visual->red_mask);
-	int red_len = masklen(visual->red_mask);
-	int green_shift = maskbase(visual->green_mask);
-	int green_len = masklen(visual->green_mask);
-	int blue_shift = maskbase(visual->blue_mask);
-	int blue_len = masklen(visual->blue_mask);
+	int red_shift = maskbase(W.vis->red_mask);
+	int red_len = masklen(W.vis->red_mask);
+	int green_shift = maskbase(W.vis->green_mask);
+	int green_len = masklen(W.vis->green_mask);
+	int blue_shift = maskbase(W.vis->blue_mask);
+	int blue_len = masklen(W.vis->blue_mask);
 	result->pixel = (((color->red >> (16 - red_len)) << red_shift) |
 	                 ((color->green >> (16 - green_len)) << green_shift) |
 	                 ((color->blue >> (16 - blue_len)) << blue_shift));
