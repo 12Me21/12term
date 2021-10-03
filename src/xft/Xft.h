@@ -62,7 +62,7 @@ Bool XftColorAllocValue(Visual* visual, Colormap cmap, const XRenderColor* color
 
 /* xftdpy.c */
 Bool XftDefaultSet(FcPattern* defaults);
-void XftDefaultSubstitute(int screen, FcPattern* pattern);
+void XftDefaultSubstitute(FcPattern* pattern);
 
 /* xftdraw.c */
 XftDraw* XftDrawCreate(Drawable drawable, Visual* visual, Colormap colormap);
@@ -93,11 +93,9 @@ void XftGlyphExtents(XftFont* pub, const FT_UInt* glyphs, int nglyphs, XGlyphInf
 void XftTextExtents32(XftFont* pub, const FcChar32* string, int len, XGlyphInfo* extents);
 
 /* xftfont.c */
-FcPattern* XftFontMatch(int screen, const FcPattern* pattern, FcResult* result);
+FcPattern* XftFontMatch(const FcPattern* pattern, FcResult* result);
 
-XftFont* XftFontOpen(int screen, ...) _X_SENTINEL(0);
-
-XftFont* XftFontOpenName(int screen, const char* name);
+XftFont* XftFontOpenName(const char* name);
 
 /* xftfreetype.c */
 

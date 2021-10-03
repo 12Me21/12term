@@ -6,9 +6,9 @@ XftColorAllocName (_Xconst Visual   *visual,
                    _Xconst char	    *name,
                    XftColor *result)
 {
-	XColor  screen, exact;
+	XColor screen, exact;
 
-	if (!XAllocNamedColor (W.d, cmap, name, &screen, &exact)) {
+	if (!XAllocNamedColor(W.d, cmap, name, &screen, &exact)) {
 		/* XXX stick standard colormap stuff here */
 		return False;
 	}

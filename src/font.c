@@ -37,7 +37,7 @@ static bool load_font(Font* f, FcPattern* pattern, bool bold, bool italic) {
 		FcPatternAddInteger(configured, FC_WEIGHT, FC_WEIGHT_BOLD);
 	
 	FcConfigSubstitute(NULL, configured, FcMatchPattern);
-	XftDefaultSubstitute(W.scr, configured);
+	XftDefaultSubstitute(configured);
 	
 	FcResult result;
 	FcPattern* match = FcFontMatch(NULL, configured, &result);

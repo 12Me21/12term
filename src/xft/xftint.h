@@ -127,7 +127,6 @@ typedef union XftClip {
 } XftClip;
 
 struct XftDraw {
-	int screen;
 	unsigned int bits_per_pixel;
 	unsigned int depth;
 	Drawable drawable;
@@ -141,7 +140,7 @@ struct XftDraw {
 
 typedef struct XftSolidColor {
 	XRenderColor color;
-	int screen;
+	int screen; //we keep this because i think it uses -1 for invalid
 	Picture pict;
 } XftSolidColor;
 

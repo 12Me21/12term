@@ -28,7 +28,7 @@ static int _XftCloseDisplay(Display* dpy, XExtCodes* codes) {
 
 static FcPattern* _XftDefaultInit();
 
-static FcResult _XftDefaultGet(const char* object, int screen, FcValue* v) {
+static FcResult _XftDefaultGet(const char* object, FcValue* v) {
 	XftDisplayInfo* info = _XftDisplayInfoGet(true);
 	if (!info)
 		return FcResultNoMatch;
@@ -38,31 +38,31 @@ static FcResult _XftDefaultGet(const char* object, int screen, FcValue* v) {
 		if (!info->defaults)
 			return FcResultNoMatch;
 	}
-	FcResult	r = FcPatternGet(info->defaults, object, screen, v);
-	if (r == FcResultNoId && screen > 0)
+	FcResult	r = FcPatternGet(info->defaults, object, W.scr, v);
+	if (r == FcResultNoId && W.scr > 0)
 		r = FcPatternGet (info->defaults, object, 0, v);
 	return r;
 }
 
-static bool XftDefaultGetBool(const char* object, int screen, bool def) {
+static bool XftDefaultGetBool(const char* object, bool def) {
 	FcValue v;
-	FcResult r = _XftDefaultGet(object, screen, &v);
+	FcResult r = _XftDefaultGet(object, &v);
 	if (r != FcResultMatch || v.type != FcTypeBool)
 		return def;
 	return v.u.b;
 }
 
-static int XftDefaultGetInteger(const char* object, int screen, int def) {
+static int XftDefaultGetInteger(const char* object, int def) {
 	FcValue v;
-	FcResult r = _XftDefaultGet(object, screen, &v);
+	FcResult r = _XftDefaultGet(object, &v);
 	if (r != FcResultMatch || v.type != FcTypeInteger)
 		return def;
 	return v.u.i;
 }
 
-static double XftDefaultGetDouble(const char* object, int screen, double def) {
+static double XftDefaultGetDouble(const char* object, double def) {
 	FcValue v;
-	FcResult r = _XftDefaultGet(object, screen, &v);
+	FcResult r = _XftDefaultGet(object, &v);
 	if (r != FcResultMatch || v.type != FcTypeDouble)
 		return def;
 	return v.u.d;
@@ -147,12 +147,12 @@ XftDisplayInfo* _XftDisplayInfoGet(bool createIfNecessary) {
 	_XftDisplayInfo = info;
 	
 	info->glyph_memory = 0;
-	info->max_glyph_memory = XftDefaultGetInteger(XFT_MAX_GLYPH_MEMORY, 0, XFT_DPY_MAX_GLYPH_MEMORY);
+	info->max_glyph_memory = XftDefaultGetInteger(XFT_MAX_GLYPH_MEMORY, XFT_DPY_MAX_GLYPH_MEMORY);
 	if (XftDebug() & XFT_DBG_CACHE)
 		printf ("global max cache memory %ld\n", info->max_glyph_memory);
 	
 	info->num_unref_fonts = 0;
-	info->max_unref_fonts = XftDefaultGetInteger(XFT_MAX_UNREF_FONTS, 0, XFT_DPY_MAX_UNREF_FONTS);
+	info->max_unref_fonts = XftDefaultGetInteger(XFT_MAX_UNREF_FONTS, XFT_DPY_MAX_UNREF_FONTS);
 	if (XftDebug() & XFT_DBG_CACHE)
 		printf ("global max unref fonts %d\n", info->max_unref_fonts);
 	
@@ -221,10 +221,10 @@ _X_EXPORT Bool XftDefaultSet(FcPattern* defaults) {
 	info->defaults = defaults;
 	if (!info->max_glyph_memory)
 		info->max_glyph_memory = XFT_DPY_MAX_GLYPH_MEMORY;
-	info->max_glyph_memory = XftDefaultGetInteger(XFT_MAX_GLYPH_MEMORY, 0, info->max_glyph_memory);
+	info->max_glyph_memory = XftDefaultGetInteger(XFT_MAX_GLYPH_MEMORY, info->max_glyph_memory);
 	if (!info->max_unref_fonts)
 		info->max_unref_fonts = XFT_DPY_MAX_UNREF_FONTS;
-	info->max_unref_fonts = XftDefaultGetInteger(XFT_MAX_UNREF_FONTS, 0, info->max_unref_fonts);
+	info->max_unref_fonts = XftDefaultGetInteger(XFT_MAX_UNREF_FONTS, info->max_unref_fonts);
 	return true;
 }
 
@@ -317,22 +317,22 @@ static FcPattern* _XftDefaultInit(void) {
 	return NULL;
 }
 
-void XftDefaultSubstitute(int screen, FcPattern* pattern) {
+void XftDefaultSubstitute(FcPattern* pattern) {
 	FcValue v;
 	if (FcPatternGet(pattern, FC_ANTIALIAS, 0, &v) == FcResultNoMatch)
-		FcPatternAddBool(pattern, FC_ANTIALIAS, XftDefaultGetBool(FC_ANTIALIAS, screen, true));
+		FcPatternAddBool(pattern, FC_ANTIALIAS, XftDefaultGetBool(FC_ANTIALIAS, true));
 	if (FcPatternGet(pattern, FC_EMBOLDEN, 0, &v) == FcResultNoMatch)
-		FcPatternAddBool(pattern, FC_EMBOLDEN, XftDefaultGetBool(FC_EMBOLDEN, screen, false));
+		FcPatternAddBool(pattern, FC_EMBOLDEN, XftDefaultGetBool(FC_EMBOLDEN, false));
 	if (FcPatternGet(pattern, FC_HINTING, 0, &v) == FcResultNoMatch)
-		FcPatternAddBool(pattern, FC_HINTING, XftDefaultGetBool(FC_HINTING, screen, true));
+		FcPatternAddBool(pattern, FC_HINTING, XftDefaultGetBool(FC_HINTING, true));
 	if (FcPatternGet(pattern, FC_HINT_STYLE, 0, &v) == FcResultNoMatch)
-		FcPatternAddInteger(pattern, FC_HINT_STYLE, XftDefaultGetInteger(FC_HINT_STYLE, screen, FC_HINT_FULL));
+		FcPatternAddInteger(pattern, FC_HINT_STYLE, XftDefaultGetInteger(FC_HINT_STYLE, FC_HINT_FULL));
 	if (FcPatternGet(pattern, FC_AUTOHINT, 0, &v) == FcResultNoMatch)
-		FcPatternAddBool(pattern, FC_AUTOHINT, XftDefaultGetBool(FC_AUTOHINT, screen, false));
+		FcPatternAddBool(pattern, FC_AUTOHINT, XftDefaultGetBool(FC_AUTOHINT, false));
 	// subpixel order
 	if (FcPatternGet(pattern, FC_RGBA, 0, &v) == FcResultNoMatch) {
 		int subpixel = FC_RGBA_UNKNOWN;
-		int render_order = XRenderQuerySubpixelOrder(W.d, screen);
+		int render_order = XRenderQuerySubpixelOrder(W.d, W.scr);
 		switch (render_order) {
 		default:
 		case SubPixelUnknown: subpixel = FC_RGBA_UNKNOWN; break;
@@ -342,22 +342,22 @@ void XftDefaultSubstitute(int screen, FcPattern* pattern) {
 		case SubPixelVerticalBGR: subpixel = FC_RGBA_VBGR; break;
 		case SubPixelNone: subpixel = FC_RGBA_NONE; break;
 		}
-		FcPatternAddInteger(pattern, FC_RGBA, XftDefaultGetInteger(FC_RGBA, screen, subpixel));
+		FcPatternAddInteger(pattern, FC_RGBA, XftDefaultGetInteger(FC_RGBA, subpixel));
 	}
 	if (FcPatternGet(pattern, FC_LCD_FILTER, 0, &v) == FcResultNoMatch)
-		FcPatternAddInteger(pattern, FC_LCD_FILTER, XftDefaultGetInteger(FC_LCD_FILTER, screen, FC_LCD_DEFAULT));
+		FcPatternAddInteger(pattern, FC_LCD_FILTER, XftDefaultGetInteger(FC_LCD_FILTER, FC_LCD_DEFAULT));
 	if (FcPatternGet(pattern, FC_MINSPACE, 0, &v) == FcResultNoMatch)
-		FcPatternAddBool(pattern, FC_MINSPACE, XftDefaultGetBool(FC_MINSPACE, screen, false));
+		FcPatternAddBool(pattern, FC_MINSPACE, XftDefaultGetBool(FC_MINSPACE, false));
 	
 	if (FcPatternGet(pattern, FC_DPI, 0, &v) == FcResultNoMatch) {
-		double dpi = (double)DisplayHeight(W.d, screen)*25.4 / DisplayHeightMM(W.d, screen);
-		FcPatternAddDouble(pattern, FC_DPI, XftDefaultGetDouble(FC_DPI, screen, dpi));
+		double dpi = (double)DisplayHeight(W.d, W.scr)*25.4 / DisplayHeightMM(W.d, W.scr);
+		FcPatternAddDouble(pattern, FC_DPI, XftDefaultGetDouble(FC_DPI, dpi));
 	}
 	if (FcPatternGet(pattern, FC_SCALE, 0, &v) == FcResultNoMatch)
-		FcPatternAddDouble(pattern, FC_SCALE, XftDefaultGetDouble(FC_SCALE, screen, 1.0));
+		FcPatternAddDouble(pattern, FC_SCALE, XftDefaultGetDouble(FC_SCALE, 1.0));
 	
 	if (FcPatternGet(pattern, XFT_MAX_GLYPH_MEMORY, 0, &v) == FcResultNoMatch)
-		FcPatternAddInteger(pattern, XFT_MAX_GLYPH_MEMORY, XftDefaultGetInteger(XFT_MAX_GLYPH_MEMORY, screen, XFT_FONT_MAX_GLYPH_MEMORY));
+		FcPatternAddInteger(pattern, XFT_MAX_GLYPH_MEMORY, XftDefaultGetInteger(XFT_MAX_GLYPH_MEMORY, XFT_FONT_MAX_GLYPH_MEMORY));
 	FcDefaultSubstitute(pattern);
 }
 

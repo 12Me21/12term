@@ -1,6 +1,6 @@
 #include "xftint.h"
 
-_X_EXPORT FcPattern* XftFontMatch(int screen, const FcPattern* pattern, FcResult* result) {
+FcPattern* XftFontMatch(const FcPattern* pattern, FcResult* result) {
 	
 	FcPattern* new = FcPatternDuplicate (pattern);
 	if (!new)
@@ -15,7 +15,7 @@ _X_EXPORT FcPattern* XftFontMatch(int screen, const FcPattern* pattern, FcResult
 		printf ("XftFontMatch after FcConfig substitutions ");
 		FcPatternPrint (new);
 	}
-	XftDefaultSubstitute (screen, new);
+	XftDefaultSubstitute (new);
 	if (XftDebug () & XFT_DBG_OPENV) {
 		printf ("XftFontMatch after X resource substitutions ");
 		FcPatternPrint (new);
@@ -30,42 +30,7 @@ _X_EXPORT FcPattern* XftFontMatch(int screen, const FcPattern* pattern, FcResult
 	return match;
 }
 
-_X_EXPORT XftFont* XftFontOpen(int screen, ...) {
-	va_list va;
-	va_start(va, screen);
-	FcPattern* pat = FcPatternVaBuild(NULL, va);
-	va_end(va);
-	if (!pat) {
-		if (XftDebug () & XFT_DBG_OPEN)
-			printf ("XftFontOpen: Invalid pattern argument\n");
-		return NULL;
-	}
-	FcResult result;
-	FcPattern* match = XftFontMatch (screen, pat, &result);
-	if (XftDebug () & XFT_DBG_OPEN) {
-		printf ("Pattern ");
-		FcPatternPrint (pat);
-		if (match) {
-			printf ("Match ");
-			FcPatternPrint (match);
-		} else
-			printf ("No Match\n");
-	}
-	FcPatternDestroy (pat);
-	if (!match)
-		return NULL;
-	
-	XftFont* font = XftFontOpenPattern (match);
-	if (!font) {
-		if (XftDebug () & XFT_DBG_OPEN)
-			printf ("No Font\n");
-		FcPatternDestroy (match);
-	}
-	
-	return font;
-}
-
-_X_EXPORT XftFont* XftFontOpenName (int screen, const char *name) {
+_X_EXPORT XftFont* XftFontOpenName(const char *name) {
 	FcPattern	    *pat;
 	FcPattern	    *match;
 	FcResult	    result;
@@ -82,7 +47,7 @@ _X_EXPORT XftFont* XftFontOpenName (int screen, const char *name) {
 
 	if (!pat)
 		return NULL;
-	match = XftFontMatch (screen, pat, &result);
+	match = XftFontMatch(pat, &result);
 	if (XftDebug () & XFT_DBG_OPEN) {
 		if (match) {
 			printf ("Match ");

@@ -1,50 +1,5 @@
 #include "xftint.h"
 
-/*
- * Ok, this is a pain.  To share source pictures across multiple destinations,
- * the screen for each drawable must be discovered.
- */
-static int _XftDrawScreen(Drawable drawable, Visual* visual) {
-	/* Special case the most common environment */
-	if (ScreenCount(W.d)==1)
-		return 0;
-	// If we've got a visual, look for the screen that points at it.
-	// This requires no round trip.
-	if (visual) {
-		for (int s=0; s < ScreenCount(W.d); s++) {
-			XVisualInfo	template, *ret;
-			int nret;
-			
-			template.visualid = visual->visualid;
-			template.screen = s;
-			ret = XGetVisualInfo(W.d, VisualIDMask|VisualScreenMask, &template, &nret);
-			if (ret) {
-				XFree(ret);
-				return s;
-			}
-		}
-	}
-	/*
-	 * Otherwise, ask the server for the drawable geometry and find
-	 * the screen from the root window.
-	 * This takes a round trip.
-	 */
-	Window root;
-	int x, y; // ignore all these
-	unsigned int width, height, borderWidth, depth;
-	if (XGetGeometry(W.d, drawable, &root, &x, &y, &width, &height, &borderWidth, &depth)) {
-		for (int s=0; s<ScreenCount(W.d); s++) {
-			if (RootWindow(W.d, s) == root)
-				return s;
-		}
-	}
-	/*
-	 * Make a guess -- it's probably wrong, but then the app probably
-	 * handed us a bogus drawable in this case
-	 */
-	return 0;
-}
-
 unsigned int XftDrawDepth(XftDraw* draw) {
 	if (!draw->depth) {
 		Window root;
@@ -82,7 +37,6 @@ XftDraw* XftDrawCreate(Drawable drawable, Visual* visual, Colormap colormap) {
 	
 	*draw = (XftDraw){
 		.drawable = drawable,
-		.screen = _XftDrawScreen(drawable, visual),
 		.depth = 0,
 		.bits_per_pixel = 0,
 		.visual = visual,
@@ -181,7 +135,7 @@ Picture XftDrawSrcPicture(XftDraw* draw, const XftColor* color) {
 	// See if there's one already available
 	for (int i=0; i<XFT_NUM_SOLID_COLOR; i++) {
 		if (info->colors[i].pict &&
-		    info->colors[i].screen == draw->screen &&
+		    info->colors[i].screen == W.scr &&
 		    !memcmp(&color->color, &info->colors[i].color, sizeof(XRenderColor)))
 			return info->colors[i].pict;
 	}
@@ -195,14 +149,14 @@ Picture XftDrawSrcPicture(XftDraw* draw, const XftColor* color) {
 		// Create picture
 		info->colors[i].pict = XRenderCreateSolidFill(W.d, &color->color);
 	} else {
-		if (info->colors[i].screen!=draw->screen && info->colors[i].pict) {
+		if (info->colors[i].screen!=W.scr && info->colors[i].pict) {
 			XRenderFreePicture(W.d, info->colors[i].pict);
 			info->colors[i].pict = 0;
 		}
 		// Create picture if necessary
 		if (!info->colors[i].pict) {
 			Pixmap pix = XCreatePixmap(
-				W.d, RootWindow(W.d, draw->screen),
+				W.d, RootWindow(W.d, W.scr),
 				1, 1, info->solidFormat->depth);
 			info->colors[i].pict = XRenderCreatePicture(
 				W.d, pix,
@@ -212,11 +166,11 @@ Picture XftDrawSrcPicture(XftDraw* draw, const XftColor* color) {
 		}
 		// Set to the new color
 		info->colors[i].color = color->color;
-		info->colors[i].screen = draw->screen;
+		info->colors[i].screen = W.scr;
 		XRenderFillRectangle(W.d, PictOpSrc, info->colors[i].pict, &color->color, 0, 0, 1, 1);
 	}
 	info->colors[i].color = color->color;
-	info->colors[i].screen = draw->screen;
+	info->colors[i].screen = W.scr;
 
 	return info->colors[i].pict;
 }
