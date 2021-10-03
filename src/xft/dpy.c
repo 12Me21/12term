@@ -26,8 +26,49 @@ static int _XftCloseDisplay(Display* dpy, XExtCodes* codes) {
 	return 0;
 }
 
+static FcPattern* _XftDefaultInit(Display* dpy);
 
-_X_HIDDEN XftDisplayInfo* _XftDisplayInfoGet(Display* dpy, bool createIfNecessary) {
+static FcResult _XftDefaultGet(Display* dpy, const char* object, int screen, FcValue* v) {
+	XftDisplayInfo* info = _XftDisplayInfoGet(dpy, true);
+	if (!info)
+		return FcResultNoMatch;
+	
+	if (!info->defaults) {
+		info->defaults = _XftDefaultInit(dpy);
+		if (!info->defaults)
+			return FcResultNoMatch;
+	}
+	FcResult	r = FcPatternGet(info->defaults, object, screen, v);
+	if (r == FcResultNoId && screen > 0)
+		r = FcPatternGet (info->defaults, object, 0, v);
+	return r;
+}
+
+static bool XftDefaultGetBool(Display* dpy, const char* object, int screen, bool def) {
+	FcValue v;
+	FcResult r = _XftDefaultGet(dpy, object, screen, &v);
+	if (r != FcResultMatch || v.type != FcTypeBool)
+		return def;
+	return v.u.b;
+}
+
+static int XftDefaultGetInteger(Display* dpy, const char* object, int screen, int def) {
+	FcValue v;
+	FcResult r = _XftDefaultGet (dpy, object, screen, &v);
+	if (r != FcResultMatch || v.type != FcTypeInteger)
+		return def;
+	return v.u.i;
+}
+
+static double XftDefaultGetDouble(Display* dpy, const char* object, int screen, double def) {
+	FcValue v;
+	FcResult r = _XftDefaultGet(dpy, object, screen, &v);
+	if (r != FcResultMatch || v.type != FcTypeDouble)
+		return def;
+	return v.u.d;
+}
+
+XftDisplayInfo* _XftDisplayInfoGet(Display* dpy, bool createIfNecessary) {
 	XftDisplayInfo* info;
 	XftDisplayInfo** prev;
 	for (prev = &_XftDisplayInfo; (info = *prev); prev = &(*prev)->next) {
@@ -227,8 +268,7 @@ static Bool _XftDefaultInitDouble(Display* dpy, FcPattern* pat, const char* opti
 	return true;
 }
 
-static Bool
-_XftDefaultInitInteger(Display *dpy, FcPattern *pat, const char *option) {
+static Bool _XftDefaultInitInteger(Display *dpy, FcPattern *pat, const char *option) {
 	char* v = XGetDefault(dpy, "Xft", option);
 	if (v) {
 		int i;
@@ -250,8 +290,6 @@ static FcPattern* _XftDefaultInit(Display* dpy) {
 	if (!_XftDefaultInitDouble(dpy, pat, FC_SCALE))
 		goto bail1;
 	if (!_XftDefaultInitDouble(dpy, pat, FC_DPI))
-		goto bail1;
-	if (!_XftDefaultInitBool(dpy, pat, XFT_RENDER))
 		goto bail1;
 	if (!_XftDefaultInitInteger(dpy, pat, FC_RGBA))
 		goto bail1;
@@ -280,50 +318,8 @@ static FcPattern* _XftDefaultInit(Display* dpy) {
 	return NULL;
 }
 
-static FcResult _XftDefaultGet(Display* dpy, const char* object, int screen, FcValue* v) {
-	XftDisplayInfo* info = _XftDisplayInfoGet(dpy, true);
-	if (!info)
-		return FcResultNoMatch;
-	
-	if (!info->defaults) {
-		info->defaults = _XftDefaultInit(dpy);
-		if (!info->defaults)
-			return FcResultNoMatch;
-	}
-	FcResult	r = FcPatternGet(info->defaults, object, screen, v);
-	if (r == FcResultNoId && screen > 0)
-		r = FcPatternGet (info->defaults, object, 0, v);
-	return r;
-}
-
-_X_HIDDEN bool XftDefaultGetBool(Display* dpy, const char* object, int screen, bool def) {
-	FcValue v;
-	FcResult r = _XftDefaultGet(dpy, object, screen, &v);
-	if (r != FcResultMatch || v.type != FcTypeBool)
-		return def;
-	return v.u.b;
-}
-
-_X_HIDDEN int XftDefaultGetInteger(Display* dpy, const char* object, int screen, int def) {
-	FcValue v;
-	FcResult r = _XftDefaultGet (dpy, object, screen, &v);
-	if (r != FcResultMatch || v.type != FcTypeInteger)
-		return def;
-	return v.u.i;
-}
-
-_X_HIDDEN double XftDefaultGetDouble(Display* dpy, const char* object, int screen, double def) {
-	FcValue v;
-	FcResult r = _XftDefaultGet(dpy, object, screen, &v);
-	if (r != FcResultMatch || v.type != FcTypeDouble)
-		return def;
-	return v.u.d;
-}
-
 void XftDefaultSubstitute(Display* dpy, int screen, FcPattern* pattern) {
 	FcValue v;
-	if (FcPatternGet(pattern, XFT_RENDER, 0, &v) == FcResultNoMatch)
-		FcPatternAddBool(pattern, XFT_RENDER, XftDefaultGetBool(dpy, XFT_RENDER, screen, true));
 	if (FcPatternGet(pattern, FC_ANTIALIAS, 0, &v) == FcResultNoMatch)
 		FcPatternAddBool(pattern, FC_ANTIALIAS, XftDefaultGetBool(dpy, FC_ANTIALIAS, screen, true));
 	if (FcPatternGet(pattern, FC_EMBOLDEN, 0, &v) == FcResultNoMatch)

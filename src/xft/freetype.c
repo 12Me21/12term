@@ -378,17 +378,6 @@ static bool XftFontInfoFill(Display* dpy, const FcPattern* pattern, XftFontInfo*
 
 	fi->transform = (fi->matrix.xx != 0x10000 || fi->matrix.xy != 0 ||
 	                 fi->matrix.yx != 0 || fi->matrix.yy != 0x10000);
-
-	// Get render value, set to false if no Render extension present
-	switch (FcPatternGetBool(pattern, XFT_RENDER, 0, &fi->render)) {
-	case FcResultNoMatch:
-		fi->render = true;
-		break;
-	case FcResultMatch:
-		break;
-	default:
-		goto bail1;
-	}
 	
 	// Compute glyph load flags
 	fi->load_flags = FT_LOAD_DEFAULT | FT_LOAD_COLOR;
@@ -653,27 +642,24 @@ XftFont* XftFontOpenInfo(Display* dpy, FcPattern* pattern, XftFontInfo* fi) {
 	bool color = FT_HAS_COLOR(face);
 	XRenderPictFormat* format;
 	// Find the appropriate picture format
-	if (fi->render) {
-		if (color)
+	if (color)
+		format = XRenderFindStandardFormat(dpy, PictStandardARGB32);
+	else if (antialias) {
+		switch (fi->rgba) {
+		case FC_RGBA_RGB:
+		case FC_RGBA_BGR:
+		case FC_RGBA_VRGB:
+		case FC_RGBA_VBGR:
 			format = XRenderFindStandardFormat(dpy, PictStandardARGB32);
-		else if (antialias) {
-			switch (fi->rgba) {
-			case FC_RGBA_RGB:
-			case FC_RGBA_BGR:
-			case FC_RGBA_VRGB:
-			case FC_RGBA_VBGR:
-				format = XRenderFindStandardFormat(dpy, PictStandardARGB32);
-				break;
-			default:
-				format = XRenderFindStandardFormat(dpy, PictStandardA8);
-				break;
-			}
-		} else
-			format = XRenderFindStandardFormat(dpy, PictStandardA1);
-		if (!format)
-			goto bail2;
+			break;
+		default:
+			format = XRenderFindStandardFormat(dpy, PictStandardA8);
+			break;
+		}
 	} else
-		format = NULL;
+		format = XRenderFindStandardFormat(dpy, PictStandardA1);
+	if (!format)
+		goto bail2;
 	
 	FcChar32 num_unicode;
 	FcChar32 hash_value;

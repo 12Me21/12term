@@ -61,7 +61,7 @@ static int _compute_xrender_bitmap_size(FT_Bitmap* target, FT_GlyphSlot slot, FT
 		height = vector.y;
 	}
 	int pitch = (width+3) & ~3;
-
+	
 	switch (ftbit->pixel_mode) {
 	case FT_PIXEL_MODE_MONO:
 		if (mode == FT_RENDER_MODE_MONO) {
@@ -129,11 +129,7 @@ static inline int clamp(int x, int min, int max) {
  *
  * matrix :: the scaling matrix to apply
  */
-static void _scaled_fill_xrender_bitmap(
-	FT_Bitmap* target,
-	FT_Bitmap* source,
-	const FT_Matrix* matrix
-) {
+static void _scaled_fill_xrender_bitmap(FT_Bitmap* target, FT_Bitmap* source, const FT_Matrix* matrix) {
 	unsigned char* src_buf = source->buffer;
 	int src_pitch = source->pitch;
 	if (src_pitch<0)
@@ -322,7 +318,7 @@ static void _fill_xrender_bitmap(FT_Bitmap* target, FT_GlyphSlot slot, FT_Render
 }
 
 void XftFontLoadGlyphs(Display* dpy, XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, int nglyph) {
-	XftDisplayInfo* info = _XftDisplayInfoGet(dpy, True);
+	XftDisplayInfo* info = _XftDisplayInfoGet(dpy, true);
 	if (!info)
 		return;
 	
@@ -363,11 +359,9 @@ void XftFontLoadGlyphs(Display* dpy, XftFont* pub, bool need_bitmaps, const FT_U
 		
 		if (XftDebug() & XFT_DBG_CACHE)
 			_XftFontValidateMemory (dpy, pub);
-		/*
-		 * Check to see if this glyph has just been loaded,
-		 * this happens when drawing the same glyph twice
-		 * in a single string
-		 */
+		// Check to see if this glyph has just been loaded,
+		// this happens when drawing the same glyph twice
+		// in a single string
 		if (xftg->glyph_memory)
 			continue;
 		
@@ -399,10 +393,9 @@ void XftFontLoadGlyphs(Display* dpy, XftFont* pub, bool need_bitmaps, const FT_U
 		int left, right, top, bottom;
 		if (transform) {
 			// calculate the true width by transforming all four corners.
-			int xc, yc;
 			left = right = top = bottom = 0;
-			for (xc = 0; xc <= 1; xc ++) {
-				for (yc = 0; yc <= 1; yc++) {
+			for (int xc = 0; xc <= 1; xc ++) {
+				for (int yc = 0; yc <= 1; yc++) {
 					vector.x = glyphslot->metrics.horiBearingX + xc * glyphslot->metrics.width;
 					vector.y = glyphslot->metrics.horiBearingY - yc * glyphslot->metrics.height;
 					FT_Vector_Transform(&vector, &font->info.matrix);
@@ -469,7 +462,7 @@ void XftFontLoadGlyphs(Display* dpy, XftFont* pub, bool need_bitmaps, const FT_U
 			error = FT_Render_Glyph(face->glyph, mode);
 			if (error)
 				continue;
-			glyph_transform = False;
+			glyph_transform = false;
 		}
 		
 		FT_Library_SetLcdFilter(_XftFTlibrary, FT_LCD_FILTER_NONE);
@@ -644,7 +637,7 @@ void XftFontLoadGlyphs(Display* dpy, XftFont* pub, bool need_bitmaps, const FT_U
 }
 
 void XftFontUnloadGlyphs(Display* dpy, XftFont* pub, const FT_UInt* glyphs, int nglyph) {
-	XftDisplayInfo* info = _XftDisplayInfoGet(dpy, False);
+	XftDisplayInfo* info = _XftDisplayInfoGet(dpy, false);
 	XftFontInt* font = (XftFontInt*)pub;
 	Glyph	glyphBuf[1024];
 	int nused = 0;

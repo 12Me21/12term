@@ -6,7 +6,7 @@ all: $(output) terminfo
 # all the .c files
 srcdir = src
 srcs = x tty debug buffer ctlseqs keymap csi draw font event settings icon clipboard #lua
-srcs += xft/color xft/dbg xft/xftdpy xft/xftdraw xft/xftextent xft/xftfont xft/xftfreetype xft/xftglyphs xft/xftinit xft/xftlist xft/xftrender xft/xftswap
+srcs += xft/color xft/dbg xft/dpy xft/draw xft/extent xft/font xft/freetype xft/glyphs xft/init xft/render xft/swap
 srcs := $(srcs:=.c)
 
 lua_version = 5.2

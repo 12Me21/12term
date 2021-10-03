@@ -120,6 +120,7 @@ static void draw_glyph(XftDraw* draw, Px x, Px y, Glyph g, XftColor col, int w) 
 	//XftGlyphFontSpecRender(XftDrawDisplay(draw), PictOpOver, src, XftDrawPicture(draw), 0, 0, spec, 1);
 }
 
+// todo: make these thicker depending on dpi/fontsize
 static void draw_char_overlays(XftDraw* draw, Px winx, Cell c) {
 	int underline = c.attrs.underline;
 	if (!(underline || c.attrs.strikethrough || c.attrs.link))
@@ -235,6 +236,7 @@ static bool draw_row(int y, Row row) {
 		}
 	}
 	XftDrawRect(rows[y].draw, &prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x-1), W.ch);
+	// todo: why does the bg color extend too far in fullscreen?
 	// draw right border background
 	XftDrawRect(rows[y].draw, (XftColor[]){make_color((Color){.i=-2})}, W.border+W.cw*T.width, 0, W.border, W.ch);
 	

@@ -15,20 +15,10 @@
 #include <fontconfig/fcprivate.h>
 #include <fontconfig/fcfreetype.h>
 
-typedef struct _XftMatcher {
-	char* object;
-	double (*compare)(char* object, FcValue value1, FcValue value2);
-} XftMatcher;
-
-typedef struct _XftSymbolic {
-	const char* name;
-	int value;
-} XftSymbolic;
-
 /*
  * Glyphs are stored in this structure
  */
-typedef struct _XftGlyph {
+typedef struct XftGlyph {
 	XGlyphInfo metrics;
 	void* bitmap;
 	unsigned long glyph_memory;
@@ -38,7 +28,7 @@ typedef struct _XftGlyph {
 /*
  * A hash table translates Unicode values into glyph indicies
  */
-typedef struct _XftUcsHash {
+typedef struct XftUcsHash {
 	FcChar32 ucs4;
 	FT_UInt glyph;
 } XftUcsHash;
@@ -49,8 +39,8 @@ typedef struct _XftUcsHash {
  * live in the same font file; that is irrelevant to this structure
  * which is concerned only with the individual faces themselves
  */
-typedef struct _XftFtFile {
-	struct _XftFtFile	*next;
+typedef struct XftFtFile {
+	struct XftFtFile	*next;
 	int ref; // number of font infos using this file
 	
 	char* file;	// file name
@@ -68,7 +58,7 @@ typedef struct _XftFtFile {
  * This structure holds the data extracted from a pattern
  * needed to create a unique font object.
  */
-struct _XftFontInfo {
+struct XftFontInfo {
 	// Hash value (not include in hash value computation)
 	FcChar32	hash;
 	XftFtFile* file; // face source
@@ -82,7 +72,6 @@ struct _XftFontInfo {
 	FT_Matrix matrix;	// glyph transformation matrix
 	FcBool transform;	// non-identify matrix?
 	FT_Int load_flags; // glyph load flags
-	FcBool render; // whether to use the Render extension
 	// Internal fields
 	int spacing;
 	FcBool minspace;
@@ -92,7 +81,7 @@ struct _XftFontInfo {
 /*
  * Internal version of the font with private data
  */
-typedef struct _XftFontInt {
+typedef struct XftFontInt {
 	XftFont public;		/* public fields */
 	XftFont* next;		/* all fonts on display */
 	XftFont* hash_next; // fonts in this hash chain
@@ -118,11 +107,11 @@ typedef struct _XftFontInt {
 	bool use_free_glyphs; // Use XRenderFreeGlyphs
 } XftFontInt;
 
-typedef enum _XftClipType {
+typedef enum XftClipType {
 	XftClipTypeNone, XftClipTypeRegion, XftClipTypeRectangles
 } XftClipType;
 
-typedef struct _XftClipRect {
+typedef struct XftClipRect {
 	int xOrigin;
 	int yOrigin;
 	int n;
@@ -130,12 +119,12 @@ typedef struct _XftClipRect {
 
 #define XftClipRects(cr) ((XRectangle*) ((cr)+1))
 
-typedef union _XftClip {
+typedef union XftClip {
 	XftClipRect* rect;
 	Region region;
 } XftClip;
 
-struct _XftDraw {
+struct XftDraw {
 	Display* dpy;
 	int screen;
 	unsigned int bits_per_pixel;
@@ -146,20 +135,10 @@ struct _XftDraw {
 	XftClipType clip_type;
 	XftClip clip;
 	int subwindow_mode;
-	struct {
-		Picture pict;
-	} render;
+	Picture pict;
 };
 
-/*
- * Instead of taking two round trips for each blending request,
- * assume that if a particular drawable fails GetImage that it will
- * fail for a "while"; use temporary pixmaps to avoid the errors
- */
-
-#define XFT_ASSUME_PIXMAP 20
-
-typedef struct _XftSolidColor {
+typedef struct XftSolidColor {
 	XRenderColor color;
 	int screen;
 	Picture pict;
@@ -169,8 +148,8 @@ typedef struct _XftSolidColor {
 
 #define XFT_NUM_FONT_HASH 127
 
-typedef struct _XftDisplayInfo {
-	struct _XftDisplayInfo* next;
+typedef struct XftDisplayInfo {
+	struct XftDisplayInfo* next;
 	Display* display;
 	XExtCodes* codes;
 	FcPattern* defaults;
@@ -219,60 +198,14 @@ extern XftDisplayInfo* _XftDisplayInfo;
 #define XFT_MEM_GLYPH 3
 #define XFT_MEM_NUM 4
 
-/* xftcompat.c */
-void XftFontSetDestroy(FcFontSet* s);
-bool XftMatrixEqual(const FcMatrix* mat1, const FcMatrix* mat2);
-void XftMatrixMultiply(FcMatrix* result, FcMatrix* a, FcMatrix* b);
-void XftMatrixRotate(FcMatrix* m, double c, double s);
-void XftMatrixScale(FcMatrix* m, double sx, double sy);
-void XftMatrixShear(FcMatrix* m, double sh, double sv);
-FcPattern* XftPatternCreate(void);
-void XftValueDestroy(FcValue v);
-void XftPatternDestroy(FcPattern* p);
-bool XftPatternAdd(FcPattern* p, const char* object, FcValue value, bool append);
-bool XftPatternDel(FcPattern* p, const char* object);
-bool XftPatternAddInteger(FcPattern* p, const char* object, int i);
-bool XftPatternAddDouble(FcPattern* p, const char* object, double i);
-bool XftPatternAddMatrix(FcPattern* p, const char* object, FcMatrix* i);
-bool XftPatternAddString(FcPattern* p, const char* object, char* i);
-bool XftPatternAddBool(FcPattern* p, const char* object, bool i);
-FcResult XftPatternGet(FcPattern* p, const char* object, int id, FcValue* v);
-FcResult XftPatternGetInteger(FcPattern* p, const char* object, int id, int* i);
-FcResult XftPatternGetDouble(FcPattern* p, const char* object, int id, double* i);
-FcResult XftPatternGetString(FcPattern* p, const char* object, int id, char** i);
-FcResult XftPatternGetMatrix(FcPattern* p, const char* object, int id, FcMatrix** i);
-FcResult XftPatternGetBool(FcPattern* p, const char* object, int id, bool* i);
-FcPattern* XftPatternDuplicate(FcPattern* orig);
-FcPattern* XftPatternVaBuild(FcPattern* orig, va_list va);
-FcPattern* XftPatternBuild(FcPattern* orig, ...);
-bool XftNameUnparse(FcPattern* pat, char* dest, int len);
-bool XftGlyphExists(Display* dpy, XftFont* font, FcChar32 ucs4);
-FcObjectSet* XftObjectSetCreate(void);
-Bool XftObjectSetAdd(FcObjectSet* os, const char* object);
-void XftObjectSetDestroy(FcObjectSet* os);
-FcObjectSet* XftObjectSetVaBuild(const char* first, va_list va);
-FcObjectSet* XftObjectSetBuild(const char* first, ...);
-FcFontSet* XftListFontSets(FcFontSet** sets, int nsets, FcPattern* p, FcObjectSet* os);
-
 /* xftdbg.c */
 int XftDebug(void);
 
 /* xftdpy.c */
 XftDisplayInfo* _XftDisplayInfoGet(Display* dpy, bool createIfNecessary);
 void _XftDisplayManageMemory(Display* dpy);
-int XftDefaultParseBool(const char* v);
-bool XftDefaultGetBool(Display* dpy, const char* object, int screen, bool def);
-int XftDefaultGetInteger(Display* dpy, const char* object, int screen, int def);
-double XftDefaultGetDouble(Display* dpy, const char* object, int screen, double def);
-FcFontSet* XftDisplayGetFontSet(Display* dpy);
-
-/* xftdraw.c */
-unsigned int XftDrawDepth(XftDraw* draw);
-unsigned int XftDrawBitsPerPixel(XftDraw* draw);
-bool XftDrawRenderPrepare(XftDraw* draw);
 
 /* xftfreetype.c */
-bool _XftSetFace(XftFtFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* matrix);
 void XftFontManageMemory(Display* dpy);
 
 /* xftglyph.c */
@@ -285,15 +218,7 @@ void XftMemAlloc(int kind, int size);
 void* XftMalloc(int kind, size_t size);
 void XftMemFree(int kind, int size);
 
-/* xftlist.c */
-FcFontSet* XftListFontsPatternObjects(Display* dpy, int screen, FcPattern* pattern, FcObjectSet* os);
-
-/* xftname.c */
-void _XftNameInit(void);
-
 /* xftswap.c */
 int XftNativeByteOrder(void);
 void XftSwapCARD32(CARD32* data, int n);
-void XftSwapCARD24(CARD8* data, int width, int height);
-void XftSwapCARD16(CARD16* data, int n);
 void XftSwapImage(XImage* image);

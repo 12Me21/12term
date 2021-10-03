@@ -2,10 +2,10 @@
 
 static struct {
 	const char *name;
-	int	    alloc_count;
-	int	    alloc_mem;
-	int	    free_count;
-	int	    free_mem;
+	int alloc_count;
+	int alloc_mem;
+	int free_count;
+	int free_mem;
 } XftInUse[XFT_MEM_NUM] = {
 	{ "XftDraw", 0, 0 },
 	{ "XftFont", 0 ,0 },
@@ -18,7 +18,7 @@ static int XftFreeCount, XftFreeMem;
 
 static const int XftMemNotice = 1*1024*1024;
 
-static int  XftAllocNotify, XftFreeNotify;
+static int XftAllocNotify, XftFreeNotify;
 
 _X_HIDDEN void XftMemReport(void) {
 	printf ("Xft Memory Usage:\n");
