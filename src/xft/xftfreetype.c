@@ -131,7 +131,7 @@ static void _XftUnlockFile(XftFtFile* f) {
 #define X_SIZE(face,i) ((face)->available_sizes[i].x_ppem)
 #define Y_SIZE(face,i) ((face)->available_sizes[i].y_ppem)
 
-FcBool _XftSetFace(XftFtFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* matrix) {
+bool _XftSetFace(XftFtFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* matrix) {
 	FT_Face face = f->face;
 	
 	if (f->xsize != xsize || f->ysize != ysize) {
@@ -226,7 +226,7 @@ static FcChar32 _XftSqrt(FcChar32 a) {
 	return h;
 }
 
-static FcBool _XftIsPrime (FcChar32 i)
+static bool _XftIsPrime (FcChar32 i)
 {
 	FcChar32	l, t;
 
@@ -272,7 +272,7 @@ void XftUnlockFace(XftFont* public) {
 	_XftUnlockFile (font->info.file);
 }
 
-static FcBool XftFontInfoFill(Display* dpy, const FcPattern* pattern, XftFontInfo* fi) {
+static bool XftFontInfoFill(Display* dpy, const FcPattern* pattern, XftFontInfo* fi) {
 	XftDisplayInfo* info = _XftDisplayInfoGet(dpy, True);
 	if (!info)
 		return FcFalse;
@@ -598,7 +598,7 @@ FcChar32 XftFontInfoHash(const XftFontInfo* fi) {
 	return fi->hash;
 }
 
-FcBool XftFontInfoEqual(const XftFontInfo* a, const XftFontInfo* b) {
+bool XftFontInfoEqual(const XftFontInfo* a, const XftFontInfo* b) {
 	return memcmp(a, b, sizeof(XftFontInfo))==0;
 }
 
@@ -646,11 +646,11 @@ XftFont* XftFontOpenInfo(Display* dpy, FcPattern* pattern, XftFontInfo* fi) {
 	else
 		charset = FcFreeTypeCharSet(face, FcConfigGetBlanks(NULL));
 
-	FcBool antialias = fi->antialias;
+	bool antialias = fi->antialias;
 	if (!(face->face_flags & FT_FACE_FLAG_SCALABLE))
 		antialias = FcFalse;
 	
-	FcBool color = FT_HAS_COLOR(face);
+	bool color = FT_HAS_COLOR(face);
 	XRenderPictFormat* format;
 	// Find the appropriate picture format
 	if (fi->render) {
@@ -919,7 +919,7 @@ void XftFontClose(Display* dpy, XftFont* public) {
 	}
 }
 
-FcBool XftInitFtLibrary(void) {
+bool XftInitFtLibrary(void) {
 	if (_XftFTlibrary)
 		return FcTrue;
 	if (FT_Init_FreeType(&_XftFTlibrary))

@@ -211,40 +211,27 @@ XftFontOpenXlfd(Display* dpy, int screen, const char* xlfd);
 
 /* xftfreetype.c */
 
-FT_Face
-XftLockFace(XftFont* pub);
+FT_Face XftLockFace(XftFont* pub);
 
-void
-XftUnlockFace(XftFont* pub);
+void XftUnlockFace(XftFont* pub);
 
-XftFontInfo* 
-XftFontInfoCreate(Display* dpy, const FcPattern* pattern);
+XftFontInfo* XftFontInfoCreate(Display* dpy, const FcPattern* pattern);
 
-void
-XftFontInfoDestroy(Display* dpy, XftFontInfo* fi);
+void XftFontInfoDestroy(Display* dpy, XftFontInfo* fi);
 
-FcChar32
-XftFontInfoHash(const XftFontInfo* fi);
+FcChar32 XftFontInfoHash(const XftFontInfo* fi);
 
-FcBool
-XftFontInfoEqual(const XftFontInfo* a, const XftFontInfo* b);
+bool XftFontInfoEqual(const XftFontInfo* a, const XftFontInfo* b);
 
-XftFont* 
-XftFontOpenInfo(Display* dpy,
- FcPattern* pattern,
- XftFontInfo* fi);
+XftFont* XftFontOpenInfo(Display* dpy, FcPattern* pattern, XftFontInfo* fi);
 
-XftFont* 
-XftFontOpenPattern(Display* dpy, FcPattern* pattern);
+XftFont* XftFontOpenPattern(Display* dpy, FcPattern* pattern);
 
-XftFont* 
-XftFontCopy(Display* dpy, XftFont* pub);
+XftFont* XftFontCopy(Display* dpy, XftFont* pub);
 
-void
-XftFontClose(Display* dpy, XftFont* pub);
+void XftFontClose(Display* dpy, XftFont* pub);
 
-FcBool
-XftInitFtLibrary(void);
+bool XftInitFtLibrary(void);
 
 /* xftglyphs.c */
 void
