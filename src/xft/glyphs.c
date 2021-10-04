@@ -318,10 +318,6 @@ static void _fill_xrender_bitmap(FT_Bitmap* target, FT_GlyphSlot slot, FT_Render
 }
 
 void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, int nglyph) {
-	XftDisplayInfo* info = _XftDisplayInfoGet(true);
-	if (!info)
-		return;
-	
 	XftFontInt* font = (XftFontInt*)pub;
 	
 	FT_Bitmap local;
@@ -551,7 +547,7 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 		
 		// If the glyph is relatively large (> 1% of server memory),
 		// don't send it until necessary.
-		if (!need_bitmaps && size>info->max_glyph_memory/100)
+		if (!need_bitmaps && size>info.max_glyph_memory/100)
 			continue;
 		
 		unsigned char bufBitmap[size]; // I hope there's enough stack space owo
@@ -627,7 +623,7 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 		}
 
 		font->glyph_memory += xftg->glyph_memory;
-		info->glyph_memory += xftg->glyph_memory;
+		info.glyph_memory += xftg->glyph_memory;
 		if (XftDebug() & XFT_DBG_CACHE)
 			_XftFontValidateMemory(pub);
 		if (XftDebug() & XFT_DBG_CACHEV)
@@ -637,7 +633,6 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 }
 
 void XftFontUnloadGlyphs(XftFont* pub, const FT_UInt* glyphs, int nglyph) {
-	XftDisplayInfo* info = _XftDisplayInfoGet(false);
 	XftFontInt* font = (XftFontInt*)pub;
 	Glyph	glyphBuf[1024];
 	int nused = 0;
@@ -662,8 +657,7 @@ void XftFontUnloadGlyphs(XftFont* pub, const FT_UInt* glyphs, int nglyph) {
 					free (xftg->bitmap);
 			}
 			font->glyph_memory -= xftg->glyph_memory;
-			if (info)
-				info->glyph_memory -= xftg->glyph_memory;
+			info.glyph_memory -= xftg->glyph_memory;
 		}
 		free(xftg);
 		XftMemFree(XFT_MEM_GLYPH, sizeof (XftGlyph));
@@ -744,16 +738,8 @@ void _XftFontUncacheGlyph(XftFont* pub) {
 		return;
 	
 	unsigned long glyph_memory;
-	if (font->use_free_glyphs) {
-		glyph_memory = rand() % font->glyph_memory;
-	} else {
-		if (font->glyphset) {
-			XRenderFreeGlyphSet(W.d, font->glyphset);
-			font->glyphset = 0;
-		}
-		glyph_memory = 0;
-	}
-
+	glyph_memory = rand() % font->glyph_memory;
+	
 	if (XftDebug() & XFT_DBG_CACHE)
 		_XftFontValidateMemory(pub);
 	for (FT_UInt glyphindex=0; glyphindex<font->num_glyphs; glyphindex++) {
@@ -763,8 +749,6 @@ void _XftFontUncacheGlyph(XftFont* pub) {
 				if (XftDebug() & XFT_DBG_CACHEV)
 					printf("Uncaching glyph 0x%x size %ld\n", glyphindex, xftg->glyph_memory);
 				XftFontUnloadGlyphs(pub, &glyphindex, 1);
-				if (!font->use_free_glyphs)
-					continue;
 				break;
 			}
 			glyph_memory -= xftg->glyph_memory;

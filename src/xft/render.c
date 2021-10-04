@@ -1,7 +1,14 @@
 #include "xftint.h"
 
 // todo: move the loadGlyphs call out of here and put it like, right after the glyph lookup in font.c  sleepy 💤
-void XftGlyphRender1(int	op, Picture src, XftFont* pub, Picture dst, int srcx, int srcy, int x, int y, FT_UInt g, int cw) {
+// op - composite operation
+// col - color (only used for normal monochrome glyphs)
+// pub - font
+// dst - destination picture
+// x,y - destination position
+// g - glyph id
+// cw - width of character cell (this is messy. maybe would be better to pass the CENTER x coordinate
+void XftGlyphRender1(int op, XRenderColor* col, XftFont* pub, Picture dst, int x, int y, FT_UInt g, int cw) {
 	XftFontInt* font = (XftFontInt*)pub;
 	if (!font->format)
 		return;
@@ -20,11 +27,12 @@ void XftGlyphRender1(int	op, Picture src, XftFont* pub, Picture dst, int srcx, i
 		wire = 0;
 	
 	XftGlyph* glyph = font->glyphs[wire];
+	Px center = (cw - glyph->metrics.xOff)/2;
 	if (glyph->picture) {
-		XRenderComposite(W.d, PictOpOver, glyph->picture, None, dst, 0, 0, 0, 0, x - glyph->metrics.x + (cw - glyph->metrics.xOff)/2, y-glyph->metrics.y, glyph->metrics.width, glyph->metrics.height);
+		XRenderComposite(W.d, PictOpOver, glyph->picture, None, dst, 0, 0, 0, 0, x - glyph->metrics.x + center, y-glyph->metrics.y, glyph->metrics.width, glyph->metrics.height);
 	} else {
-		XRenderCompositeString32(W.d, op, src, dst, font->format, font->glyphset, srcx, srcy, x + (cw - glyph->metrics.xOff)/2, y, (unsigned int[]){wire}, 1);
-		//printf("comp glyph %ld. %d %d %d\n", wire, glyph->metrics.x, glyph->metrics.width, glyph->metrics.xOff);
+		Picture src = XftDrawSrcPicture(col);
+		XRenderCompositeString32(W.d, op, src, dst, font->format, font->glyphset, 0, 0, x + center, y, (unsigned int[]){wire}, 1);
 	}
  bail1:
 	if (glyphs_loaded)

@@ -2,9 +2,12 @@
 
 #include <stdarg.h>
 #include <stdbool.h>
+
 #include <ft2build.h>
 #include FT_FREETYPE_H
+
 #include <fontconfig/fontconfig.h>
+
 #include <X11/extensions/Xrender.h>
 
 #define XFT_MAX_GLYPH_MEMORY	"maxglyphmemory"
@@ -23,27 +26,6 @@ typedef struct XftFont {
 
 typedef struct XftDraw XftDraw;
 
-typedef struct XftColor {
-	unsigned long pixel;
-	XRenderColor color;
-} XftColor;
-
-typedef struct XftCharSpec {
-	FcChar32	ucs4;
-	short	x, y;
-} XftCharSpec;
-
-typedef struct XftCharFontSpec {
-	XftFont* font;
-	FcChar32	ucs4;
-	short	x, y;
-} XftCharFontSpec;
-
-typedef struct XftGlyphSpec {
-	FT_UInt glyph;
-	short	x, y;
-} XftGlyphSpec;
-
 typedef struct XftGlyphFontSpec {
 	XftFont* font;
 	FT_UInt glyph;
@@ -57,12 +39,12 @@ typedef struct XftGlyphFont {
 } XftGlyphFont;
 
 /* xftcolor.c */
-Bool XftColorAllocName(const char* name, XftColor* result);
-Bool XftColorAllocValue(const XRenderColor* color, XftColor* result);
+unsigned long XftColorAllocValue(const XRenderColor* color);
 
 /* xftdpy.c */
-Bool XftDefaultSet(FcPattern* defaults);
+bool XftDefaultSet(FcPattern* defaults);
 void XftDefaultSubstitute(FcPattern* pattern);
+void XftDisplayInfoInit(void);
 
 /* xftdraw.c */
 XftDraw* XftDrawCreate(Drawable drawable);
@@ -73,13 +55,13 @@ Drawable XftDrawDrawable(XftDraw* draw);
 void XftDrawDestroy(XftDraw* draw);
 
 Picture XftDrawPicture(XftDraw* draw);
-Picture XftDrawSrcPicture(XftDraw* draw, const XftColor* color);
+Picture XftDrawSrcPicture(const XRenderColor* color);
 
-void XftDrawRect(XftDraw* draw, const XftColor* color, int x, int y, unsigned int width, unsigned int height);
+void XftDrawRect(XftDraw* draw, const XRenderColor* color, int x, int y, unsigned int width, unsigned int height);
 
-Bool XftDrawSetClip(XftDraw* draw, Region r);
+bool XftDrawSetClip(XftDraw* draw, Region r);
 
-Bool XftDrawSetClipRectangles(XftDraw* draw, int xOrigin, int yOrigin, const XRectangle* rects, int n);
+bool XftDrawSetClipRectangles(XftDraw* draw, int xOrigin, int yOrigin, const XRectangle* rects, int n);
 
 void XftDrawSetSubwindowMode(XftDraw* draw, int mode);
 
@@ -88,11 +70,6 @@ void XftDrawSetSubwindowMode(XftDraw* draw, int mode);
 void XftGlyphExtents(XftFont* pub, const FT_UInt* glyphs, int nglyphs, XGlyphInfo* extents);
 
 void XftTextExtents32(XftFont* pub, const FcChar32* string, int len, XGlyphInfo* extents);
-
-/* xftfont.c */
-FcPattern* XftFontMatch(const FcPattern* pattern, FcResult* result);
-
-XftFont* XftFontOpenName(const char* name);
 
 /* xftfreetype.c */
 
@@ -111,8 +88,6 @@ bool XftFontInfoEqual(const XftFontInfo* a, const XftFontInfo* b);
 XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi);
 
 XftFont* XftFontOpenPattern(FcPattern* pattern);
-
-XftFont* XftFontCopy(XftFont* pub);
 
 void XftFontClose(XftFont* pub);
 
@@ -134,4 +109,4 @@ FT_UInt XftCharIndex(XftFont* pub, FcChar32 ucs4);
 /* xftrender.c */
 
 // eee
-void XftGlyphRender1(int op, Picture src, XftFont* pub, Picture dst, int srcx, int srcy, int x, int y, const FT_UInt g, int cw);
+void XftGlyphRender1(int op, XRenderColor* src, XftFont* pub, Picture dst, int x, int y, const FT_UInt g, int cw);

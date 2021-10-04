@@ -1,46 +1,30 @@
 #include "xftint.h"
 
-_X_HIDDEN XftDisplayInfo* _XftDisplayInfo;
+XftDisplayInfo info;
 
 static int _XftCloseDisplay(Display* dpy, XExtCodes* codes) {
-	XftDisplayInfo* info = _XftDisplayInfoGet(false);
-	if (!info)
-		return 0;
-	
 	// Get rid of any dangling unreferenced fonts
-	info->max_unref_fonts = 0;
+	info.max_unref_fonts = 0;
 	XftFontManageMemory();
 	
 	// Clean up the default values
-	if (info->defaults)
-		FcPatternDestroy(info->defaults);
+	if (info.defaults)
+		FcPatternDestroy(info.defaults);
 	
-	// Unhook from the global list
-	XftDisplayInfo** prev;
-	for (prev = &_XftDisplayInfo; (info = *prev); prev = &(*prev)->next)
-		if (info->display==dpy)
-			break;
-	*prev = info->next;
-	
-	free(info);
 	return 0;
 }
 
 static FcPattern* _XftDefaultInit();
 
 static FcResult _XftDefaultGet(const char* object, FcValue* v) {
-	XftDisplayInfo* info = _XftDisplayInfoGet(true);
-	if (!info)
-		return FcResultNoMatch;
-	
-	if (!info->defaults) {
-		info->defaults = _XftDefaultInit();
-		if (!info->defaults)
+	if (!info.defaults) {
+		info.defaults = _XftDefaultInit();
+		if (!info.defaults)
 			return FcResultNoMatch;
 	}
-	FcResult	r = FcPatternGet(info->defaults, object, W.scr, v);
+	FcResult	r = FcPatternGet(info.defaults, object, W.scr, v);
 	if (r == FcResultNoId && W.scr > 0)
-		r = FcPatternGet (info->defaults, object, 0, v);
+		r = FcPatternGet(info.defaults, object, 0, v);
 	return r;
 }
 
@@ -68,56 +52,20 @@ static double XftDefaultGetDouble(const char* object, double def) {
 	return v.u.d;
 }
 
-XftDisplayInfo* _XftDisplayInfoGet(bool createIfNecessary) {
-	XftDisplayInfo* info;
-	XftDisplayInfo** prev;
-	for (prev = &_XftDisplayInfo; (info = *prev); prev = &(*prev)->next) {
-		if (info->display == W.d) {
-			// MRU the list
-			if (prev != &_XftDisplayInfo) {
-				*prev = info->next;
-				info->next = _XftDisplayInfo;
-				_XftDisplayInfo = info;
-			}
-			return info;
-		}
-	}
-	if (!createIfNecessary)
-		return NULL;
-
-	info = malloc(sizeof(XftDisplayInfo));
-	if (!info)
-		goto bail0;
-	info->codes = XAddExtension(W.d);
-	if (!info->codes)
+void XftDisplayInfoInit(void) {
+	info.codes = XAddExtension(W.d);
+	if (!info.codes)
 		goto bail1;
-	XESetCloseDisplay(W.d, info->codes->extension, _XftCloseDisplay);
+	XESetCloseDisplay(W.d, info.codes->extension, _XftCloseDisplay);
 
-	info->display = W.d;
-	info->defaults = NULL;
-	info->solidFormat = NULL;
-	info->use_free_glyphs = true;
+	info.defaults = NULL;
 	
 	int major, minor;
 	XRenderQueryVersion(W.d, &major, &minor);
-	if (major<0 || (major==0 && minor<=2))
-		info->use_free_glyphs = false;
-		
-	info->hasSolid = false;
-	if (major>0 || (major==0 && minor>=10))
-		info->hasSolid = true;
+	if (major<0 || (major==0 && minor<10)) {
+		die("Requires xrender >= 0.10");
+	}
 	
-	info->solidFormat = XRenderFindFormat(
-		W.d,
-		PictFormatType|PictFormatDepth|PictFormatRedMask|PictFormatGreenMask|PictFormatBlueMask|PictFormatAlphaMask,
-		&(XRenderPictFormat){
-			.type = PictTypeDirect,
-			.depth = 32,
-			.direct.redMask = 0xFF,
-			.direct.greenMask = 0xFF,
-			.direct.blueMask = 0xFF,
-			.direct.alphaMask = 0xFF,
-		}, 0);
 	if (XftDebug() & XFT_DBG_RENDER) {
 		XRenderPictFormat* format = XRenderFindVisualFormat(W.d, W.vis);
 		
@@ -137,64 +85,56 @@ XftDisplayInfo* _XftDisplayInfoGet(bool createIfNecessary) {
 		printf("XftDisplayInfoGet initialized");
 	}
 	for (int i=0; i<XFT_NUM_SOLID_COLOR; i++) {
-		info->colors[i].screen = -1;
-		info->colors[i].pict = 0;
+		info.colors[i].screen = -1;
+		info.colors[i].pict = 0;
 	}
-	info->fonts = NULL;
+	info.fonts = NULL;
 	
-	info->next = _XftDisplayInfo;
-	_XftDisplayInfo = info;
-	
-	info->glyph_memory = 0;
-	info->max_glyph_memory = XftDefaultGetInteger(XFT_MAX_GLYPH_MEMORY, XFT_DPY_MAX_GLYPH_MEMORY);
+	info.glyph_memory = 0;
+	info.max_glyph_memory = XftDefaultGetInteger(XFT_MAX_GLYPH_MEMORY, XFT_DPY_MAX_GLYPH_MEMORY);
 	if (XftDebug() & XFT_DBG_CACHE)
-		printf ("global max cache memory %ld\n", info->max_glyph_memory);
+		printf ("global max cache memory %ld\n", info.max_glyph_memory);
 	
-	info->num_unref_fonts = 0;
-	info->max_unref_fonts = XftDefaultGetInteger(XFT_MAX_UNREF_FONTS, XFT_DPY_MAX_UNREF_FONTS);
+	info.num_unref_fonts = 0;
+	info.max_unref_fonts = XftDefaultGetInteger(XFT_MAX_UNREF_FONTS, XFT_DPY_MAX_UNREF_FONTS);
 	if (XftDebug() & XFT_DBG_CACHE)
-		printf ("global max unref fonts %d\n", info->max_unref_fonts);
+		printf ("global max unref fonts %d\n", info.max_unref_fonts);
 	
-	memset(info->fontHash, '\0', sizeof(XftFont*)*XFT_NUM_FONT_HASH);
-	return info;
+	memset(info.fontHash, '\0', sizeof(XftFont*)*XFT_NUM_FONT_HASH);
 	
  bail1:
-	free (info);
- bail0:
 	if (XftDebug() & XFT_DBG_RENDER) {
 		printf ("XftDisplayInfoGet failed to initialize, Xft unhappy :(\n");
 	}
-	return NULL;
 }
 
 // Reduce memory usage in X server
 
-static void _XftDisplayValidateMemory(XftDisplayInfo* info) {
+static void _XftDisplayValidateMemory(void) {
 	unsigned long glyph_memory = 0;
 	XftFontInt* font;
-	for (XftFont* public=info->fonts; public; public=font->next) {
+	for (XftFont* public=info.fonts; public; public=font->next) {
 		font = (XftFontInt*)public;
 		glyph_memory += font->glyph_memory;
 	}
-	if (glyph_memory != info->glyph_memory)
-		printf("Display glyph cache incorrect has %ld bytes, should have %ld\n", info->glyph_memory, glyph_memory);
+	if (glyph_memory != info.glyph_memory)
+		printf("Display glyph cache incorrect has %ld bytes, should have %ld\n", info.glyph_memory, glyph_memory);
 }
 
-_X_HIDDEN void _XftDisplayManageMemory() {
-	XftDisplayInfo* info = _XftDisplayInfoGet(false);
-	if (!info || !info->max_glyph_memory)
+_X_HIDDEN void _XftDisplayManageMemory(void) {
+	if (!info.max_glyph_memory)
 		return;
 	
 	if (XftDebug () & XFT_DBG_CACHE) {
-		if (info->glyph_memory > info->max_glyph_memory)
+		if (info.glyph_memory > info.max_glyph_memory)
 			printf ("Reduce global memory from %ld to %ld\n",
-			        info->glyph_memory, info->max_glyph_memory);
-		_XftDisplayValidateMemory(info);
+			        info.glyph_memory, info.max_glyph_memory);
+		_XftDisplayValidateMemory();
 	}
 	
-	while (info->glyph_memory > info->max_glyph_memory) {
-		unsigned long glyph_memory = rand () % info->glyph_memory;
-		XftFont* public = info->fonts;
+	while (info.glyph_memory > info.max_glyph_memory) {
+		unsigned long glyph_memory = rand () % info.glyph_memory;
+		XftFont* public = info.fonts;
 		while (public) {
 			XftFontInt* font = (XftFontInt*)public;
 			
@@ -207,23 +147,19 @@ _X_HIDDEN void _XftDisplayManageMemory() {
 		}
 	}
 	if (XftDebug() & XFT_DBG_CACHE)
-		_XftDisplayValidateMemory (info);
+		_XftDisplayValidateMemory();
 }
 
-_X_EXPORT Bool XftDefaultSet(FcPattern* defaults) {
-	XftDisplayInfo* info = _XftDisplayInfoGet(true);
-	
-	if (!info)
-		return false;
-	if (info->defaults)
-		FcPatternDestroy (info->defaults);
-	info->defaults = defaults;
-	if (!info->max_glyph_memory)
-		info->max_glyph_memory = XFT_DPY_MAX_GLYPH_MEMORY;
-	info->max_glyph_memory = XftDefaultGetInteger(XFT_MAX_GLYPH_MEMORY, info->max_glyph_memory);
-	if (!info->max_unref_fonts)
-		info->max_unref_fonts = XFT_DPY_MAX_UNREF_FONTS;
-	info->max_unref_fonts = XftDefaultGetInteger(XFT_MAX_UNREF_FONTS, info->max_unref_fonts);
+bool XftDefaultSet(FcPattern* defaults) {
+	if (info.defaults)
+		FcPatternDestroy(info.defaults);
+	info.defaults = defaults;
+	if (!info.max_glyph_memory)
+		info.max_glyph_memory = XFT_DPY_MAX_GLYPH_MEMORY;
+	info.max_glyph_memory = XftDefaultGetInteger(XFT_MAX_GLYPH_MEMORY, info.max_glyph_memory);
+	if (!info.max_unref_fonts)
+		info.max_unref_fonts = XFT_DPY_MAX_UNREF_FONTS;
+	info.max_unref_fonts = XftDefaultGetInteger(XFT_MAX_UNREF_FONTS, info.max_unref_fonts);
 	return true;
 }
 
@@ -247,15 +183,15 @@ _X_HIDDEN int XftDefaultParseBool(const char* v) {
 	return -1;
 }
 
-static Bool _XftDefaultInitBool(FcPattern* pat, const char* option) {
+static bool _XftDefaultInitBool(FcPattern* pat, const char* option) {
 	int i;
 	char* v = XGetDefault(W.d, "Xft", option);
-	if (v && (i = XftDefaultParseBool (v)) >= 0)
-		return FcPatternAddBool(pat, option, i != 0);
+	if (v && (i = XftDefaultParseBool(v)) >= 0)
+		return FcPatternAddBool(pat, option, i!=0);
 	return true;
 }
 
-static Bool _XftDefaultInitDouble(FcPattern* pat, const char* option) {
+static bool _XftDefaultInitDouble(FcPattern* pat, const char* option) {
 	char* v = XGetDefault(W.d, "Xft", option);
 	if (v) {
 		char* e;
@@ -266,7 +202,7 @@ static Bool _XftDefaultInitDouble(FcPattern* pat, const char* option) {
 	return true;
 }
 
-static Bool _XftDefaultInitInteger(FcPattern *pat, const char *option) {
+static bool _XftDefaultInitInteger(FcPattern *pat, const char *option) {
 	char* v = XGetDefault(W.d, "Xft", option);
 	if (v) {
 		int i;

@@ -1,22 +1,17 @@
 #include "xftint.h"
 
-_X_HIDDEN FT_Library _XftFTlibrary;
+FT_Library _XftFTlibrary;
 
 #define FT_Matrix_Equal(a,b)	((a)->xx == (b)->xx && \
 				 (a)->yy == (b)->yy && \
 				 (a)->xy == (b)->xy && \
 				 (a)->yx == (b)->yx)
-/*
- * List of all open files (each face in a file is managed separately)
- */
 
+// List of all open files (each face in a file is managed separately)
 static XftFtFile* _XftFtFiles;
 static int XftMaxFreeTypeFiles = 5;
 
 static XftFtFile* _XftGetFile(const FcChar8* file, int id) {
-	if (!XftInitFtLibrary())
-		return NULL;
-	
 	XftFtFile* f;
 	for (f = _XftFtFiles; f; f = f->next) {
 		if (!strcmp(f->file, (char*)file) && f->id == id) {
@@ -52,7 +47,7 @@ static XftFtFile* _XftGetFile(const FcChar8* file, int id) {
 	return f;
 }
 
-static XftFtFile* _XftGetFaceFile (FT_Face face) {
+static XftFtFile* _XftGetFaceFile(FT_Face face) {
 	XftFtFile* f = XftMalloc(XFT_MEM_FILE, sizeof(XftFtFile));
 	if (!f)
 		return NULL;
@@ -226,10 +221,9 @@ static FcChar32 _XftSqrt(FcChar32 a) {
 	return h;
 }
 
-static bool _XftIsPrime (FcChar32 i)
-{
+static bool _XftIsPrime (FcChar32 i) {
 	FcChar32	l, t;
-
+	
 	if (i < 2)
 		return FcFalse;
 	if ((i&1) == 0) {
@@ -273,10 +267,6 @@ void XftUnlockFace(XftFont* public) {
 }
 
 static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
-	XftDisplayInfo* info = _XftDisplayInfoGet(True);
-	if (!info)
-		return FcFalse;
-	
 	// Initialize the whole XftFontInfo so that padding doesn't interfere with
 	// hash or XftFontInfoEqual().
 	memset(fi, '\0', sizeof(*fi));
@@ -592,16 +582,12 @@ bool XftFontInfoEqual(const XftFontInfo* a, const XftFontInfo* b) {
 }
 
 XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
-	XftDisplayInfo	*info = _XftDisplayInfoGet(true);
-	if (!info)
-		return NULL;
-	
 	// Find a matching previously opened font
-	XftFont** bucket = &info->fontHash[fi->hash % XFT_NUM_FONT_HASH];
+	XftFont** bucket = &info.fontHash[fi->hash % XFT_NUM_FONT_HASH];
 	for (XftFontInt* font = (XftFontInt*)*bucket; font; font=(XftFontInt*)font->hash_next)
 		if (XftFontInfoEqual(&font->info, fi)) {
 			if (!font->ref++)
-				--info->num_unref_fonts;
+				--info.num_unref_fonts;
 			FcPatternDestroy(pattern);
 			return &font->public;
 		}
@@ -739,8 +725,8 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	// Management fields
 	font->ref = 1;
 
-	font->next = info->fonts;
-	info->fonts = &font->public;
+	font->next = info.fonts;
+	info.fonts = &font->public;
 
 	font->hash_next = *bucket;
 	*bucket = &font->public;
@@ -778,7 +764,6 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	// Glyph memory management fields
 	font->glyph_memory = 0;
 	font->max_glyph_memory = max_glyph_memory;
-	font->use_free_glyphs = info->use_free_glyphs;
 	
 	_XftUnlockFile(fi->file);
 	
@@ -802,20 +787,11 @@ XftFont* XftFontOpenPattern(FcPattern* pattern) {
 	return font;
 }
 
-XftFont* XftFontCopy(XftFont* public) {
-	XftFontInt* font = (XftFontInt*)public;
-	
-	font->ref++;
-	return public;
-}
-
 static void XftFontDestroy(XftFont* public) {
-	XftDisplayInfo* info = _XftDisplayInfoGet(False);
 	XftFontInt* font = (XftFontInt*)public;
 	
 	/* note reduction in memory use */
-	if (info)
-		info->glyph_memory -= font->glyph_memory;
+	info.glyph_memory -= font->glyph_memory;
 	/* Clean up the info */
 	XftFontInfoEmpty(&font->info);
 	/* Free the glyphset */
@@ -842,10 +818,10 @@ static void XftFontDestroy(XftFont* public) {
 	free(font);
 }
 // i think i've been incorrectly marking these as static
-static XftFont* XftFontFindNthUnref(XftDisplayInfo* info, int n) {
+static XftFont* XftFontFindNthUnref(int n) {
 	XftFont* public;
 	XftFontInt* font;
-	for (public=info->fonts; public; public=font->next) {
+	for (public=info.fonts; public; public=font->next) {
 		font = (XftFontInt*)public;
 		if (!font->ref && !n--)
 			break;
@@ -854,12 +830,8 @@ static XftFont* XftFontFindNthUnref(XftDisplayInfo* info, int n) {
 }
 
 void XftFontManageMemory(void) {
-	XftDisplayInfo* info = _XftDisplayInfoGet(false);
-	
-	if (!info)
-		return;
-	while (info->num_unref_fonts > info->max_unref_fonts) {
-		XftFont* public = XftFontFindNthUnref(info, rand() % info->num_unref_fonts);
+	while (info.num_unref_fonts > info.max_unref_fonts) {
+		XftFont* public = XftFontFindNthUnref(rand() % info.num_unref_fonts);
 		XftFontInt* font = (XftFontInt*)public;
 		
 		if (XftDebug () & XFT_DBG_CACHE)
@@ -869,14 +841,14 @@ void XftFontManageMemory(void) {
 		
 		XftFont** prev;
 		/* Unhook from display list */
-		for (prev = &info->fonts; *prev; prev = &(*(XftFontInt**)prev)->next) {
+		for (prev = &info.fonts; *prev; prev = &(*(XftFontInt**)prev)->next) {
 			if (*prev == public) {
 				*prev = font->next;
 				break;
 			}
 		}
 		/* Unhook from hash list */
-		for (prev = &info->fontHash[font->info.hash % XFT_NUM_FONT_HASH];
+		for (prev = &info.fontHash[font->info.hash % XFT_NUM_FONT_HASH];
 		     *prev;
 		     prev = &(*(XftFontInt**)prev)->hash_next) {
 			if (*prev == public) {
@@ -886,29 +858,16 @@ void XftFontManageMemory(void) {
 		}
 		/* Destroy the font */
 		XftFontDestroy(public);
-		--info->num_unref_fonts;
+		--info.num_unref_fonts;
 	}
 }
 
 void XftFontClose(XftFont* public) {
-	XftDisplayInfo* info = _XftDisplayInfoGet(False);
 	XftFontInt* font = (XftFontInt*)public;
 	
 	if (--font->ref != 0)
 		return;
 	
-	if (info) {
-		++info->num_unref_fonts;
-		XftFontManageMemory();
-	} else {
-		XftFontDestroy(public);
-	}
-}
-
-bool XftInitFtLibrary(void) {
-	if (_XftFTlibrary)
-		return FcTrue;
-	if (FT_Init_FreeType(&_XftFTlibrary))
-		return FcFalse;
-	return FcTrue;
+	++info.num_unref_fonts;
+	XftFontManageMemory();
 }

@@ -52,7 +52,7 @@ typedef struct XftFtFile {
 	FT_F26Dot6 ysize;	// current ysize setting
 	FT_Matrix matrix;	// current matrix setting
 	
-	int lock; // lock count; can't unload unless 0 */
+	int lock; // lock count; can't unload unless 0
 	FT_Face face; // pointer to face; only valid when lock
 } XftFtFile;
 
@@ -106,7 +106,6 @@ typedef struct XftFontInt {
 	// Glyph memory management fields
 	unsigned long glyph_memory;
 	unsigned long max_glyph_memory;
-	bool use_free_glyphs; // Use XRenderFreeGlyphs
 } XftFontInt;
 
 typedef enum XftClipType {
@@ -126,16 +125,6 @@ typedef union XftClip {
 	Region region;
 } XftClip;
 
-struct XftDraw {
-	unsigned int bits_per_pixel;
-	unsigned int depth;
-	Drawable drawable;
-	XftClipType clip_type;
-	XftClip clip;
-	int subwindow_mode;
-	Picture pict;
-};
-
 typedef struct XftSolidColor {
 	XRenderColor color;
 	int screen; //we keep this because i think it uses -1 for invalid
@@ -147,37 +136,26 @@ typedef struct XftSolidColor {
 #define XFT_NUM_FONT_HASH 127
 
 typedef struct XftDisplayInfo {
-	struct XftDisplayInfo* next;
-	Display* display;
 	XExtCodes* codes;
 	FcPattern* defaults;
-	bool hasSolid;
 	XftFont* fonts;
-	XRenderPictFormat* solidFormat;
 	unsigned long glyph_memory;
 	unsigned long max_glyph_memory;
-	bool use_free_glyphs;
 	int num_unref_fonts;
 	int max_unref_fonts;
 	XftSolidColor colors[XFT_NUM_SOLID_COLOR];
 	XftFont* fontHash[XFT_NUM_FONT_HASH];
 } XftDisplayInfo;
 
-/*
- * By default, use no more than 4 meg of server memory total, and no
- * more than 1 meg for any one font
- */
+// By default, use no more than 4 meg of server memory total, and no
+// more than 1 meg for any one font
 #define XFT_DPY_MAX_GLYPH_MEMORY (4 * 1024 * 1024)
 #define XFT_FONT_MAX_GLYPH_MEMORY (1024 * 1024)
 
-/*
- * By default, keep the last 16 unreferenced fonts around to
- * speed reopening them.  Note that the glyph caching code
- * will keep the global memory usage reasonably limited
- */
+// By default, keep the last 16 unreferenced fonts around to
+// speed reopening them.  Note that the glyph caching code
+// will keep the global memory usage reasonably limited
 #define XFT_DPY_MAX_UNREF_FONTS 16
-
-extern XftDisplayInfo* _XftDisplayInfo;
 
 #define XFT_DBG_OPEN	1
 #define XFT_DBG_OPENV 2
@@ -200,7 +178,6 @@ extern XftDisplayInfo* _XftDisplayInfo;
 int XftDebug(void);
 
 /* xftdpy.c */
-XftDisplayInfo* _XftDisplayInfoGet(bool createIfNecessary);
 void _XftDisplayManageMemory(void);
 
 /* xftfreetype.c */
@@ -220,3 +197,5 @@ void XftMemFree(int kind, int size);
 int XftNativeByteOrder(void);
 void XftSwapCARD32(CARD32* data, int n);
 void XftSwapImage(XImage* image);
+
+extern XftDisplayInfo info;

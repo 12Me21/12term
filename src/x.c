@@ -273,9 +273,12 @@ int main(int argc, char* argv[argc+1]) {
 	
 	if (!FcInit())
 		die("fontconfig init failed");
+	XftDisplayInfoInit();
+	if (FT_Init_FreeType(&_XftFTlibrary))
+		die("freetype init failed");
 	
 	time_log("init xft");
-	
+		
 	load_fonts(settings.faceName, settings.faceSize);
 	
 	// messy messy
