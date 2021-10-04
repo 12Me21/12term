@@ -1,6 +1,7 @@
 #pragma once
 
 #include <X11/Xlib.h>
+#include <xcb/xcb.h>
 #include "xft/Xft.h"
 #include <X11/Xatom.h>
 
@@ -9,6 +10,7 @@
 // globals
 typedef struct Xw {
 	Display* d;
+	xcb_connection_t* c;
 	int scr;
 	Visual* vis;
 	Colormap cmap;

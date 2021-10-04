@@ -14,6 +14,8 @@
 #endif
 
 #include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
+#include <xcb/render.h>
 #include "xft/Xft.h"
 #include <X11/Xatom.h>
 #include <X11/Xresource.h>
@@ -246,14 +248,18 @@ int main(int argc, char* argv[argc+1]) {
 	W.d = XOpenDisplay(NULL);
 	if (!W.d)
 		die("Could not connect to X server\n");
+	W.c = XGetXCBConnection(W.d);
 	W.scr = XDefaultScreen(W.d);
 	W.vis = XDefaultVisual(W.d, W.scr);
 	// check if user has modern display (otherwise nnnnnnnn sorry i dont want to deal with this)
 	if (W.vis->class!=TrueColor)
 		die("Cannot handle non truecolor visual ...\n");
-	int event_base, error_base;
-	if (!XRenderQueryExtension(W.d, &event_base, &error_base))
-		die("No Xrender ...\n");
+	
+	xcb_render_query_version_cookie_t c = xcb_render_query_version_unchecked(W.c, XCB_RENDER_MAJOR_VERSION, XCB_RENDER_MINOR_VERSION);
+	xcb_render_query_version_reply_t* r = xcb_render_query_version_reply(W.c, c, NULL);
+	print("xrender version: %d.%d\n", r->major_version, r->minor_version);
+	free(r);
+	
 	if (!XRenderFindVisualFormat(W.d, W.vis))
 		die("cant find visual format ...\n");
 	
