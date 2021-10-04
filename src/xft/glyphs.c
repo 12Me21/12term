@@ -572,8 +572,10 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 		xftg->picture = 0;
 		xftg->glyph_memory = size + sizeof (XftGlyph);
 		if (font->format) {
-			if (!font->glyphset)
-				font->glyphset = XRenderCreateGlyphSet(W.d, font->format);
+			if (!font->glyphset) {
+				font->glyphset = xcb_generate_id(W.c);
+				xcb_render_create_glyph_set_checked(W.c, font->glyphset, font->format->id);
+			}
 			if (mode == FT_RENDER_MODE_MONO) {
 				/* swap bits in each byte */
 				if (BitmapBitOrder(W.d) != MSBFirst) {
@@ -607,7 +609,8 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 				
 				XInitImage(&image);
 				XPutImage(W.d, pixmap, gc, &image, 0, 0, 0, 0, local.width, local.rows);
-				xftg->picture = XRenderCreatePicture(W.d, pixmap, font->format, 0, NULL);
+				xftg->picture = xcb_generate_id(W.c);
+				xcb_render_create_picture_checked(W.c, xftg->picture, pixmap, font->format->id, 0, NULL);
 				
 				XFreeGC(W.d, gc);
 				XFreePixmap(W.d, pixmap);

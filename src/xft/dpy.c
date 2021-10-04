@@ -17,11 +17,8 @@ static int _XftCloseDisplay(Display* dpy, XExtCodes* codes) {
 static FcPattern* _XftDefaultInit();
 
 static FcResult _XftDefaultGet(const char* object, FcValue* v) {
-	if (!info.defaults) {
-		info.defaults = _XftDefaultInit();
-		if (!info.defaults)
-			return FcResultNoMatch;
-	}
+	if (!info.defaults)
+		return FcResultNoMatch;
 	FcResult	r = FcPatternGet(info.defaults, object, W.scr, v);
 	if (r == FcResultNoId && W.scr > 0)
 		r = FcPatternGet(info.defaults, object, 0, v);
@@ -53,37 +50,11 @@ static double XftDefaultGetDouble(const char* object, double def) {
 }
 
 void XftDisplayInfoInit(void) {
-	info.codes = XAddExtension(W.d);
+	info.codes = XAddExtension(W.d); // what does this do?
 	if (!info.codes)
 		goto bail1;
 	XESetCloseDisplay(W.d, info.codes->extension, _XftCloseDisplay);
-
-	info.defaults = NULL;
 	
-	int major, minor;
-	XRenderQueryVersion(W.d, &major, &minor);
-	if (major<0 || (major==0 && minor<10)) {
-		die("Requires xrender >= 0.10");
-	}
-	
-	if (XftDebug() & XFT_DBG_RENDER) {
-		XRenderPictFormat* format = XRenderFindVisualFormat(W.d, W.vis);
-		
-		printf ("XftDisplayInfoGet Default visual 0x%x ", (int)W.vis->visualid);
-		if (format) {
-			if (format->type == PictTypeDirect) {
-				printf("format %d,%d,%d,%d\n",
-				        format->direct.alpha,
-				        format->direct.red,
-				        format->direct.green,
-				        format->direct.blue);
-			} else {
-				printf("format indexed\n");
-			}
-		} else
-			printf("No Render format for default visual\n");
-		printf("XftDisplayInfoGet initialized");
-	}
 	for (int i=0; i<XFT_NUM_SOLID_COLOR; i++) {
 		info.colors[i].screen = -1;
 		info.colors[i].pict = 0;
@@ -101,6 +72,8 @@ void XftDisplayInfoInit(void) {
 		printf ("global max unref fonts %d\n", info.max_unref_fonts);
 	
 	memset(info.fontHash, '\0', sizeof(XftFont*)*XFT_NUM_FONT_HASH);
+	
+	info.defaults = _XftDefaultInit();
 	
  bail1:
 	if (XftDebug() & XFT_DBG_RENDER) {

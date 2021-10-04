@@ -12,10 +12,12 @@ typedef struct Xw {
 	Display* d;
 	xcb_connection_t* c;
 	int scr;
+	xcb_screen_t* scr2;
 	Visual* vis;
 	Colormap cmap;
-	GC gc;
-	Window win;
+	xcb_gcontext_t gc;
+	xcb_window_t win;
+	XRenderPictFormat* format;
 	
 	int event_mask;
 	

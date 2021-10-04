@@ -9,6 +9,7 @@
 #include <fontconfig/fontconfig.h>
 
 #include <X11/extensions/Xrender.h>
+#include <xcb/render.h>
 
 #define XFT_MAX_GLYPH_MEMORY	"maxglyphmemory"
 #define XFT_MAX_UNREF_FONTS	"maxunreffonts"
@@ -39,7 +40,7 @@ typedef struct XftGlyphFont {
 } XftGlyphFont;
 
 /* xftcolor.c */
-unsigned long XftColorAllocValue(const XRenderColor* color);
+unsigned long XftColorAllocValue(const xcb_render_color_t* color);
 
 /* xftdpy.c */
 bool XftDefaultSet(FcPattern* defaults);
@@ -54,17 +55,9 @@ Drawable XftDrawDrawable(XftDraw* draw);
 
 void XftDrawDestroy(XftDraw* draw);
 
-Picture XftDrawPicture(XftDraw* draw);
+xcb_render_picture_t XftDrawPicture(XftDraw* draw);
 
-Picture XftDrawSrcPicture(const XRenderColor* color);
-
-void XftDrawRect(XftDraw* draw, const XRenderColor* color, int x, int y, unsigned int width, unsigned int height);
-
-bool XftDrawSetClip(XftDraw* draw, Region r);
-
-bool XftDrawSetClipRectangles(XftDraw* draw, int xOrigin, int yOrigin, const XRectangle* rects, int n);
-
-void XftDrawSetSubwindowMode(XftDraw* draw, int mode);
+void XftDrawRect(XftDraw* draw, const xcb_render_color_t color, int x, int y, unsigned int width, unsigned int height);
 
 /* xftextent.c */
 
@@ -95,5 +88,7 @@ FT_UInt XftCharIndex(XftFont* pub, FcChar32 ucs4);
 
 /* xftrender.c */
 
+xcb_render_picture_t XftDrawSrcPicture(const xcb_render_color_t color);
+
 // eee
-void XftGlyphRender1(int op, XRenderColor* src, XftFont* pub, Picture dst, int x, int y, const FT_UInt g, int cw);
+void XftGlyphRender1(int op, xcb_render_color_t src, XftFont* pub, xcb_render_picture_t dst, int x, int y, const FT_UInt g, int cw);

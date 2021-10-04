@@ -34,7 +34,7 @@ static int cursor_y;
 
 // todo: cache the palette colors?
 // or perhaps store them as xftcolor internally
-static XRenderColor make_color(Color c) {
+static xcb_render_color_t make_color(Color c) {
 	RGBColor rgb;
 	if (c.truecolor)
 		rgb = c.rgb;
@@ -49,7 +49,7 @@ static XRenderColor make_color(Color c) {
 		else // -2
 			rgb = T.background;
 	}
-	return (XRenderColor){
+	return (xcb_render_color_t){
 		.red = rgb.r*65535/255,
 		.green = rgb.g*65535/255,
 		.blue = rgb.b*65535/255,
@@ -58,7 +58,7 @@ static XRenderColor make_color(Color c) {
 }
 
 unsigned long alloc_color(Color c) {
-	XRenderColor x = make_color(c);
+	xcb_render_color_t x = make_color(c);
 	return XftColorAllocValue(&x);
 }
 
@@ -104,15 +104,15 @@ void draw_resize(int width, int height, bool charsize) {
 	}
 }
 
-static int same_color(XRenderColor a, XRenderColor b) {
+static int same_color(xcb_render_color_t a, xcb_render_color_t b) {
 	return a.red==b.red && a.green==b.green && a.blue==b.blue && a.alpha==b.alpha;
 }
 
 // todo: allow drawing multiple at once for efficiency?
-static void draw_glyph(XftDraw* draw, Px x, Px y, Glyph g, XRenderColor col, int w) {
+static void draw_glyph(XftDraw* draw, Px x, Px y, Glyph g, xcb_render_color_t col, int w) {
 	if (!g.font)
 		return;
-	XftGlyphRender1(PictOpOver, &col, g.font, XftDrawPicture(draw), x+g.x, y+g.y, g.glyph, W.cw*w);
+	XftGlyphRender1(PictOpOver, col, g.font, XftDrawPicture(draw), x+g.x, y+g.y, g.glyph, W.cw*w);
 }
 
 // todo: make these thicker depending on dpi/fontsize
@@ -130,11 +130,10 @@ static void draw_char_overlays(XftDraw* draw, Px winx, Cell c) {
 	}
 	
 	if (underline) {
-		XRenderColor col = make_color(underline_color);
-		XftDrawRect(draw, &col, winx, W.font_ascent+1, width*W.cw, underline);
+		XftDrawRect(draw, make_color(underline_color), winx, W.font_ascent+1, width*W.cw, underline);
 	}
 	if (c.attrs.strikethrough) {
-		XftDrawRect(draw, (XRenderColor[]){make_color(c.attrs.color)}, winx, W.font_ascent*2/3, width*W.cw, 1);
+		XftDrawRect(draw, make_color(c.attrs.color), winx, W.font_ascent*2/3, width*W.cw, 1);
 	}
 }
 
@@ -155,7 +154,7 @@ static void draw_cursor(int x, int y) {
 	int width = temp.wide==1 ? 2 : 1;
 	
 	// draw background
-	XftDrawRect(cursor_draw, (XRenderColor[]){make_color((Color){.i=-3})}, 0, 0, W.cw*width, W.ch);
+	XftDrawRect(cursor_draw, make_color((Color){.i=-3}), 0, 0, W.cw*width, W.ch);
 	
 	// draw char
 	if (temp.chr) {
@@ -212,28 +211,28 @@ static bool draw_row(int y, Row row) {
 	memcpy(rows[y].cells, row, T.width*sizeof(Cell));
 	
 	if (row==blank_row) {
-		XftDrawRect(rows[y].draw, (XRenderColor[]){make_color((Color){.truecolor=true,.rgb=T.background})}, 0, 0, W.w, W.ch );
+		XftDrawRect(rows[y].draw, make_color((Color){.truecolor=true,.rgb=T.background}), 0, 0, W.w, W.ch );
 		return true;
 	}
 	
 	// draw left border background
-	XftDrawRect(rows[y].draw, (XRenderColor[]){make_color((Color){.i=-2})}, 0, 0, W.border, W.ch);
+	XftDrawRect(rows[y].draw, make_color((Color){.i=-2}), 0, 0, W.border, W.ch);
 	// draw cell backgrounds
-	XRenderColor prev_color = make_color(row[0].attrs.background);
+	xcb_render_color_t prev_color = make_color(row[0].attrs.background);
 	int prev_start = 0;
 	int x;
 	for (x=1; x<T.width; x++) {
-		XRenderColor bg = make_color(row[x].attrs.background);
+		xcb_render_color_t bg = make_color(row[x].attrs.background);
 		if (!same_color(bg, prev_color)) {
-			XftDrawRect(rows[y].draw, &prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x-1), W.ch);
+			XftDrawRect(rows[y].draw, prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x-1), W.ch);
 			prev_start = x;
 			prev_color = bg;
 		}
 	}
-	XftDrawRect(rows[y].draw, &prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x-1), W.ch);
+	XftDrawRect(rows[y].draw, prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x-1), W.ch);
 	// todo: why does the bg color extend too far in fullscreen?
 	// draw right border background
-	XftDrawRect(rows[y].draw, (XRenderColor[]){make_color((Color){.i=-2})}, W.border+W.cw*T.width, 0, W.border, W.ch);
+	XftDrawRect(rows[y].draw, make_color((Color){.i=-2}), W.border+W.cw*T.width, 0, W.border, W.ch);
 	
 	// draw text
 	// todo: we need to handle combining chars here!!
@@ -259,15 +258,14 @@ static int row_displayed_at(int y) {
 }
 
 void copy_cursor_part(Px x, Px y, Px w, Px h, int cx, int cy) {
-	XCopyArea(W.d, cursor_pix, W.win, W.gc,
-		x, y, w, h, W.border+cx*W.cw+x, W.border+W.ch*cy+y);
+	xcb_copy_area(W.c, cursor_pix, W.win, W.gc, x, y, W.border+cx*W.cw+x, W.border+W.ch*cy+y, w, h);
 }
 
 // todo: vary thickness of cursors and lines based on font size
 
 // todo: keep better track of where cursor is rendered
 static void paint_row(int y) {
-	XCopyArea(W.d, rows[y].pix, W.win, W.gc, 0, 0, W.w, W.ch, 0, W.border+W.ch*y);
+	xcb_copy_area(W.c, rows[y].pix, W.win, W.gc, 0, 0, 0, W.border+W.ch*y, W.w, W.ch);
 	if (T.show_cursor && row_displayed_at(y)==T.c.y) {
 		switch (T.cursor_shape) {
 		case 0: // filled box

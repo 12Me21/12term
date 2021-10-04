@@ -24,7 +24,7 @@ typedef struct XftGlyph {
 	XGlyphInfo metrics;
 	void* bitmap;
 	unsigned long glyph_memory;
-	Picture picture;
+	xcb_render_picture_t picture;
 } XftGlyph;
 
 /*
@@ -102,33 +102,16 @@ typedef struct XftFontInt {
 	int			rehash_value;
 	// X specific fields
 	GlyphSet glyphset; // Render glyphset
-	XRenderPictFormat* format;	// Render format for glyphs
+	xcb_render_pictforminfo_t* format;	// Render format for glyphs
 	// Glyph memory management fields
 	unsigned long glyph_memory;
 	unsigned long max_glyph_memory;
 } XftFontInt;
 
-typedef enum XftClipType {
-	XftClipTypeNone, XftClipTypeRegion, XftClipTypeRectangles
-} XftClipType;
-
-typedef struct XftClipRect {
-	int xOrigin;
-	int yOrigin;
-	int n;
-} XftClipRect;
-
-#define XftClipRects(cr) ((XRectangle*) ((cr)+1))
-
-typedef union XftClip {
-	XftClipRect* rect;
-	Region region;
-} XftClip;
-
 typedef struct XftSolidColor {
-	XRenderColor color;
+	xcb_render_color_t color;
 	int screen; //we keep this because i think it uses -1 for invalid
-	Picture pict;
+	xcb_render_picture_t pict;
 } XftSolidColor;
 
 #define XFT_NUM_SOLID_COLOR 16

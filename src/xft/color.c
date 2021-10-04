@@ -18,7 +18,7 @@ static short masklen(unsigned long m) {
 	return (short)(((y + (y>>3)) & 030707070707) % 077);
 }
 
-unsigned long XftColorAllocValue(const XRenderColor* color) {
+unsigned long XftColorAllocValue(const xcb_render_color_t* color) {
 	int red_shift = maskbase(W.vis->red_mask);
 	int red_len = masklen(W.vis->red_mask);
 	int green_shift = maskbase(W.vis->green_mask);

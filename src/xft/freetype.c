@@ -1,4 +1,5 @@
 #include "xftint.h"
+#include <xcb/xcb_renderutil.h>
 
 FT_Library _XftFTlibrary;
 
@@ -506,24 +507,27 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 		antialias = false;
 	
 	bool color = FT_HAS_COLOR(face);
-	XRenderPictFormat* format;
+	
+	const xcb_render_query_pict_formats_reply_t* fs = xcb_render_util_query_formats(W.c);
 	// Find the appropriate picture format
-	if (color)
-		format = XRenderFindStandardFormat(W.d, PictStandardARGB32);
-	else if (antialias) {
+	xcb_pict_standard_t f;
+	if (color) {
+		f = XCB_PICT_STANDARD_ARGB_32;
+	} else if (antialias) {
 		switch (fi->rgba) {
 		case FC_RGBA_RGB:
 		case FC_RGBA_BGR:
 		case FC_RGBA_VRGB:
 		case FC_RGBA_VBGR:
-			format = XRenderFindStandardFormat(W.d, PictStandardARGB32);
+			f = XCB_PICT_STANDARD_ARGB_32;
 			break;
 		default:
-			format = XRenderFindStandardFormat(W.d, PictStandardA8);
+			f = XCB_PICT_STANDARD_A_8;
 			break;
 		}
 	} else
-		format = XRenderFindStandardFormat(W.d, PictStandardA1);
+		f = XCB_PICT_STANDARD_A_1;
+	xcb_render_pictforminfo_t* format = xcb_render_util_find_standard_format(fs, f);
 	if (!format)
 		goto bail2;
 	

@@ -16,6 +16,8 @@
 #include <X11/Xlib.h>
 #include <X11/Xlib-xcb.h>
 #include <xcb/render.h>
+#include <xcb/xcb_aux.h>
+#include <xcb/xcb_icccm.h>
 #include "xft/Xft.h"
 #include <X11/Xatom.h>
 #include <X11/Xresource.h>
@@ -144,7 +146,7 @@ static void run(void) {
 	//init_lua();
 	//time_log("lua");
 	
-	Fd xfd = XConnectionNumber(W.d);
+	Fd xfd = xcb_get_file_descriptor(W.c);
 	
 	struct timespec last_redraw = {0};
 	
@@ -217,10 +219,6 @@ void set_title(utf8* s) {
 	});
 }
 
-static int gosh_dang_destroy_image_function(XImage* img) {
-	return 1;
-}
-
 #ifdef CATCH_SEGFAULT
 static void hecko(int signum, siginfo_t* si, ucontext_t* context) {
 	static unsigned long long n[10];
@@ -250,6 +248,7 @@ int main(int argc, char* argv[argc+1]) {
 		die("Could not connect to X server\n");
 	W.c = XGetXCBConnection(W.d);
 	W.scr = XDefaultScreen(W.d);
+	W.scr2 = xcb_aux_get_screen(W.c, W.scr);
 	W.vis = XDefaultVisual(W.d, W.scr);
 	// check if user has modern display (otherwise nnnnnnnn sorry i dont want to deal with this)
 	if (W.vis->class!=TrueColor)
@@ -260,7 +259,8 @@ int main(int argc, char* argv[argc+1]) {
 	print("xrender version: %d.%d\n", r->major_version, r->minor_version);
 	free(r);
 	
-	if (!XRenderFindVisualFormat(W.d, W.vis))
+	W.format = XRenderFindVisualFormat(W.d, W.vis);
+	if (!W.format)
 		die("cant find visual format ...\n");
 	
 	W.cmap = XDefaultColormap(W.d, W.scr);
@@ -297,32 +297,31 @@ int main(int argc, char* argv[argc+1]) {
 	
 	W.event_mask = FocusChangeMask | KeyPressMask | KeyReleaseMask | ExposureMask | VisibilityChangeMask | StructureNotifyMask | ButtonMotionMask | ButtonPressMask | ButtonReleaseMask;
 	
-	W.win = XCreateWindow(W.d, XRootWindow(W.d, W.scr),
-		0, 0, W.w, W.h, // geometry
-		0, // border width
-		XDefaultDepth(W.d, W.scr), // depth
-		InputOutput, // class
-		W.vis, // visual
-		// attributes:
-		CWBackPixel | CWBorderPixel | CWBitGravity | CWEventMask | CWColormap,
-		&(XSetWindowAttributes){
-			.background_pixel = bg_pixel,
-			.border_pixel = bg_pixel,
-			.bit_gravity = NorthWestGravity,
+	W.win = xcb_generate_id(W.c);
+	xcb_aux_create_window(W.c, xcb_aux_get_depth(W.c, W.scr2),
+		W.win, XRootWindow(W.d, W.scr),
+		0, 0, W.w, W.h,
+		0, 
+		XCB_WINDOW_CLASS_INPUT_OUTPUT,
+		W.vis->visualid,
+		XCB_CW_BACK_PIXEL | XCB_CW_BIT_GRAVITY | XCB_CW_EVENT_MASK | XCB_CW_COLORMAP,
+		&(xcb_params_cw_t) {
+			.back_pixel = bg_pixel,
+			.bit_gravity = XCB_GRAVITY_NORTH_WEST,
 			.event_mask = W.event_mask,
 			.colormap = W.cmap,
 		}
 	);
+	// set _NET_WM_PID property
+	XChangeProperty(W.d, W.win, W.atoms.net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (void*)&(pid_t){getpid()}, 1);
 	
-	W.gc = XCreateGC(W.d, W.win, GCGraphicsExposures, &(XGCValues){
-		.graphics_exposures = False,
-	});
+	W.gc = xcb_generate_id(W.c);
+	xcb_create_gc(W.c, W.gc, W.win, XCB_GC_GRAPHICS_EXPOSURES, &(xcb_params_gc_t){
+			.graphics_exposures = false,
+		});
 	
 	// allow listening for window close event
 	XSetWMProtocols(W.d, W.win, &W.atoms.wm_delete_window, 1);
-	
-	// set _NET_WM_PID property
-	XChangeProperty(W.d, W.win, W.atoms.net_wm_pid, XA_CARDINAL, 32, PropModeReplace, (void*)&(pid_t){getpid()}, 1);
 	
 	// set title
 	XSetClassHint(W.d, W.win, &(XClassHint){
@@ -332,15 +331,13 @@ int main(int argc, char* argv[argc+1]) {
 	set_title(NULL);
 	
 	// set icon
-	Pixmap icon_pixmap = XCreatePixmap(W.d, W.win, ICON_SIZE, ICON_SIZE, 24);
-	XImage* icon_image = XCreateImage(W.d, W.vis, 24, ZPixmap, 0, (void*)ICON_DATA, ICON_SIZE, ICON_SIZE, 8, 0);
-	icon_image->f.destroy_image = gosh_dang_destroy_image_function;
-	XPutImage(W.d, icon_pixmap, W.gc, icon_image, 0,0,0,0, icon_image->width, icon_image->height);
-	XDestroyImage(icon_image);
+	xcb_pixmap_t icon_pixmap = xcb_generate_id(W.c);
+	xcb_create_pixmap(W.c, 24, icon_pixmap, W.win, ICON_SIZE, ICON_SIZE);
+	xcb_put_image(W.c, XCB_IMAGE_FORMAT_Z_PIXMAP, icon_pixmap, W.gc, ICON_SIZE, ICON_SIZE, 0, 0, 0, 24, ICON_SIZE*ICON_SIZE*4, ICON_DATA);
 	
-	XSetWMHints(W.d, W.win, &(XWMHints){
-		.flags = InputHint | IconPixmapHint,
-		.input = true, // which input focus model
+	xcb_icccm_set_wm_hints(W.c, W.win, &(xcb_icccm_wm_hints_t){
+		.flags = XCB_ICCCM_WM_HINT_INPUT | XCB_ICCCM_WM_HINT_ICON_PIXMAP,
+		.input = true,
 		.icon_pixmap = icon_pixmap,
 	});
 	
