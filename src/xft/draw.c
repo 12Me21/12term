@@ -28,8 +28,7 @@ static void XftDrawRenderPrepare(XftDraw* draw) {
 		XRenderSetPictureClipRegion(W.d, draw->pict, draw->clip.region);
 		break;
 	case XftClipTypeRectangles:
-		XRenderSetPictureClipRectangles(W.d, draw->pict,
-		                                draw->clip.rect->xOrigin,
+		XRenderSetPictureClipRectangles(W.d, draw->pict, draw->clip.rect->xOrigin,
 		                                draw->clip.rect->yOrigin,
 		                                XftClipRects(draw->clip.rect),
 		                                draw->clip.rect->n);

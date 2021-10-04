@@ -55,6 +55,7 @@ Drawable XftDrawDrawable(XftDraw* draw);
 void XftDrawDestroy(XftDraw* draw);
 
 Picture XftDrawPicture(XftDraw* draw);
+
 Picture XftDrawSrcPicture(const XRenderColor* color);
 
 void XftDrawRect(XftDraw* draw, const XRenderColor* color, int x, int y, unsigned int width, unsigned int height);
@@ -68,42 +69,28 @@ void XftDrawSetSubwindowMode(XftDraw* draw, int mode);
 /* xftextent.c */
 
 void XftGlyphExtents(XftFont* pub, const FT_UInt* glyphs, int nglyphs, XGlyphInfo* extents);
-
 void XftTextExtents32(XftFont* pub, const FcChar32* string, int len, XGlyphInfo* extents);
 
 /* xftfreetype.c */
 
 FT_Face XftLockFace(XftFont* pub);
-
 void XftUnlockFace(XftFont* pub);
-
 XftFontInfo* XftFontInfoCreate(const FcPattern* pattern);
-
 void XftFontInfoDestroy(XftFontInfo* fi);
-
 FcChar32 XftFontInfoHash(const XftFontInfo* fi);
-
 bool XftFontInfoEqual(const XftFontInfo* a, const XftFontInfo* b);
-
 XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi);
-
 XftFont* XftFontOpenPattern(FcPattern* pattern);
-
 void XftFontClose(XftFont* pub);
-
-bool XftInitFtLibrary(void);
 
 /* xftglyphs.c */
 void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, int nglyph);
-
 void XftFontUnloadGlyphs(XftFont* pub, const FT_UInt* glyphs, int nglyph);
 
 #define XFT_NMISSING 256
 
 bool XftFontCheckGlyph(XftFont* pub, bool need_bitmaps, FT_UInt glyph, FT_UInt* missing, int* nmissing);
-
 bool XftCharExists(XftFont* pub, FcChar32 ucs4);
-
 FT_UInt XftCharIndex(XftFont* pub, FcChar32 ucs4);
 
 /* xftrender.c */

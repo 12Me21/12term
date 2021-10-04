@@ -200,8 +200,7 @@ static void _XftReleaseFile(XftFtFile* f) {
 		if (f->face)
 			FT_Done_Face(f->face);
 	}
-	XftMemFree(XFT_MEM_FILE,
-	            sizeof(XftFtFile) + (f->file ? strlen(f->file)+1 : 0));
+	XftMemFree(XFT_MEM_FILE, sizeof(XftFtFile) + (f->file ? strlen(f->file)+1 : 0));
 	free(f);
 }
 
@@ -225,26 +224,26 @@ static bool _XftIsPrime (FcChar32 i) {
 	FcChar32	l, t;
 	
 	if (i < 2)
-		return FcFalse;
+		return false;
 	if ((i&1) == 0) {
 		if (i == 2)
-			return FcTrue;
-		return FcFalse;
+			return true;
+		return false;
 	}
 	l = _XftSqrt(i) + 1;
 	for (t = 3; t <= l; t += 2)
 		if (i % t == 0)
-			return FcFalse;
-	return FcTrue;
+			return false;
+	return true;
 }
 
 static FcChar32 _XftHashSize(FcChar32 num_unicode) {
-	/* at least 31.25 % extra space */
-	FcChar32	hash = num_unicode + (num_unicode >> 2) + (num_unicode >> 4);
+	// at least 31.25% extra space
+	FcChar32	hash = num_unicode + (num_unicode>>2) + (num_unicode>>4);
 	
-	if ((hash & 1) == 0)
+	if ((hash&1) == 0)
 		hash++;
-	while (!_XftIsPrime (hash))
+	while (!_XftIsPrime(hash))
 		hash += 2;
 	return hash;
 }
@@ -263,7 +262,7 @@ FT_Face XftLockFace(XftFont* public) {
 
 void XftUnlockFace(XftFont* public) {
 	XftFontInt* font = (XftFontInt*)public;
-	_XftUnlockFile (font->info.file);
+	_XftUnlockFile(font->info.file);
 }
 
 static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
@@ -272,27 +271,11 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 	memset(fi, '\0', sizeof(*fi));
 	
 	// Find the associated file
-	FcChar8* filename;
-	switch (FcPatternGetString(pattern, FC_FILE, 0, &filename)) {
-	case FcResultNoMatch:
-		filename = NULL;
-		break;
-	case FcResultMatch:
-		break;
-	default:
-		goto bail0;
-	}
+	FcChar8* filename = NULL;
+	FcPatternGetString(pattern, FC_FILE, 0, &filename);
 	
-	int id;
-	switch (FcPatternGetInteger(pattern, FC_INDEX, 0, &id)) {
-	case FcResultNoMatch:
-		id = 0;
-		break;
-	case FcResultMatch:
-		break;
-	default:
-		goto bail0;
-	}
+	int id = 0;
+	FcPatternGetInteger(pattern, FC_INDEX, 0, &id);
 	
 	FT_Face face;
 	if (filename)
@@ -306,9 +289,8 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 	double dsize;
 	if (FcPatternGetDouble(pattern, FC_PIXEL_SIZE, 0, &dsize) != FcResultMatch)
 		goto bail1;
-	double aspect;
-	if (FcPatternGetDouble(pattern, FC_ASPECT, 0, &aspect) != FcResultMatch)
-		aspect = 1.0;
+	double aspect = 1.0;
+	FcPatternGetDouble(pattern, FC_ASPECT, 0, &aspect);
 	
 	fi->ysize = (FT_F26Dot6)(dsize * 64.0);
 	fi->xsize = (FT_F26Dot6)(dsize * aspect * 64.0);
@@ -316,39 +298,19 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 	if (XftDebug() & XFT_DBG_OPEN)
 		printf("XftFontInfoFill: %s: %d (%g pixels)\n",
 		       (filename ? filename : (FcChar8*)"<none>"), id, dsize);
+	
+	fi->antialias = true;
 	// Get antialias value
-	switch (FcPatternGetBool(pattern, FC_ANTIALIAS, 0, &fi->antialias)) {
-	case FcResultNoMatch:
-		fi->antialias = True;
-		break;
-	case FcResultMatch:
-		break;
-	default:
-		goto bail1;
-	}
-
+	FcPatternGetBool(pattern, FC_ANTIALIAS, 0, &fi->antialias);
+	
 	// Get rgba value
-	switch (FcPatternGetInteger(pattern, FC_RGBA, 0, &fi->rgba)) {
-	case FcResultNoMatch:
-		fi->rgba = FC_RGBA_UNKNOWN;
-		break;
-	case FcResultMatch:
-		break;
-	default:
-		goto bail1;
-	}
-
+	fi->rgba = FC_RGBA_UNKNOWN;
+	FcPatternGetInteger(pattern, FC_RGBA, 0, &fi->rgba);
+	
 	// Get lcd_filter value
-	switch (FcPatternGetInteger(pattern, FC_LCD_FILTER, 0, &fi->lcd_filter)) {
-	case FcResultNoMatch:
-		fi->lcd_filter = FC_LCD_DEFAULT;
-		break;
-	case FcResultMatch:
-		break;
-	default:
-		goto bail1;
-	}
-
+	fi->lcd_filter = FC_LCD_DEFAULT;
+	FcPatternGetInteger(pattern, FC_LCD_FILTER, 0, &fi->lcd_filter);
+	
 	// Get matrix and transform values
 	FcMatrix* font_matrix;
 	switch (FcPatternGetMatrix(pattern, FC_MATRIX, 0, &font_matrix)) {
@@ -365,69 +327,32 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 	default:
 		goto bail1;
 	}
-
-	fi->transform = (fi->matrix.xx != 0x10000 || fi->matrix.xy != 0 ||
-	                 fi->matrix.yx != 0 || fi->matrix.yy != 0x10000);
+	
+	fi->transform = (fi->matrix.xx != 0x10000 || fi->matrix.xy != 0 || fi->matrix.yx != 0 || fi->matrix.yy != 0x10000);
 	
 	// Compute glyph load flags
 	fi->load_flags = FT_LOAD_DEFAULT | FT_LOAD_COLOR;
-
-#ifndef XFT_EMBEDDED_BITMAP
-#define XFT_EMBEDDED_BITMAP "embeddedbitmap"
-#endif
-
-	FcBool bitmap;
-	switch (FcPatternGetBool (pattern, XFT_EMBEDDED_BITMAP, 0, &bitmap)) {
-	case FcResultNoMatch:
-		bitmap = FcFalse;
-		break;
-	case FcResultMatch:
-		break;
-	default:
-		goto bail1;
-	}
 	
-	/* disable bitmaps when anti-aliasing or transforming glyphs */
+	FcBool bitmap = false;
+	FcPatternGetBool(pattern, "embeddedbitmap", 0, &bitmap);
+	
+	// disable bitmaps when anti-aliasing or transforming glyphs
 	if ((!bitmap && fi->antialias) || fi->transform)
 		fi->load_flags |= FT_LOAD_NO_BITMAP;
-
-	/* disable hinting if requested */
-	FcBool hinting;
-	switch (FcPatternGetBool(pattern, FC_HINTING, 0, &hinting)) {
-	case FcResultNoMatch:
-		hinting = FcTrue;
-		break;
-	case FcResultMatch:
-		break;
-	default:
-		goto bail1;
-	}
-
-	switch (FcPatternGetBool(pattern, FC_EMBOLDEN, 0, &fi->embolden)) {
-	case FcResultNoMatch:
-		fi->embolden = FcFalse;
-		break;
-	case FcResultMatch:
-		break;
-	default:
-		goto bail1;
-	}
-
-	int hint_style;
-	switch (FcPatternGetInteger(pattern, FC_HINT_STYLE, 0, &hint_style)) {
-	case FcResultNoMatch:
-		hint_style = FC_HINT_FULL;
-		break;
-	case FcResultMatch:
-		break;
-	default:
-		goto bail1;
-	}
-
-	if (!hinting || hint_style == FC_HINT_NONE) {
+	
+	// disable hinting if requested
+	FcBool hinting = true;
+	FcPatternGetBool(pattern, FC_HINTING, 0, &hinting);
+	
+	fi->embolden = false;
+	FcPatternGetBool(pattern, FC_EMBOLDEN, 0, &fi->embolden);
+	
+	int hint_style = FC_HINT_FULL;
+	FcPatternGetInteger(pattern, FC_HINT_STYLE, 0, &hint_style);
+	
+	if (!hinting || hint_style == FC_HINT_NONE)
 		fi->load_flags |= FT_LOAD_NO_HINTING;
-	}
-
+	
 	// Figure out the load target, which modifies the hinting
 	// behavior of FreeType based on the intended use of the glyphs.
 	if (fi->antialias) {
@@ -451,84 +376,39 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 		fi->load_flags |= FT_LOAD_TARGET_MONO;
 	
 	/* set vertical layout if requested */
-	FcBool vertical_layout;
-	switch (FcPatternGetBool(pattern, FC_VERTICAL_LAYOUT, 0, &vertical_layout)) {
-	case FcResultNoMatch:
-		vertical_layout = FcFalse;
-		break;
-	case FcResultMatch:
-		break;
-	default:
-		goto bail1;
-	}
-
+	FcBool vertical_layout = false;
+	FcPatternGetBool(pattern, FC_VERTICAL_LAYOUT, 0, &vertical_layout);
+	
 	if (vertical_layout)
 		fi->load_flags |= FT_LOAD_VERTICAL_LAYOUT;
-
+	
 	/* force autohinting if requested */
-	FcBool autohint;
-	switch (FcPatternGetBool(pattern, FC_AUTOHINT, 0, &autohint)) {
-	case FcResultNoMatch:
-		autohint = FcFalse;
-		break;
-	case FcResultMatch:
-		break;
-	default:
-		goto bail1;
-	}
+	FcBool autohint = false;
+	FcPatternGetBool(pattern, FC_AUTOHINT, 0, &autohint);
 	
 	if (autohint)
 		fi->load_flags |= FT_LOAD_FORCE_AUTOHINT;
 	
 	/* disable global advance width (for broken DynaLab TT CJK fonts) */
-	FcBool global_advance;
-	switch (FcPatternGetBool(pattern, FC_GLOBAL_ADVANCE, 0, &global_advance)) {
-	case FcResultNoMatch:
-		global_advance = FcTrue;
-		break;
-	case FcResultMatch:
-		break;
-	default:
-		goto bail1;
-	}
-
+	FcBool global_advance = true;
+	FcPatternGetBool(pattern, FC_GLOBAL_ADVANCE, 0, &global_advance);
+	
 	if (!global_advance)
 		fi->load_flags |= FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH;
-
+	
 	// Get requested spacing value
-	switch (FcPatternGetInteger(pattern, FC_SPACING, 0, &fi->spacing)) {
-	case FcResultNoMatch:
-		fi->spacing = FC_PROPORTIONAL;
-		break;
-	case FcResultMatch:
-		break;
-	default:
-		goto bail1;
-	}
-
+	fi->spacing = FC_PROPORTIONAL;
+	FcPatternGetInteger(pattern, FC_SPACING, 0, &fi->spacing);
+	
 	// Check for minspace
-	switch (FcPatternGetBool(pattern, FC_MINSPACE, 0, &fi->minspace)) {
-	case FcResultNoMatch:
-		fi->minspace = FcFalse;
-		break;
-	case FcResultMatch:
-		break;
-	default:
-		goto bail1;
-	}
+	fi->minspace = false;
+	FcPatternGetBool(pattern, FC_MINSPACE, 0, &fi->minspace);
 	
 	// Check for fixed pixel spacing
-	switch (FcPatternGetInteger(pattern, FC_CHAR_WIDTH, 0, &fi->char_width)) {
-	case FcResultNoMatch:
-		fi->char_width = 0;
-		break;
-	case FcResultMatch:
-		if (fi->char_width)
-			fi->spacing = FC_MONO;
-		break;
-	default:
-		goto bail1;
-	}
+	fi->char_width = 0;
+	FcPatternGetInteger(pattern, FC_CHAR_WIDTH, 0, &fi->char_width);
+	if (fi->char_width)
+		fi->spacing = FC_MONO;
 	
 	// Step over hash value in the structure
 	FcChar32 hash = 0;
@@ -540,13 +420,13 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 	fi->hash = hash;
 
 	// All done
-	return FcTrue;
+	return true;
 
  bail1:
-	_XftReleaseFile (fi->file);
+	_XftReleaseFile(fi->file);
 	fi->file = NULL;
  bail0:
-	return FcFalse;
+	return false;
 }
 
 static void XftFontInfoEmpty(XftFontInfo* fi) {
@@ -616,14 +496,14 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
      * required to map Unicode to glyph indices.
      */
 	FcCharSet* charset;
-	if (FcPatternGetCharSet (pattern, FC_CHARSET, 0, &charset) == FcResultMatch)
+	if (FcPatternGetCharSet(pattern, FC_CHARSET, 0, &charset) == FcResultMatch)
 		charset = FcCharSetCopy(charset);
 	else
 		charset = FcFreeTypeCharSet(face, FcConfigGetBlanks(NULL));
 
 	bool antialias = fi->antialias;
 	if (!(face->face_flags & FT_FACE_FLAG_SCALABLE))
-		antialias = FcFalse;
+		antialias = false;
 	
 	bool color = FT_HAS_COLOR(face);
 	XRenderPictFormat* format;
@@ -667,26 +547,26 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	                  num_glyphs * sizeof(XftGlyph*) +
 	                  hash_value * sizeof(XftUcsHash));
 	
-	XftFontInt *font = XftMalloc(XFT_MEM_FONT, alloc_size);
+	XftFontInt* font = XftMalloc(XFT_MEM_FONT, alloc_size);
 	if (!font)
 		goto bail2;
 	
 	int ascent, descent, height;
 	// Public fields
 	if (fi->transform) {
-		FT_Vector	vector;
+		FT_Vector vector;
 		
 		vector.x = 0;
 		vector.y = face->size->metrics.descender;
 		FT_Vector_Transform(&vector, &fi->matrix);
 		descent = -(vector.y >> 6);
-
+		
 		vector.x = 0;
 		vector.y = face->size->metrics.ascender;
 		FT_Vector_Transform(&vector, &fi->matrix);
 		
 		ascent = vector.y >> 6;
-
+		
 		if (fi->minspace)
 			height = ascent + descent;
 		else {
@@ -711,7 +591,7 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 		font->public.max_advance_width = fi->char_width;
 	else {
 		if (fi->transform) {
-			FT_Vector	vector;
+			FT_Vector vector;
 			vector.x = face->size->metrics.max_advance;
 			vector.y = 0;
 			FT_Vector_Transform (&vector, &fi->matrix);
@@ -724,13 +604,13 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 
 	// Management fields
 	font->ref = 1;
-
+	
 	font->next = info.fonts;
 	info.fonts = &font->public;
-
+	
 	font->hash_next = *bucket;
 	*bucket = &font->public;
-
+	
 	// Copy the info over
 	font->info = *fi;
 	
@@ -745,7 +625,7 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	
 	// bump XftFile reference count
 	font->info.file->ref++;
-
+	
 	// Per glyph information
 	font->glyphs = (XftGlyph**)&font[1];
 	memset(font->glyphs, '\0', num_glyphs*sizeof(XftGlyph*));

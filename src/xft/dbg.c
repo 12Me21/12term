@@ -1,9 +1,9 @@
 #include "xftint.h"
 
 _X_HIDDEN int XftDebug(void) {
-	static int  initialized;
-	static int  debug;
-
+	static int initialized;
+	static int debug;
+	
 	if (!initialized) {
 		initialized = 1;
 		char* e = getenv("XFT_DEBUG");

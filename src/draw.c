@@ -236,6 +236,7 @@ static bool draw_row(int y, Row row) {
 	XftDrawRect(rows[y].draw, (XRenderColor[]){make_color((Color){.i=-2})}, W.border+W.cw*T.width, 0, W.border, W.ch);
 	
 	// draw text
+	// todo: we need to handle combining chars here!!
 	Glyph* specs = rows[y].glyphs;
 	cells_to_glyphs(T.width, row, specs, true);
 	

@@ -621,7 +621,7 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 			} else
 				xftg->bitmap = NULL;
 		}
-
+		
 		font->glyph_memory += xftg->glyph_memory;
 		info.glyph_memory += xftg->glyph_memory;
 		if (XftDebug() & XFT_DBG_CACHE)
