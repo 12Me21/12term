@@ -8,7 +8,7 @@
 
 #include <fontconfig/fontconfig.h>
 
-#include <X11/extensions/Xrender.h>
+//#include <X11/extensions/Xrender.h>
 #include <xcb/render.h>
 
 #define XFT_MAX_GLYPH_MEMORY	"maxglyphmemory"
@@ -43,15 +43,14 @@ typedef struct XftGlyphFont {
 unsigned long XftColorAllocValue(const xcb_render_color_t* color);
 
 /* xftdpy.c */
-bool XftDefaultSet(FcPattern* defaults);
 void XftDefaultSubstitute(FcPattern* pattern);
 void XftDisplayInfoInit(void);
 
 /* xftdraw.c */
-XftDraw* XftDrawCreate(Drawable drawable);
-void XftDrawChange(XftDraw* draw, Drawable drawable);
+XftDraw* XftDrawCreate(xcb_drawable_t drawable);
+void XftDrawChange(XftDraw* draw, xcb_drawable_t drawable);
 
-Drawable XftDrawDrawable(XftDraw* draw);
+xcb_drawable_t XftDrawDrawable(XftDraw* draw);
 
 void XftDrawDestroy(XftDraw* draw);
 
@@ -61,8 +60,8 @@ void XftDrawRect(XftDraw* draw, const xcb_render_color_t color, int x, int y, un
 
 /* xftextent.c */
 
-void XftGlyphExtents(XftFont* pub, const FT_UInt* glyphs, int nglyphs, XGlyphInfo* extents);
-void XftTextExtents32(XftFont* pub, const FcChar32* string, int len, XGlyphInfo* extents);
+void XftGlyphExtents(XftFont* pub, const FT_UInt* glyphs, int nglyphs, xcb_render_glyphinfo_t* extents);
+void XftTextExtents32(XftFont* pub, const FcChar32* string, int len, xcb_render_glyphinfo_t* extents);
 
 /* xftfreetype.c */
 

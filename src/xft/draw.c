@@ -2,7 +2,7 @@
 #include <xcb/render.h>
 
 struct XftDraw {
-	Drawable drawable;
+	xcb_drawable_t drawable;
 	xcb_render_picture_t pict;
 };
 
@@ -14,7 +14,7 @@ static void XftDrawRenderPrepare(XftDraw* draw) {
 		return; // fail!
 }
 
-XftDraw* XftDrawCreate(Drawable drawable) {
+XftDraw* XftDrawCreate(xcb_drawable_t drawable) {
 	XftDraw* draw = malloc(sizeof(XftDraw));
 	
 	*draw = (XftDraw){
@@ -27,14 +27,14 @@ XftDraw* XftDrawCreate(Drawable drawable) {
 	return draw;
 }
 
-void XftDrawChange(XftDraw* draw, Drawable drawable) {
+void XftDrawChange(XftDraw* draw, xcb_drawable_t drawable) {
 	if (draw->pict)
 		xcb_render_free_picture_checked(W.c, draw->pict);
 	draw->drawable = drawable;
 	XftDrawRenderPrepare(draw);
 }
 
-Drawable XftDrawDrawable(XftDraw* draw) {
+xcb_drawable_t XftDrawDrawable(XftDraw* draw) {
 	return draw->drawable;
 }
 

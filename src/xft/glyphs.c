@@ -1,4 +1,5 @@
 #include "xftint.h"
+#include <X11/Xlibint.h>
 #include FT_OUTLINE_H
 #include FT_LCD_FILTER_H
 
@@ -473,20 +474,20 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 					vector.y = 0;
 				}
 				FT_Vector_Transform (&vector, &font->info.matrix);
-				xftg->metrics.xOff = vector.x >> 6;
-				xftg->metrics.yOff = -(vector.y >> 6);
+				xftg->metrics.x_off = vector.x >> 6;
+				xftg->metrics.y_off = -(vector.y >> 6);
 			} else {
 				if (font->info.load_flags & FT_LOAD_VERTICAL_LAYOUT) {
-					xftg->metrics.xOff = 0;
-					xftg->metrics.yOff = -font->public.max_advance_width;
+					xftg->metrics.x_off = 0;
+					xftg->metrics.y_off = -font->public.max_advance_width;
 				} else {
-					xftg->metrics.xOff = font->public.max_advance_width;
-					xftg->metrics.yOff = 0;
+					xftg->metrics.x_off = font->public.max_advance_width;
+					xftg->metrics.y_off = 0;
 				}
 			}
 		} else {
-			xftg->metrics.xOff = TRUNC(ROUND(glyphslot->advance.x));
-			xftg->metrics.yOff = -TRUNC(ROUND(glyphslot->advance.y));
+			xftg->metrics.x_off = TRUNC(ROUND(glyphslot->advance.x));
+			xftg->metrics.y_off = -TRUNC(ROUND(glyphslot->advance.y));
 		}
 		
 		// compute the size of the final bitmap
@@ -567,10 +568,10 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 		// these by first usage to smaller values, but that
 		// would require persistently storing the map when
 		// glyphs were freed.
-		Glyph glyph = glyphindex;
+		uint32_t glyph = glyphindex;
 		
 		xftg->picture = 0;
-		xftg->glyph_memory = size + sizeof (XftGlyph);
+		xftg->glyph_memory = size + sizeof(XftGlyph);
 		if (font->format) {
 			if (!font->glyphset) {
 				font->glyphset = xcb_generate_id(W.c);
@@ -594,7 +595,7 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 			} else if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA || mode != FT_RENDER_MODE_NORMAL) {
 				/* invert ARGB <=> BGRA */
 				if (ImageByteOrder(W.d) != XftNativeByteOrder())
-					XftSwapCARD32((CARD32*)bufBitmap, size/4);
+					XftSwapCARD32((uint32_t*)bufBitmap, size/4);
 			}
 			
 			if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA) {
@@ -615,7 +616,7 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 				XFreeGC(W.d, gc);
 				XFreePixmap(W.d, pixmap);
 			} else
-				XRenderAddGlyphs(W.d, font->glyphset, &glyph, &xftg->metrics, 1, (char*)bufBitmap, size);
+				xcb_render_add_glyphs_checked(W.c, font->glyphset, 1, &glyph, &xftg->metrics, size, bufBitmap);
 		} else {
 			if (size) {
 				xftg->bitmap = malloc(size);
@@ -637,7 +638,7 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 
 void XftFontUnloadGlyphs(XftFont* pub, const FT_UInt* glyphs, int nglyph) {
 	XftFontInt* font = (XftFontInt*)pub;
-	Glyph	glyphBuf[1024];
+	uint32_t glyphBuf[1024];
 	int nused = 0;
 	while (nglyph--) {
 		FT_UInt glyphindex = *glyphs++;
@@ -647,11 +648,11 @@ void XftFontUnloadGlyphs(XftFont* pub, const FT_UInt* glyphs, int nglyph) {
 		if (xftg->glyph_memory) {
 			if (font->format) {
 				if (xftg->picture)
-					XRenderFreePicture(W.d, xftg->picture);
+					xcb_render_free_picture_checked(W.c, xftg->picture);
 				else if (font->glyphset) {
-					glyphBuf[nused++] = (Glyph)glyphindex;
+					glyphBuf[nused++] = (uint32_t)glyphindex;
 					if (nused == sizeof(glyphBuf) / sizeof(glyphBuf[0])) {
-						XRenderFreeGlyphs(W.d, font->glyphset, glyphBuf, nused);
+						xcb_render_free_glyphs_checked(W.c, font->glyphset, nused, glyphBuf);
 						nused = 0;
 					}
 				}
@@ -663,11 +664,11 @@ void XftFontUnloadGlyphs(XftFont* pub, const FT_UInt* glyphs, int nglyph) {
 			info.glyph_memory -= xftg->glyph_memory;
 		}
 		free(xftg);
-		XftMemFree(XFT_MEM_GLYPH, sizeof (XftGlyph));
+		XftMemFree(XFT_MEM_GLYPH, sizeof(XftGlyph));
 		font->glyphs[glyphindex] = NULL;
 	}
 	if (font->glyphset && nused)
-		XRenderFreeGlyphs(W.d, font->glyphset, glyphBuf, nused);
+		xcb_render_free_glyphs_checked(W.c, font->glyphset, nused, glyphBuf);
 }
 
 bool XftFontCheckGlyph(XftFont* pub, bool need_bitmaps, FT_UInt glyph, FT_UInt* missing, int* nmissing) {

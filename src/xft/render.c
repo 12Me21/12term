@@ -1,5 +1,6 @@
 #include "xftint.h"
 #include <xcb/render.h>
+#include <X11/extensions/Xrender.h>
 
 static xcb_render_picture_t pict;
 
@@ -54,12 +55,12 @@ void XftGlyphRender1(int op, xcb_render_color_t col, XftFont* pub, xcb_render_pi
 	
 	if (!font->glyphset)
 		goto bail1;
-	Glyph wire = (Glyph)g;
+	xcb_render_glyph_t wire = g;
 	if (wire>=font->num_glyphs || !font->glyphs[wire])
 		wire = 0;
 	
 	XftGlyph* glyph = font->glyphs[wire];
-	Px center = (cw - glyph->metrics.xOff)/2;
+	Px center = (cw - glyph->metrics.x_off)/2;
 	if (glyph->picture) {
 		xcb_render_composite(W.c, op, glyph->picture, XCB_RENDER_PICTURE_NONE, dst, 0, 0, 0, 0, x - glyph->metrics.x + center, y-glyph->metrics.y, glyph->metrics.width, glyph->metrics.height);
 	} else {

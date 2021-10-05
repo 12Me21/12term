@@ -17,7 +17,8 @@ typedef struct Xw {
 	Colormap cmap;
 	xcb_gcontext_t gc;
 	xcb_window_t win;
-	XRenderPictFormat* format;
+	xcb_render_pictforminfo_t* format;
+	uint8_t depth;
 	
 	int event_mask;
 	

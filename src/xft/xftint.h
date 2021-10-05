@@ -6,14 +6,11 @@
 #include <stdbool.h>
 #include <ctype.h>
 
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xmd.h>
-#include <X11/Xlibint.h>
-#define _XFT_NO_COMPAT_
 #include "Xft.h"
 #include <fontconfig/fcprivate.h>
 #include <fontconfig/fcfreetype.h>
+
+#include <xcb/render.h>
 
 #include "../x.h"
 
@@ -21,7 +18,7 @@
  * Glyphs are stored in this structure
  */
 typedef struct XftGlyph {
-	XGlyphInfo metrics;
+	xcb_render_glyphinfo_t metrics;
 	void* bitmap;
 	unsigned long glyph_memory;
 	xcb_render_picture_t picture;
@@ -101,7 +98,7 @@ typedef struct XftFontInt {
 	int			hash_value;
 	int			rehash_value;
 	// X specific fields
-	GlyphSet glyphset; // Render glyphset
+	xcb_render_glyphset_t glyphset; // Render glyphset
 	xcb_render_pictforminfo_t* format;	// Render format for glyphs
 	// Glyph memory management fields
 	unsigned long glyph_memory;
@@ -178,7 +175,7 @@ void XftMemFree(int kind, int size);
 
 /* xftswap.c */
 int XftNativeByteOrder(void);
-void XftSwapCARD32(CARD32* data, int n);
+void XftSwapCARD32(uint32_t* data, int n);
 void XftSwapImage(XImage* image);
 
 extern XftDisplayInfo info;

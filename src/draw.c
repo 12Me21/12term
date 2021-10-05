@@ -1,6 +1,6 @@
 // Drawing graphics
 
-#include <X11/Xlib.h>
+#include <xcb/xcb.h>
 #include "xft/Xft.h"
 
 #include "common.h"
@@ -16,7 +16,7 @@ typedef struct DrawRow {
 	Cell* cells;
 	Glyph* glyphs;
 	// framebuffer
-	Pixmap pix;
+	xcb_pixmap_t pix;
 	XftDraw* draw;
 	// to force a redraw 
 	bool redraw;
@@ -27,7 +27,7 @@ static DrawRow* rows = NULL;
 static Cell* blank_row = NULL;
 
 // cursor
-static Pixmap cursor_pix = None;
+static xcb_pixmap_t cursor_pix = None;
 static XftDraw* cursor_draw = NULL;
 static int cursor_width;
 static int cursor_y;
@@ -69,7 +69,7 @@ void draw_resize(int width, int height, bool charsize) {
 		for (int i=0; i<drawn_height; i++) {
 			FREE(rows[i].glyphs);
 			FREE(rows[i].cells);
-			XFreePixmap(W.d, rows[i].pix);
+			xcb_free_pixmap_checked(W.c, rows[i].pix);
 			XftDrawDestroy(rows[i].draw);
 		}
 	}
@@ -83,7 +83,8 @@ void draw_resize(int width, int height, bool charsize) {
 			rows[y].glyphs[x] = (Glyph){0}; // mreh
 			rows[y].cells[x] = (Cell){0}; //ehnnnn
 		}
-		rows[y].pix = XCreatePixmap(W.d, W.win, W.w, W.ch, DefaultDepth(W.d, W.scr));
+		rows[y].pix = xcb_generate_id(W.c);
+		xcb_create_pixmap_checked(W.c, W.depth, rows[y].pix, W.win, W.w, W.ch);
 		rows[y].draw = XftDrawCreate(rows[y].pix);
 		rows[y].redraw = true;
 	}
@@ -95,8 +96,9 @@ void draw_resize(int width, int height, bool charsize) {
 	// char size changing
 	if (charsize) {
 		if (cursor_pix)
-			XFreePixmap(W.d, cursor_pix);
-		cursor_pix = XCreatePixmap(W.d, W.win, W.cw*2, W.ch, DefaultDepth(W.d, W.scr));
+			xcb_free_pixmap_checked(W.c, cursor_pix);
+		cursor_pix = xcb_generate_id(W.c);
+		xcb_create_pixmap_checked(W.c, W.depth, cursor_pix, W.win, W.cw*2, W.ch);
 		if (cursor_draw)
 			XftDrawChange(cursor_draw, cursor_pix);
 		else
@@ -112,7 +114,7 @@ static int same_color(xcb_render_color_t a, xcb_render_color_t b) {
 static void draw_glyph(XftDraw* draw, Px x, Px y, Glyph g, xcb_render_color_t col, int w) {
 	if (!g.font)
 		return;
-	XftGlyphRender1(PictOpOver, col, g.font, XftDrawPicture(draw), x+g.x, y+g.y, g.glyph, W.cw*w);
+	XftGlyphRender1(XCB_RENDER_PICT_OP_OVER, col, g.font, XftDrawPicture(draw), x+g.x, y+g.y, g.glyph, W.cw*w);
 }
 
 // todo: make these thicker depending on dpi/fontsize
@@ -334,7 +336,3 @@ void dirty_all(void) {
 	for (int y=0; y<T.height; y++)
 		rows[y].redraw = true;
 }
-
-// todo: display characters CENTERED within the cell rather than aligned to the left side.
-
-

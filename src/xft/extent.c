@@ -16,7 +16,7 @@
 //  this gives me a bunch of glyphs (i.e. font+glyph id) which are known to be loaded
 // these can then be rendered without checking
 
-void XftGlyphExtents(XftFont* pub, const FT_UInt* glyphs, int nglyphs, XGlyphInfo* extents) {
+void XftGlyphExtents(XftFont* pub, const FT_UInt* glyphs, int nglyphs, xcb_render_glyphinfo_t* extents) {
 	XftFontInt* font = (XftFontInt*)pub;
 	FT_UInt missing[XFT_NMISSING];
 	
@@ -51,8 +51,8 @@ void XftGlyphExtents(XftFont* pub, const FT_UInt* glyphs, int nglyphs, XGlyphInf
 		int overall_top = y - xftg->metrics.y;
 		int overall_right = overall_left + (int) xftg->metrics.width;
 		int overall_bottom = overall_top + (int) xftg->metrics.height;
-		x += xftg->metrics.xOff;
-		y += xftg->metrics.yOff;
+		x += xftg->metrics.x_off;
+		y += xftg->metrics.y_off;
 		while (n--) {
 			glyph = *g++;
 			if (glyph < font->num_glyphs && (xftg = font->glyphs[glyph])) {
@@ -68,22 +68,22 @@ void XftGlyphExtents(XftFont* pub, const FT_UInt* glyphs, int nglyphs, XGlyphInf
 					overall_right = right;
 				if (bottom > overall_bottom)
 					overall_bottom = bottom;
-				x += xftg->metrics.xOff;
-				y += xftg->metrics.yOff;
+				x += xftg->metrics.x_off;
+				y += xftg->metrics.y_off;
 			}
 		}
 		extents->x = -overall_left;
 		extents->y = -overall_top;
 		extents->width = overall_right - overall_left;
 		extents->height = overall_bottom - overall_top;
-		extents->xOff = x;
-		extents->yOff = y;
+		extents->x_off = x;
+		extents->y_off = y;
 	}
 	if (glyphs_loaded)
 		_XftFontManageMemory(pub);
 }
 
-void XftTextExtents32(XftFont* pub, const FcChar32* string, int len, XGlyphInfo* extents) {
+void XftTextExtents32(XftFont* pub, const FcChar32* string, int len, xcb_render_glyphinfo_t* extents) {
 	FT_UInt glyphs[len];
 	for (int i=0; i<len; i++)
 		glyphs[i] = XftCharIndex(pub, string[i]);

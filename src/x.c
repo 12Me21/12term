@@ -15,12 +15,16 @@
 
 #include <X11/Xlib.h>
 #include <X11/Xlib-xcb.h>
+#include <X11/Xatom.h>
+#include <X11/Xresource.h>
+#include <X11/Xutil.h>
+#include <X11/extensions/Xrender.h>
+
 #include <xcb/render.h>
 #include <xcb/xcb_aux.h>
 #include <xcb/xcb_icccm.h>
+
 #include "xft/Xft.h"
-#include <X11/Xatom.h>
-#include <X11/Xresource.h>
 
 #include "common.h"
 #include "tty.h"
@@ -249,6 +253,7 @@ int main(int argc, char* argv[argc+1]) {
 	W.c = XGetXCBConnection(W.d);
 	W.scr = XDefaultScreen(W.d);
 	W.scr2 = xcb_aux_get_screen(W.c, W.scr);
+	W.depth = xcb_aux_get_depth(W.c, W.scr2);
 	W.vis = XDefaultVisual(W.d, W.scr);
 	// check if user has modern display (otherwise nnnnnnnn sorry i dont want to deal with this)
 	if (W.vis->class!=TrueColor)
@@ -259,7 +264,7 @@ int main(int argc, char* argv[argc+1]) {
 	print("xrender version: %d.%d\n", r->major_version, r->minor_version);
 	free(r);
 	
-	W.format = XRenderFindVisualFormat(W.d, W.vis);
+	W.format = (xcb_render_pictforminfo_t*)XRenderFindVisualFormat(W.d, W.vis);
 	if (!W.format)
 		die("cant find visual format ...\n");
 	
@@ -279,11 +284,14 @@ int main(int argc, char* argv[argc+1]) {
 	
 	if (!FcInit())
 		die("fontconfig init failed");
+	time_log("init fontconfig");
+	
 	XftDisplayInfoInit();
+	time_log("init xft");
+	
 	if (FT_Init_FreeType(&_XftFTlibrary))
 		die("freetype init failed");
-	
-	time_log("init xft");
+	time_log("init freetype");
 		
 	load_fonts(settings.faceName, settings.faceSize);
 	
@@ -298,7 +306,7 @@ int main(int argc, char* argv[argc+1]) {
 	W.event_mask = FocusChangeMask | KeyPressMask | KeyReleaseMask | ExposureMask | VisibilityChangeMask | StructureNotifyMask | ButtonMotionMask | ButtonPressMask | ButtonReleaseMask;
 	
 	W.win = xcb_generate_id(W.c);
-	xcb_aux_create_window(W.c, xcb_aux_get_depth(W.c, W.scr2),
+	xcb_aux_create_window(W.c, W.depth,
 		W.win, XRootWindow(W.d, W.scr),
 		0, 0, W.w, W.h,
 		0, 

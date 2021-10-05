@@ -2,12 +2,14 @@
 
 #include <errno.h>
 #include <math.h>
+
 #include "xft/Xft.h"
 
 #include "common.h"
+#include "x.h"
 #include "font.h"
 #include "buffer.h"
-#include "x.h"
+#include "settings.h"
 
 #define Font Font_
 typedef struct {
@@ -36,8 +38,9 @@ static bool load_font(Font* f, FcPattern* pattern, bool bold, bool italic) {
 	if (bold)
 		FcPatternAddInteger(configured, FC_WEIGHT, FC_WEIGHT_BOLD);
 	
+	// todo: see how the config works, maybe we can use this to load defaults better
 	FcConfigSubstitute(NULL, configured, FcMatchPattern);
-	XftDefaultSubstitute(configured);
+	pattern_default_substitute(configured);
 	
 	FcResult result;
 	FcPattern* match = FcFontMatch(NULL, configured, &result);
@@ -59,9 +62,9 @@ static bool load_font(Font* f, FcPattern* pattern, bool bold, bool italic) {
 	Char ascii_printable[len];
 	for (int i=0; i<len; i++)
 		ascii_printable[i] = ' '+i;
-	XGlyphInfo extents;
+	xcb_render_glyphinfo_t extents;
 	XftTextExtents32(f->font, (FcChar32*)ascii_printable, len, &extents);
-	f->width = ceildiv(extents.xOff, len);
+	f->width = ceildiv(extents.x_off, len);
 	
 	f->set = NULL;
 	f->pattern = configured;
@@ -115,6 +118,18 @@ typedef struct {
 static Fontcache frc[100];
 static int frclen = 0;
 
+void fonts_free(void) {
+	for (int i=0; i<4; i++) {
+		if (fonts[i].font) {
+			FcPatternDestroy(fonts[i].pattern);
+			XftFontClose(fonts[i].font);
+			fonts[i].font = NULL;
+		}
+	}
+	for (int i=0; i<frclen; i++)
+		XftFontClose(frc[i].font);
+}
+
 // this is gross and I don't fully understand how it works
 static void find_fallback_font(Char chr, int style, XftFont** xfont, FT_UInt* glyph) {
 	print("finding fallback font for %d\n", chr);
@@ -140,7 +155,7 @@ static void find_fallback_font(Char chr, int style, XftFont** xfont, FT_UInt* gl
 	
 	FcPattern* fcpattern = FcPatternDuplicate(font->pattern);
 	FcCharSet* fccharset = FcCharSetCreate();
-		
+	
 	FcCharSetAddChar(fccharset, chr);
 	FcPatternAddCharSet(fcpattern, FC_CHARSET, fccharset);
 	FcPatternAddBool(fcpattern, FC_SCALABLE, true);
@@ -211,15 +226,3 @@ void cells_to_glyphs(int len, Cell cells[len], Glyph glyphs[len], bool cache) {
 }
 // "_ascent"
 //_ascent
- 
-void fonts_free(void) {
-	for (int i=0; i<4; i++) {
-		if (fonts[i].font) {
-			FcPatternDestroy(fonts[i].pattern);
-			XftFontClose(fonts[i].font);
-			fonts[i].font = NULL;
-		}
-	}
-	for (int i=0; i<frclen; i++)
-		XftFontClose(frc[i].font);
-}

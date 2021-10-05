@@ -56,12 +56,12 @@ typedef struct HistoryCell {
 typedef Cell* Row;
 
 // the cursor keeps track of a position as well as the attributes
-#define Cursor Cursor_
-typedef struct Cursor {
+#define Cursor Cursor__
+typedef struct Cursor__ {
 	int x; // 0 … width (note: NOT width-1! cursor can be in the column past the right edge of the screen)
 	int y; // 0 … height-1
 	Attrs attrs;
-} Cursor;
+} Cursor__;
 
 // the main or alternate buffer.
 typedef struct Buffer {

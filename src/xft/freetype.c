@@ -17,9 +17,9 @@ static XftFtFile* _XftGetFile(const FcChar8* file, int id) {
 	for (f = _XftFtFiles; f; f = f->next) {
 		if (!strcmp(f->file, (char*)file) && f->id == id) {
 			++f->ref;
-			if (XftDebug () & XFT_DBG_REF)
-				printf ("FontFile %s/%d matches existing (%d)\n",
-				        file, id, f->ref);
+			if (XftDebug() & XFT_DBG_REF)
+				printf("FontFile %s/%d matches existing (%d)\n",
+				       file, id, f->ref);
 			return f;
 		}
 	}
@@ -121,7 +121,7 @@ static void _XftLockError(const char* reason) {
 
 static void _XftUnlockFile(XftFtFile* f) {
 	if (--f->lock < 0)
-		_XftLockError ("too many file unlocks");
+		_XftLockError("too many file unlocks");
 }
 
 #define X_SIZE(face,i) ((face)->available_sizes[i].x_ppem)
@@ -143,12 +143,12 @@ bool _XftSetFace(XftFtFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* ma
 #define dist(a,b)	(xft_abs((a)-(b)))
 			
 			for (int i=1; i<face->num_fixed_sizes; i++) {
-				if (dist (ysize, Y_SIZE(face,i)) <
-				    dist (ysize, Y_SIZE(face, best)) ||
-				    (dist (ysize, Y_SIZE(face, i)) ==
-				     dist (ysize, Y_SIZE(face, best)) &&
-				     dist (xsize, X_SIZE(face, i)) <
-				     dist (xsize, X_SIZE(face, best)))) {
+				if (dist(ysize, Y_SIZE(face,i)) <
+				    dist(ysize, Y_SIZE(face, best)) ||
+				    (dist(ysize, Y_SIZE(face, i)) ==
+				     dist(ysize, Y_SIZE(face, best)) &&
+				     dist(xsize, X_SIZE(face, i)) <
+				     dist(xsize, X_SIZE(face, best)))) {
 					best = i;
 				}
 			}
@@ -157,16 +157,16 @@ bool _XftSetFace(XftFtFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* ma
 			// This has been fixed for 2.1.8.  Because BDF and PCF
 			// files have but a single strike per file, we can
 			// simply try both sizes.
-			if (FT_Set_Char_Size (face, face->available_sizes[best].x_ppem,
-			                      face->available_sizes[best].y_ppem, 0, 0) != 0
+			if (FT_Set_Char_Size(face, face->available_sizes[best].x_ppem,
+			                     face->available_sizes[best].y_ppem, 0, 0) != 0
 			    &&
-			    FT_Set_Char_Size (face, face->available_sizes[best].width << 6,
-			                      face->available_sizes[best].height << 6,
-			                      0, 0) != 0) {
+			    FT_Set_Char_Size(face, face->available_sizes[best].width << 6,
+			                     face->available_sizes[best].height << 6,
+			                     0, 0) != 0) {
 				return False;
 			}
 		} else {
-			if (FT_Set_Char_Size (face, xsize, ysize, 0, 0)) {
+			if (FT_Set_Char_Size(face, xsize, ysize, 0, 0)) {
 				return False;
 			}
 		}
@@ -598,7 +598,7 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 			FT_Vector vector;
 			vector.x = face->size->metrics.max_advance;
 			vector.y = 0;
-			FT_Vector_Transform (&vector, &fi->matrix);
+			FT_Vector_Transform(&vector, &fi->matrix);
 			font->public.max_advance_width = vector.x >> 6;
 		} else
 			font->public.max_advance_width = face->size->metrics.max_advance >> 6;
@@ -680,7 +680,7 @@ static void XftFontDestroy(XftFont* public) {
 	XftFontInfoEmpty(&font->info);
 	/* Free the glyphset */
 	if (font->glyphset)
-		XRenderFreeGlyphSet(W.d, font->glyphset);
+		xcb_render_free_glyph_set_checked(W.c, font->glyphset);
 	/* Free the glyphs */
 	for (int i=0; i<font->num_glyphs; i++) {
 		XftGlyph* xftg = font->glyphs[i];
@@ -718,10 +718,10 @@ void XftFontManageMemory(void) {
 		XftFont* public = XftFontFindNthUnref(rand() % info.num_unref_fonts);
 		XftFontInt* font = (XftFontInt*)public;
 		
-		if (XftDebug () & XFT_DBG_CACHE)
-			printf ("freeing unreferenced font %s/%d size %dx%d\n",
-			        font->info.file->file, font->info.file->id,
-			        (int) font->info.xsize >> 6, (int) font->info.ysize >> 6);
+		if (XftDebug() & XFT_DBG_CACHE)
+			printf("freeing unreferenced font %s/%d size %dx%d\n",
+			       font->info.file->file, font->info.file->id,
+			       (int) font->info.xsize >> 6, (int) font->info.ysize >> 6);
 		
 		XftFont** prev;
 		/* Unhook from display list */

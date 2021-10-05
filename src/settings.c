@@ -3,6 +3,9 @@
 // see `xresources-example.ad` for more information
 
 #include <X11/Xresource.h>
+#include <X11/extensions/Xrender.h>
+#include <fontconfig/fontconfig.h>
+#include <ctype.h>
 
 #include "buffer.h"
 #include "settings.h"
@@ -66,6 +69,37 @@ static bool get_color(char* name, RGBColor* out) {
 	return false;
 }
 
+static bool get_boolean(char* name, bool* out) {
+	char* str;
+	if (get_string(name, &str)) {
+		char c0 = str[0];
+		if (isupper(c0))
+			c0 = tolower(c0);
+		if (c0 == 't' || c0 == 'y' || c0 == '1') {
+			*out = true;
+			return true;
+		}
+		if (c0 == 'f' || c0 == 'n' || c0 == '0') {
+			*out = false;
+			return true;
+		}
+		if (c0 == 'o') {
+			char c1 = str[1];
+			if (isupper(c1))
+				c1 = tolower(c1);
+			if (c1 == 'n') {
+				*out = true;
+				return true;
+			}
+			if (c1 == 'f') {
+				*out = false;
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 static bool get_number(char* name, double* out) {
 	char* str;
 	if (get_string(name, &str)) {
@@ -89,6 +123,8 @@ static bool get_integer(char* name, int* out) {
 }
 
 #define FIELD(name) "12term." #name, &settings.name
+
+#define XFT_MAX_GLYPH_MEMORY "maxglyphmemory"
 
 void load_settings(int* argc, char** argv) {
 	char* resource_manager = XResourceManagerString(W.d);//screen?
@@ -142,4 +178,76 @@ void load_settings(int* argc, char** argv) {
 		settings.hyperlinkCommand = NULL;
 	get_integer(FIELD(cursorShape));
 	
+	// xft
+	settings.xft.antialias = true;
+	get_boolean("Xft." FC_ANTIALIAS, &settings.xft.antialias);
+	settings.xft.embolden = false;
+	get_boolean("Xft." FC_EMBOLDEN, &settings.xft.embolden);
+	settings.xft.hinting = true;
+	get_boolean("Xft." FC_HINTING, &settings.xft.hinting);
+	settings.xft.hint_style = FC_HINT_FULL;
+	get_integer("Xft." FC_HINTING, &settings.xft.hint_style);
+	settings.xft.autohint = FC_AUTOHINT;
+	get_boolean("Xft." FC_AUTOHINT, &settings.xft.autohint);
+	if (!get_integer("Xft." FC_RGBA, &settings.xft.rgba)) {
+		int render_order = XRenderQuerySubpixelOrder(W.d, W.scr);
+		int subpixel;
+		switch (render_order) {
+		default:
+		case XCB_RENDER_SUB_PIXEL_UNKNOWN: subpixel = FC_RGBA_UNKNOWN; break;
+		case XCB_RENDER_SUB_PIXEL_HORIZONTAL_RGB: subpixel = FC_RGBA_RGB; break;
+		case XCB_RENDER_SUB_PIXEL_HORIZONTAL_BGR: subpixel = FC_RGBA_BGR; break;
+		case XCB_RENDER_SUB_PIXEL_VERTICAL_RGB: subpixel = FC_RGBA_VRGB; break;
+		case XCB_RENDER_SUB_PIXEL_VERTICAL_BGR: subpixel = FC_RGBA_VBGR; break;
+		case XCB_RENDER_SUB_PIXEL_NONE: subpixel = FC_RGBA_NONE; break;
+		}
+		settings.xft.rgba = subpixel;
+	}
+	settings.xft.lcd_filter = FC_LCD_DEFAULT;
+	get_integer("Xft." FC_LCD_FILTER, &settings.xft.lcd_filter);
+	settings.xft.minspace = false;
+	get_boolean("Xft." FC_MINSPACE, &settings.xft.minspace);
+	if (!get_number("Xft." FC_DPI, &settings.xft.dpi)) {
+		settings.xft.dpi = (double)DisplayHeight(W.d, W.scr)*25.4 / DisplayHeightMM(W.d, W.scr);
+	}
+	settings.xft.scale = 1;
+	get_number("Xft." FC_SCALE, &settings.xft.scale);
+	settings.xft.max_glyph_memory = 1024*1024;
+	get_integer("Xft." XFT_MAX_GLYPH_MEMORY, &settings.xft.max_glyph_memory);
+}
+
+static bool pattern_missing(FcPattern* pattern, const char* name) {
+	FcValue v;
+	return FcPatternGet(pattern, name, 0, &v)==FcResultNoMatch;
+}
+
+static void pattern_default_bool(FcPattern* pattern, char* field, bool value) {
+	if (pattern_missing(pattern, field))
+		FcPatternAddBool(pattern, field, value);
+}
+
+static void pattern_default_integer(FcPattern* pattern, char* field, int value) {
+	if (pattern_missing(pattern, field))
+		FcPatternAddInteger(pattern, field, value);
+}
+
+static void pattern_default_number(FcPattern* pattern, char* field, double value) {
+	if (pattern_missing(pattern, field))
+		FcPatternAddDouble(pattern, field, value);
+}
+
+// 
+void pattern_default_substitute(FcPattern* pattern) {
+	pattern_default_bool(pattern, FC_ANTIALIAS, settings.xft.antialias);
+	pattern_default_bool(pattern, FC_EMBOLDEN, settings.xft.embolden);
+	pattern_default_bool(pattern, FC_HINTING, settings.xft.hinting);
+	pattern_default_integer(pattern, FC_HINT_STYLE, settings.xft.hint_style);
+	pattern_default_bool(pattern, FC_AUTOHINT, settings.xft.autohint);
+	pattern_default_integer(pattern, FC_RGBA, settings.xft.rgba);
+	pattern_default_integer(pattern, FC_LCD_FILTER, settings.xft.lcd_filter);
+	pattern_default_bool(pattern, FC_MINSPACE, settings.xft.minspace);
+	pattern_default_number(pattern, FC_DPI, settings.xft.dpi);
+	pattern_default_number(pattern, FC_SCALE, settings.xft.scale);
+	pattern_default_integer(pattern, XFT_MAX_GLYPH_MEMORY, settings.xft.max_glyph_memory);
+	FcDefaultSubstitute(pattern);
 }
