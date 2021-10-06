@@ -1,6 +1,6 @@
 #include "xftint.h"
 #include <xcb/render.h>
-#include <X11/extensions/Xrender.h>
+#include <xcb/xcb_renderutil.h>
 
 static xcb_render_picture_t pict;
 
@@ -65,7 +65,22 @@ void XftGlyphRender1(int op, xcb_render_color_t col, XftFont* pub, xcb_render_pi
 		xcb_render_composite(W.c, op, glyph->picture, XCB_RENDER_PICTURE_NONE, dst, 0, 0, 0, 0, x - glyph->metrics.x + center, y-glyph->metrics.y, glyph->metrics.width, glyph->metrics.height);
 	} else {
 		xcb_render_picture_t src = XftDrawSrcPicture(col);
-		XRenderCompositeString32(W.d, op, src, dst, (XRenderPictFormat*)font->format, font->glyphset, 0, 0, x + center, y, (unsigned int[]){wire}, 1);
+		// todo: figure out the real best way to do this
+		xcb_render_util_composite_text_stream_t* ts = xcb_render_util_composite_text_stream(font->glyphset, 1, 0);
+		// add the glyphs
+		xcb_render_util_glyphs_32(ts, x, y, 1, &wire);
+		// composite
+		xcb_render_util_composite_text(
+			W.c,
+			op,
+			src,
+			dst,
+			font->format->id,
+			0, // src x
+			0, // src y
+			ts); // txt stream
+		xcb_render_util_composite_text_free(ts);
+		//XRenderCompositeString32(W.d, op, src, dst, (XRenderPictFormat*)font->format, font->glyphset, 0, 0, x + center, y, (unsigned int[]){wire}, 1);
 	}
  bail1:
 	if (glyphs_loaded)

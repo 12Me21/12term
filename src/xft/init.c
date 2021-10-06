@@ -45,7 +45,7 @@ _X_HIDDEN void XftMemAlloc(int kind, int size) {
 		XftAllocMem += size;
 		XftAllocNotify += size;
 		if (XftAllocNotify > XftMemNotice)
-			XftMemReport ();
+			XftMemReport();
 	}
 }
 

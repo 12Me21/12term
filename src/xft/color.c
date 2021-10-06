@@ -1,4 +1,5 @@
-#include "xftint.h"
+#include <xcb/render.h>
+#include "../x.h"
 
 static short maskbase(unsigned long m) {
 	if (!m)

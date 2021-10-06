@@ -129,7 +129,7 @@ static Nanosec min_redraw = 10*1000*1000;
 
 // todo: clean this up
 static void run(void) {
-	XMapWindow(W.d, W.win);
+	XMapWindow(W.d, W.win); // why doesn't xcb_map_window work here?
 	
 	XEvent ev;
 	int w = W.w, h = W.h;
@@ -240,18 +240,22 @@ int main(int argc, char* argv[argc+1]) {
 	
 	// hecking locale
 	setlocale(LC_CTYPE, "");
-	XSetLocaleModifiers("");
+	XSetLocaleModifiers(""); // is this required
 	
 	int w = settings.width;
 	int h = settings.height;
 	
 	W.border = 3;
 	
+	//
 	W.d = XOpenDisplay(NULL);
 	if (!W.d)
 		die("Could not connect to X server\n");
 	W.c = XGetXCBConnection(W.d);
 	W.scr = XDefaultScreen(W.d);
+	// when ready, replace above code with:
+	/* W.c = xcb_connect(NULL, &W.scr); */
+	
 	W.scr2 = xcb_aux_get_screen(W.c, W.scr);
 	W.depth = xcb_aux_get_depth(W.c, W.scr2);
 	W.vis = XDefaultVisual(W.d, W.scr);
@@ -282,7 +286,7 @@ int main(int argc, char* argv[argc+1]) {
 	
 	time_log("init stuff 1");
 	
-	if (!FcInit())
+	if (!FcInit()) // you can skip this but it'll just init itself when the first font is loaded anyway
 		die("fontconfig init failed");
 	time_log("init fontconfig");
 	
@@ -307,7 +311,7 @@ int main(int argc, char* argv[argc+1]) {
 	
 	W.win = xcb_generate_id(W.c);
 	xcb_aux_create_window(W.c, W.depth,
-		W.win, XRootWindow(W.d, W.scr),
+		W.win, W.scr2->root,
 		0, 0, W.w, W.h,
 		0, 
 		XCB_WINDOW_CLASS_INPUT_OUTPUT,
@@ -325,10 +329,11 @@ int main(int argc, char* argv[argc+1]) {
 	
 	W.gc = xcb_generate_id(W.c);
 	xcb_create_gc(W.c, W.gc, W.win, XCB_GC_GRAPHICS_EXPOSURES, &(xcb_params_gc_t){
-			.graphics_exposures = false,
-		});
+		.graphics_exposures = false,
+	});
 	
 	// allow listening for window close event
+	// todo: for xcb there's a special way to handle atoms
 	XSetWMProtocols(W.d, W.win, &W.atoms.wm_delete_window, 1);
 	
 	// set title
@@ -339,19 +344,20 @@ int main(int argc, char* argv[argc+1]) {
 	set_title(NULL);
 	
 	// set icon
-	xcb_pixmap_t icon_pixmap = xcb_generate_id(W.c);
-	xcb_create_pixmap(W.c, 24, icon_pixmap, W.win, ICON_SIZE, ICON_SIZE);
-	xcb_put_image(W.c, XCB_IMAGE_FORMAT_Z_PIXMAP, icon_pixmap, W.gc, ICON_SIZE, ICON_SIZE, 0, 0, 0, 24, ICON_SIZE*ICON_SIZE*4, ICON_DATA);
-	
-	xcb_icccm_set_wm_hints(W.c, W.win, &(xcb_icccm_wm_hints_t){
-		.flags = XCB_ICCCM_WM_HINT_INPUT | XCB_ICCCM_WM_HINT_ICON_PIXMAP,
-		.input = true,
-		.icon_pixmap = icon_pixmap,
-	});
-	
+	{
+		xcb_pixmap_t pixmap = xcb_generate_id(W.c);
+		xcb_create_pixmap(W.c, 24, pixmap, W.win, ICON_SIZE, ICON_SIZE);
+		xcb_put_image(W.c, XCB_IMAGE_FORMAT_Z_PIXMAP, pixmap, W.gc, ICON_SIZE, ICON_SIZE, 0, 0, 0, 24, ICON_SIZE*ICON_SIZE*4, ICON_DATA);
+		xcb_icccm_set_wm_hints(W.c, W.win, &(xcb_icccm_wm_hints_t){
+			.flags = XCB_ICCCM_WM_HINT_INPUT | XCB_ICCCM_WM_HINT_ICON_PIXMAP,
+			.input = true,
+			.icon_pixmap = pixmap,
+		});
+	}
+
 	time_log("created window");
 	
-	init_input();
+	//init_input();
 	
 	time_log("init input");
 	

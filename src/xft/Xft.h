@@ -8,7 +8,6 @@
 
 #include <fontconfig/fontconfig.h>
 
-//#include <X11/extensions/Xrender.h>
 #include <xcb/render.h>
 
 #define XFT_MAX_GLYPH_MEMORY	"maxglyphmemory"

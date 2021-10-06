@@ -1,28 +1,8 @@
 #include "xftint.h"
-#include <X11/Xlibint.h>
-#include <X11/extensions/Xrender.h>
-#include <X11/extensions/Xrandr.h>
 
 XftDisplayInfo info;
 
-static int _XftCloseDisplay(Display* dpy, XExtCodes* codes) {
-	// Get rid of any dangling unreferenced fonts
-	info.max_unref_fonts = 0;
-	XftFontManageMemory();
-	
-	// Clean up the default values
-	if (info.defaults)
-		FcPatternDestroy(info.defaults);
-	
-	return 0;
-}
-
 void XftDisplayInfoInit(void) {
-	info.codes = XAddExtension(W.d); // what does this do?
-	if (!info.codes)
-		goto bail1;
-	XESetCloseDisplay(W.d, info.codes->extension, _XftCloseDisplay);
-	
 	for (int i=0; i<XFT_NUM_SOLID_COLOR; i++) {
 		info.colors[i].screen = -1;
 		info.colors[i].pict = 0;
@@ -37,13 +17,13 @@ void XftDisplayInfoInit(void) {
 	info.num_unref_fonts = 0;
 	info.max_unref_fonts = XFT_DPY_MAX_UNREF_FONTS;//XftDefaultGetInteger(XFT_MAX_UNREF_FONTS, XFT_DPY_MAX_UNREF_FONTS);
 	if (XftDebug() & XFT_DBG_CACHE)
-		printf ("global max unref fonts %d\n", info.max_unref_fonts);
+		printf("global max unref fonts %d\n", info.max_unref_fonts);
 	
 	memset(info.fontHash, '\0', sizeof(XftFont*)*XFT_NUM_FONT_HASH);
 	
  bail1:
 	if (XftDebug() & XFT_DBG_RENDER) {
-		printf ("XftDisplayInfoGet failed to initialize, Xft unhappy :(\n");
+		printf("XftDisplayInfoGet failed to initialize, Xft unhappy :(\n");
 	}
 }
 
@@ -64,9 +44,9 @@ void _XftDisplayManageMemory(void) {
 	if (!info.max_glyph_memory)
 		return;
 	
-	if (XftDebug () & XFT_DBG_CACHE) {
+	if (XftDebug() & XFT_DBG_CACHE) {
 		if (info.glyph_memory > info.max_glyph_memory)
-			printf ("Reduce global memory from %ld to %ld\n",
+			printf("Reduce global memory from %ld to %ld\n",
 			        info.glyph_memory, info.max_glyph_memory);
 		_XftDisplayValidateMemory();
 	}

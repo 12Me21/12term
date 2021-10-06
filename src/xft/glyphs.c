@@ -1,10 +1,9 @@
 #include "xftint.h"
-#include <X11/Xlibint.h>
+
+#include <ft2build.h>
 #include FT_OUTLINE_H
 #include FT_LCD_FILTER_H
-
 #include FT_SYNTHESIS_H
-
 #include FT_GLYPH_H
 
 // Validate the memory info for a font
@@ -577,9 +576,10 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 				font->glyphset = xcb_generate_id(W.c);
 				xcb_render_create_glyph_set_checked(W.c, font->glyphset, font->format->id);
 			}
+			const struct xcb_setup_t* setup = xcb_get_setup(W.c);
 			if (mode == FT_RENDER_MODE_MONO) {
 				/* swap bits in each byte */
-				if (BitmapBitOrder(W.d) != MSBFirst) {
+				if (setup->bitmap_format_bit_order != XCB_IMAGE_ORDER_MSB_FIRST) {
 					unsigned char* line = (unsigned char*)bufBitmap;
 					int i = size;
 					
@@ -594,27 +594,23 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 				}
 			} else if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA || mode != FT_RENDER_MODE_NORMAL) {
 				/* invert ARGB <=> BGRA */
-				if (ImageByteOrder(W.d) != XftNativeByteOrder())
+				if (setup->image_byte_order != XftNativeByteOrder())
 					XftSwapCARD32((uint32_t*)bufBitmap, size/4);
 			}
 			
 			if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA) {
-				Pixmap pixmap = XCreatePixmap(W.d, DefaultRootWindow(W.d), local.width, local.rows, 32);
-				GC gc = XCreateGC(W.d, pixmap, 0, NULL);
-				XImage image = {
-					local.width, local.rows, 0, ZPixmap, (char*)bufBitmap,
-					W.d->byte_order, W.d->bitmap_unit, W.d->bitmap_bit_order, 32,
-					32, local.width * 4 - local.pitch, 32,
-					0, 0, 0
-				};
+				// there's probably a nicer way to do all this
+				xcb_pixmap_t pixmap = xcb_generate_id(W.c);
+				xcb_create_pixmap(W.c, 32, pixmap, W.win, local.width, local.rows);
+				xcb_gcontext_t gc = xcb_generate_id(W.c);
+				xcb_create_gc(W.c, gc, pixmap, 0, NULL);
+				xcb_put_image(W.c, XCB_IMAGE_FORMAT_Z_PIXMAP, pixmap, gc, local.width, local.rows, 0, 0, 0, 32, size, bufBitmap);
 				
-				XInitImage(&image);
-				XPutImage(W.d, pixmap, gc, &image, 0, 0, 0, 0, local.width, local.rows);
 				xftg->picture = xcb_generate_id(W.c);
 				xcb_render_create_picture_checked(W.c, xftg->picture, pixmap, font->format->id, 0, NULL);
 				
-				XFreeGC(W.d, gc);
-				XFreePixmap(W.d, pixmap);
+				xcb_free_gc(W.c, gc);
+				xcb_free_pixmap(W.c, pixmap);
 			} else
 				xcb_render_add_glyphs_checked(W.c, font->glyphset, 1, &glyph, &xftg->metrics, size, bufBitmap);
 		} else {

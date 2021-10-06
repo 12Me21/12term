@@ -116,7 +116,6 @@ typedef struct XftSolidColor {
 #define XFT_NUM_FONT_HASH 127
 
 typedef struct XftDisplayInfo {
-	XExtCodes* codes;
 	FcPattern* defaults;
 	XftFont* fonts;
 	unsigned long glyph_memory;
