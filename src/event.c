@@ -3,6 +3,8 @@
 #include <X11/Xlib.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "common.h"
 #include "event.h"

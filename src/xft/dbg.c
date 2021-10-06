@@ -1,6 +1,6 @@
 #include "xftint.h"
 
-_X_HIDDEN int XftDebug(void) {
+int XftDebug(void) {
 	static int initialized;
 	static int debug;
 	

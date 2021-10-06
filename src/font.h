@@ -30,3 +30,4 @@ void load_fonts(const utf8* fontstr, double fontsize);
 int make_glyphs(int len, XftGlyphFontSpec specs[len], Cell cells[len], int indexs[len], DrawnCell old[len]);
 void fonts_free(void);
 void cells_to_glyphs(int len, Cell cells[len], Glyph glyphs[len], bool cache);
+void font_init(void);

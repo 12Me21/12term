@@ -1,6 +1,6 @@
 #include "xftint.h"
 
-_X_HIDDEN int XftNativeByteOrder(void) {
+int XftNativeByteOrder(void) {
 	int whichbyte = 1;
 	if (*((char*)&whichbyte))
 		return LSBFirst;
@@ -39,7 +39,7 @@ static void XftSwapCARD16(CARD16* data, int u) {
 	}
 }
 
-_X_HIDDEN void XftSwapImage(XImage* image) {
+void XftSwapImage(XImage* image) {
 	switch (image->bits_per_pixel) {
 	case 32:
 		XftSwapCARD32((CARD32*)image->data, image->height*image->bytes_per_line/4);

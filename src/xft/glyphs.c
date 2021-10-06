@@ -1,4 +1,5 @@
 #include "xftint.h"
+#include <ft2build.h>
 #include FT_OUTLINE_H
 #include FT_LCD_FILTER_H
 
@@ -16,7 +17,7 @@ static void _XftFontValidateMemory(XftFont* public) {
 			glyph_memory += xftg->glyph_memory;
 	}
 	if (glyph_memory != font->glyph_memory)
-		printf ("Font glyph cache incorrect has %ld bytes, should have %ld\n", font->glyph_memory, glyph_memory);
+		print("Font glyph cache incorrect has %ld bytes, should have %ld\n", font->glyph_memory, glyph_memory);
 }
 
 /* we sometimes need to convert the glyph bitmap in a FT_GlyphSlot
@@ -361,7 +362,7 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 		if (xftg->glyph_memory)
 			continue;
 		
-		FT_Library_SetLcdFilter(_XftFTlibrary, font->info.lcd_filter);
+		FT_Library_SetLcdFilter(ft_library, font->info.lcd_filter);
 		
 		FT_Error	error = FT_Load_Glyph(face, glyphindex, font->info.load_flags);
 		if (error) {
@@ -396,7 +397,7 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 					vector.y = glyphslot->metrics.horiBearingY - yc * glyphslot->metrics.height;
 					FT_Vector_Transform(&vector, &font->info.matrix);
 					if (XftDebug() & XFT_DBG_GLYPH)
-						printf("Trans %d %d: %d %d\n", (int) xc, (int) yc,
+						print("Trans %d %d: %d %d\n", (int) xc, (int) yc,
 						       (int) vector.x, (int) vector.y);
 					if (xc == 0 && yc == 0) {
 						left = right = vector.x;
@@ -461,7 +462,7 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 			glyph_transform = false;
 		}
 		
-		FT_Library_SetLcdFilter(_XftFTlibrary, FT_LCD_FILTER_NONE);
+		FT_Library_SetLcdFilter(ft_library, FT_LCD_FILTER_NONE);
 		
 		if (font->info.spacing >= FC_MONO) {
 			if (transform) {
@@ -496,8 +497,8 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 		height = ftbit->rows;
 		
 		if (XftDebug() & XFT_DBG_GLYPH) {
-			printf("glyph %d:\n", (int) glyphindex);
-			printf(" xywh (%d %d %d %d), trans (%d %d %d %d) wh (%d %d)\n",
+			print("glyph %d:\n", (int) glyphindex);
+			print(" xywh (%d %d %d %d), trans (%d %d %d %d) wh (%d %d)\n",
 			       (int) glyphslot->metrics.horiBearingX,
 			       (int) glyphslot->metrics.horiBearingY,
 			       (int) glyphslot->metrics.width,
@@ -513,16 +514,16 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 					if (font->info.antialias) {
 						static const char den[] = {" .:;=+*#"};
 						for (int x = 0; x < width; x++)
-							printf("%c", den[line[x] >> 5]);
+							print("%c", den[line[x] >> 5]);
 					} else {
 						for (int x = 0; x < width * 8; x++) {
-							printf("%c", line[x>>3] & (1 << (x & 7)) ? '#' : ' ');
+							print("%c", line[x>>3] & (1 << (x & 7)) ? '#' : ' ');
 						}
 					}
-					printf("|\n");
+					print("|\n");
 					line += ftbit->pitch;
 				}
-				printf("\n");
+				print("\n");
 			}
 		}
 		
@@ -596,19 +597,14 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 			}
 			
 			if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA) {
+				// h
 				Pixmap pixmap = XCreatePixmap(W.d, DefaultRootWindow(W.d), local.width, local.rows, 32);
 				GC gc = XCreateGC(W.d, pixmap, 0, NULL);
-				XImage image = {
-					local.width, local.rows, 0, ZPixmap, (char*)bufBitmap,
-					W.d->byte_order, W.d->bitmap_unit, W.d->bitmap_bit_order, 32,
-					32, local.width * 4 - local.pitch, 32,
-					0, 0, 0
-				};
-				
-				XInitImage(&image);
-				XPutImage(W.d, pixmap, gc, &image, 0, 0, 0, 0, local.width, local.rows);
+				XImage* image = XCreateImage(W.d, W.vis, 32, ZPixmap, 0, (char*)bufBitmap, local.width, local.rows, 32, 0);
+				XPutImage(W.d, pixmap, gc, image, 0, 0, 0, 0, local.width, local.rows);
 				xftg->picture = XRenderCreatePicture(W.d, pixmap, font->format, 0, NULL);
-				
+				image->data = NULL; // this is probably safe...
+				XDestroyImage(image);
 				XFreeGC(W.d, gc);
 				XFreePixmap(W.d, pixmap);
 			} else
@@ -627,7 +623,7 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 		if (XftDebug() & XFT_DBG_CACHE)
 			_XftFontValidateMemory(pub);
 		if (XftDebug() & XFT_DBG_CACHEV)
-			printf("Caching glyph 0x%x size %ld\n", glyphindex, xftg->glyph_memory);
+			print("Caching glyph 0x%x size %ld\n", glyphindex, xftg->glyph_memory);
 	}
 	XftUnlockFace(&font->public);
 }
@@ -747,7 +743,7 @@ void _XftFontUncacheGlyph(XftFont* pub) {
 		if (xftg) {
 			if (xftg->glyph_memory > glyph_memory) {
 				if (XftDebug() & XFT_DBG_CACHEV)
-					printf("Uncaching glyph 0x%x size %ld\n", glyphindex, xftg->glyph_memory);
+					print("Uncaching glyph 0x%x size %ld\n", glyphindex, xftg->glyph_memory);
 				XftFontUnloadGlyphs(pub, &glyphindex, 1);
 				break;
 			}
@@ -764,9 +760,9 @@ void _XftFontManageMemory(XftFont* pub) {
 	if (font->max_glyph_memory) {
 		if (XftDebug() & XFT_DBG_CACHE) {
 			if (font->glyph_memory > font->max_glyph_memory)
-				printf("Reduce memory for font 0x%lx from %ld to %ld\n",
-				       font->glyphset ? font->glyphset : (unsigned long)font,
-				       font->glyph_memory, font->max_glyph_memory);
+				print("Reduce memory for font 0x%lx from %ld to %ld\n",
+					font->glyphset ? font->glyphset : (unsigned long)font,
+					font->glyph_memory, font->max_glyph_memory);
 		}
 		while (font->glyph_memory > font->max_glyph_memory)
 			_XftFontUncacheGlyph(pub);

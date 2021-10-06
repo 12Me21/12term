@@ -7,6 +7,7 @@
 #include "common.h"
 #include "font.h"
 #include "buffer.h"
+#include "settings.h"
 #include "x.h"
 
 #define Font Font_
@@ -20,6 +21,14 @@ typedef struct {
 } Font;
 
 static Font fonts[4] = {0}; // normal, bold, italic, bold+italic
+
+void font_init(void) {
+	if (!FcInit())
+		die("fontconfig init failed");
+	XftDisplayInfoInit();
+	if (FT_Init_FreeType(&ft_library))
+		die("freetype init failed");
+}
 
 static int ceildiv(int a, int b) {
 	return (a+b-1)/b;
@@ -36,8 +45,9 @@ static bool load_font(Font* f, FcPattern* pattern, bool bold, bool italic) {
 	if (bold)
 		FcPatternAddInteger(configured, FC_WEIGHT, FC_WEIGHT_BOLD);
 	
+	// todo: see how the config works, maybe we can use this to load defaults better
 	FcConfigSubstitute(NULL, configured, FcMatchPattern);
-	XftDefaultSubstitute(configured);
+	pattern_default_substitute(configured);
 	
 	FcResult result;
 	FcPattern* match = FcFontMatch(NULL, configured, &result);

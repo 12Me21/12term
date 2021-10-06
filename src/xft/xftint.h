@@ -9,10 +9,8 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xmd.h>
-#include <X11/Xlibint.h>
-#define _XFT_NO_COMPAT_
 #include "Xft.h"
-#include <fontconfig/fcprivate.h>
+#include <fontconfig/fontconfig.h>
 #include <fontconfig/fcfreetype.h>
 
 #include "../x.h"

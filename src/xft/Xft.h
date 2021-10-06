@@ -13,7 +13,7 @@
 #define XFT_MAX_GLYPH_MEMORY	"maxglyphmemory"
 #define XFT_MAX_UNREF_FONTS	"maxunreffonts"
 
-extern FT_Library	_XftFTlibrary;
+extern FT_Library	ft_library;
 
 typedef struct XftFontInfo XftFontInfo;
 

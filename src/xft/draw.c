@@ -9,17 +9,13 @@ struct XftDraw {
 };
 
 static void XftDrawRenderPrepare(XftDraw* draw) {
-	XRenderPictFormat* format = XRenderFindVisualFormat(W.d, W.vis);
-	if (!format)
-		return; //fail
-	
 	unsigned long mask = 0;
 	XRenderPictureAttributes pa;
 	if (draw->subwindow_mode == IncludeInferiors) {
 		pa.subwindow_mode = IncludeInferiors;
 		mask |= CPSubwindowMode;
 	}
-	draw->pict = XRenderCreatePicture(W.d, draw->drawable, format, mask, &pa);
+	draw->pict = XRenderCreatePicture(W.d, draw->drawable, W.format, mask, &pa);
 		
 	if (!draw->pict)
 		return; // fail!
@@ -132,10 +128,10 @@ bool XftDrawSetClip(XftDraw* draw, Region r) {
 	
 	// Duplicate the region so future changes can be short circuited
 	if (r) {
-		n = XCreateRegion ();
+		n = XCreateRegion();
 		if (n) {
-			if (!XUnionRegion (n, r, n)) {
-				XDestroyRegion (n);
+			if (!XUnionRegion(n, r, n)) {
+				XDestroyRegion(n);
 				return False;
 			}
 		}

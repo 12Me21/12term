@@ -14,7 +14,6 @@
 #endif
 
 #include <X11/Xlib.h>
-#include "xft/Xft.h"
 #include <X11/Xatom.h>
 #include <X11/Xresource.h>
 
@@ -251,10 +250,14 @@ int main(int argc, char* argv[argc+1]) {
 	// check if user has modern display (otherwise nnnnnnnn sorry i dont want to deal with this)
 	if (W.vis->class!=TrueColor)
 		die("Cannot handle non truecolor visual ...\n");
-	int event_base, error_base;
-	if (!XRenderQueryExtension(W.d, &event_base, &error_base))
-		die("No Xrender ...\n");
-	if (!XRenderFindVisualFormat(W.d, W.vis))
+	{
+		int major, minor;
+		XRenderQueryVersion(W.d, &major, &minor);
+		if (major<0 || (major==0 && minor<10))
+			die("Requires xrender >= 0.10");
+	}
+	W.format = XRenderFindVisualFormat(W.d, W.vis);
+	if (!W.format)
 		die("cant find visual format ...\n");
 	
 	W.cmap = XDefaultColormap(W.d, W.scr);
@@ -271,11 +274,7 @@ int main(int argc, char* argv[argc+1]) {
 	
 	time_log("init stuff 1");
 	
-	if (!FcInit())
-		die("fontconfig init failed");
-	XftDisplayInfoInit();
-	if (FT_Init_FreeType(&_XftFTlibrary))
-		die("freetype init failed");
+	font_init();
 	
 	time_log("init xft");
 		

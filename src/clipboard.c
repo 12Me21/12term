@@ -1,5 +1,7 @@
 // X11 clipboard is so fucked that I had to put this in a separate file
 #include <X11/Xlib.h>
+#include <stdio.h>
+#include <string.h>
 #include "common.h"
 #include "x.h"
 #include "clipboard.h"

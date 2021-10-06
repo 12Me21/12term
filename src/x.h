@@ -1,7 +1,7 @@
 #pragma once
 
 #include <X11/Xlib.h>
-#include "xft/Xft.h"
+#include <X11/extensions/Xrender.h>
 #include <X11/Xatom.h>
 
 #include "common.h"
@@ -14,6 +14,7 @@ typedef struct Xw {
 	Colormap cmap;
 	GC gc;
 	Window win;
+	XRenderPictFormat* format;
 	
 	int event_mask;
 	

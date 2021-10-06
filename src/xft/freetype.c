@@ -1,6 +1,6 @@
 #include "xftint.h"
 
-FT_Library _XftFTlibrary;
+FT_Library ft_library;
 
 #define FT_Matrix_Equal(a,b)	((a)->xx == (b)->xx && \
 				 (a)->yy == (b)->yy && \
@@ -103,7 +103,7 @@ static FT_Face _XftLockFile(XftFtFile* f) {
 	if (!f->face) {
 		if (XftDebug() & XFT_DBG_REF)
 			printf("Loading file %s/%d\n", f->file, f->id);
-		if (FT_New_Face(_XftFTlibrary, f->file, f->id, &f->face))
+		if (FT_New_Face(ft_library, f->file, f->id, &f->face))
 			--f->lock;
 		
 		f->xsize = 0;
