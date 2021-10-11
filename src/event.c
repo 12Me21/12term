@@ -328,8 +328,17 @@ static int xicdestroy(XIC xim, XPointer client, XPointer call) {
 
 static bool ximopen(Display* d) {
 	ime.xim = XOpenIM(d, NULL, NULL, NULL);
-	if (!ime.xim)
-		return false;
+	if (!ime.xim) {
+		// in case your XMODIFIERS env var is set incorrectly (i.e. you just uninstalled ibus but it's still set to "@im=ibus")
+		// we try loading it again with that setting overridden
+		// which will use xim
+		XSetLocaleModifiers("@im=none");
+		ime.xim = XOpenIM(d, NULL, NULL, NULL);
+		if (!ime.xim) {
+			print("no input method\n");
+			return false;
+		}
+	}
 	
 	if (XSetIMValues(ime.xim, XNDestroyCallback, &(XIMCallback){.callback = ximdestroy}, NULL))
 		print("XSetIMValues: Could not set XNDestroyCallback.\n");

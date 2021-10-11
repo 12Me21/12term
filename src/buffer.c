@@ -12,6 +12,16 @@
 
 Term T;
 
+static struct history {
+	Row* rows; // data
+	int size; // length of ring buffer
+		
+	int scroll; // visual scroll position
+		
+	int length; // number of rows stored currently
+	int head; // next empty slot
+} history;
+
 static void init_palette(void) {
 	T.foreground = settings.foreground;
 	T.background = settings.background;
@@ -19,11 +29,15 @@ static void init_palette(void) {
 	memcpy(T.palette, settings.palette, sizeof(T.palette));
 }
 
+// clear + init
 void init_history(void) {
-	FREE(T.history.rows);
-	T.history.size = 0;
-	T.history.lines = 0;
-	T.history.scroll = 0;
+	history.size = settings.saveLines;
+	ALLOC(history.rows, history.size);
+	
+	history.head = 0;
+	history.length = 0;
+	
+	T.scroll = 0;
 }
 
 static void clear_row(Row row, int start, bool bce) {
@@ -47,23 +61,31 @@ void term_free(void) {
 	free(T.tabs);
 }
 
+static void incwrap(int* x, int range) {
+	(*x)++;
+	if (*x >= range)
+		*x = 0;
+}
+
 // idea: scroll lock support
 // todo: add a limit to the number of pushed lines, and then turn this into a ring buffer.
 static void push_history(int y) {
 	if (y<0 || y>=T.height)
 		return;
-	// if history is full, allocate more space
-	if (T.history.lines >= T.history.size) {
-		int length = T.history.size + 1000;
-		REALLOC(T.history.rows, length);
-		T.history.size = length;
+	// free oldest item if necessary
+	if (history.length == history.size) {
+		FREE(history.rows[history.head]);
+	} else {
+		history.length++;
 	}
-	// now insert the row
-	T.history.rows[T.history.lines++] = T.buffers[0].rows[y];
-	// remove the row from the buffer itself so it doesn't get freed later
-	T.buffers[0].rows[y] = NULL;
-	if (T.history.scroll)
-		T.history.scroll++;
+	// move row into history
+	history.rows[history.head] = T.buffers[0].rows[y];
+	T.buffers[0].rows[y] = NULL; // set to null so it doesn't get freed
+	// move head forward to next slot
+	incwrap(&history.head, history.size);
+	// adjust scroll offset if we are scrolled up currently
+	if (T.scroll>0)
+		T.scroll++;
 }
 
 void term_resize(int width, int height) {
@@ -87,10 +109,11 @@ void term_resize(int width, int height) {
 		// update cursor position
 		T.c.x = limit(T.c.x, 0, T.width); //note this is NOT width-1, since cursor is allowed to be in the right margin
 		// resize history rows
-		for (int i=0; i<T.history.lines; i++) {
-			REALLOC(T.history.rows[i], T.width);
+		for (int i=1; i<=history.length; i++) {
+			Row* row = &history.rows[(history.head-i+history.size) % history.size];
+			REALLOC(*row, T.width);
 			if (T.width > old_width)
-				clear_row(T.history.rows[i], old_width, true);
+				clear_row(*row, old_width, true);
 		}
 	}
 	
@@ -212,6 +235,7 @@ void full_reset(void) {
 	reset_parser();
 }
 
+// todo: um we need to free these??
 int new_link(utf8* url) {
 	if (T.links.length < LEN(T.links.items))
 		if ((T.links.items[T.links.length] = strdup(url)))
@@ -221,6 +245,7 @@ int new_link(utf8* url) {
 }
 
 // only call this ONCE
+// make sure it's after settings are loaded
 void init_term(int width, int height) {
 	T = (Term){
 		// REMEMBER: this sets all the other fields to 0
@@ -647,24 +672,25 @@ void set_scroll_region(int y1, int y2) {
 }
 
 void set_scrollback(int pos) {
-	pos = limit(pos, 0, T.history.lines);
-	int dist = pos-T.history.scroll;
+	pos = limit(pos, 0, history.length);
+	print("scrolling %d\n", pos);
+	int dist = pos-T.scroll;
 	if (abs(dist)<T.height)
 		draw_rotate_rows(0, T.height, dist, true);
-	T.history.scroll = pos;
+	T.scroll = pos;
 }
 
 bool move_scrollback(int amount) {
-	int before = T.history.scroll;
-	set_scrollback(T.history.scroll+amount);
-	return before!=T.history.scroll;
+	int before = T.scroll;
+	set_scrollback(T.scroll+amount);
+	return before!=T.scroll;
 }
 
-// get a row from the current screen (if n ≥ 0) or the history buffer (if n < 0). returns NULL if n is out of range
+// get a row from the current screen (if y ≥ 0) or the history buffer (if y < 0). returns NULL if n is out of range
 Row get_row(int y) {
 	if (y>=0 && y<T.height)
 		return T.current->rows[y];
-	if (y<0 && T.history.lines+y>=0)
-		return T.history.rows[T.history.lines+y];
+	if (y<0 && -y <= history.length) // history is "-1 indexed"
+		return history.rows[(history.head+y+history.size) % history.size];
 	return NULL;
 }

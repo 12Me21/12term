@@ -10,6 +10,8 @@
 
 #include <X11/extensions/Xrender.h>
 
+#include "../common.h"
+
 #define XFT_MAX_GLYPH_MEMORY	"maxglyphmemory"
 #define XFT_MAX_UNREF_FONTS	"maxunreffonts"
 
@@ -47,8 +49,7 @@ void XftDefaultSubstitute(FcPattern* pattern);
 void XftDisplayInfoInit(void);
 
 /* xftdraw.c */
-XftDraw* XftDrawCreate(Drawable drawable);
-void XftDrawChange(XftDraw* draw, Drawable drawable);
+XftDraw* XftDrawCreate(Px w, Px h);
 
 Drawable XftDrawDrawable(XftDraw* draw);
 
@@ -56,15 +57,11 @@ void XftDrawDestroy(XftDraw* draw);
 
 Picture XftDrawPicture(XftDraw* draw);
 
-Picture XftDrawSrcPicture(const XRenderColor* color);
+Picture XftDrawSrcPicture(const XRenderColor color);
 
-void XftDrawRect(XftDraw* draw, const XRenderColor* color, int x, int y, unsigned int width, unsigned int height);
+void XftDrawRect(XftDraw* draw, const XRenderColor color, Px x, Px y, Px width, Px height);
 
-bool XftDrawSetClip(XftDraw* draw, Region r);
-
-bool XftDrawSetClipRectangles(XftDraw* draw, int xOrigin, int yOrigin, const XRectangle* rects, int n);
-
-void XftDrawSetSubwindowMode(XftDraw* draw, int mode);
+void XftDrawPut(XftDraw* draw, Px x, Px y, Px w, Px h, Px dx, Px dy);
 
 /* xftextent.c */
 
@@ -96,4 +93,4 @@ FT_UInt XftCharIndex(XftFont* pub, FcChar32 ucs4);
 /* xftrender.c */
 
 // eee
-void XftGlyphRender1(int op, XRenderColor* src, XftFont* pub, Picture dst, int x, int y, const FT_UInt g, int cw);
+void XftGlyphRender1(int op, XRenderColor col, XftFont* pub, Picture dst, int x, int y, FT_UInt g, int cw);

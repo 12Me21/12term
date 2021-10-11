@@ -8,7 +8,7 @@
 // x,y - destination position
 // g - glyph id
 // cw - width of character cell (this is messy. maybe would be better to pass the CENTER x coordinate
-void XftGlyphRender1(int op, XRenderColor* col, XftFont* pub, Picture dst, int x, int y, FT_UInt g, int cw) {
+void XftGlyphRender1(int op, XRenderColor col, XftFont* pub, Picture dst, int x, int y, FT_UInt g, int cw) {
 	XftFontInt* font = (XftFontInt*)pub;
 	if (!font->format)
 		return;

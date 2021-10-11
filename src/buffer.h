@@ -94,15 +94,9 @@ typedef struct Term {
 	// and don't bother checking or resetting these
 	// so honestly idk if even allowing setting them is a good idea...
 	
-	int charsets[4];
+	int scroll;
 	
-	struct history {
-		// these names are bad..
-		Row* rows; // array
-		int size; // length of array
-		int lines; // number of actual items stored in array
-		int scroll; // visual scroll position
-	} history;
+	int charsets[4];
 	
 	struct links {
 		int length;

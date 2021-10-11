@@ -321,14 +321,12 @@ static void _fill_xrender_bitmap(FT_Bitmap* target, FT_GlyphSlot slot, FT_Render
 void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, int nglyph) {
 	XftFontInt* font = (XftFontInt*)pub;
 	
-	FT_Bitmap local;
-	FT_Vector vector;
-	
 	FT_Face face = XftLockFace(&font->public);
 	if (!face)
 		return;
 	
-	FT_Render_Mode  mode = FT_RENDER_MODE_MONO;
+	// determine render mode
+	FT_Render_Mode mode = FT_RENDER_MODE_MONO;
 	if (font->info.color)
 		mode = FT_RENDER_MODE_NORMAL;
 	if (font->info.antialias) {
@@ -348,6 +346,7 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 	
 	bool transform = font->info.transform && mode != FT_RENDER_MODE_MONO;
 	
+	// for each glyph:
 	while (nglyph--) {
 		FT_UInt glyphindex = *glyphs++;
 		XftGlyph* xftg = font->glyphs[glyphindex];
@@ -388,6 +387,7 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 		
 		// Compute glyph metrics from FreeType information
 		int left, right, top, bottom;
+		FT_Vector vector;
 		if (transform) {
 			// calculate the true width by transforming all four corners.
 			left = right = top = bottom = 0;
@@ -416,10 +416,10 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 			top = CEIL(top);
 			// lots of rounding going on here... kinda sus
 		} else {
-			left  = FLOOR( glyphslot->metrics.horiBearingX );
+			left = FLOOR( glyphslot->metrics.horiBearingX );
 			right = CEIL( glyphslot->metrics.horiBearingX + glyphslot->metrics.width );
 			
-			top    = CEIL( glyphslot->metrics.horiBearingY );
+			top = CEIL( glyphslot->metrics.horiBearingY );
 			bottom = FLOOR( glyphslot->metrics.horiBearingY - glyphslot->metrics.height );
 		}
 		
@@ -431,9 +431,7 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 		if (font->info.spacing >= FC_CHARCELL && !transform) {
 			if (font->info.load_flags & FT_LOAD_VERTICAL_LAYOUT) {
 				if (TRUNC(bottom) > font->public.max_advance_width) {
-					int adjust;
-					
-					adjust = bottom - (font->public.max_advance_width << 6);
+					int adjust = bottom - (font->public.max_advance_width << 6);
 					if (adjust > top)
 						adjust = top;
 					top -= adjust;
@@ -442,9 +440,7 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 				}
 			} else {
 				if (TRUNC(right) > font->public.max_advance_width) {
-					int adjust;
-					
-					adjust = right - (font->public.max_advance_width << 6);
+					int adjust = right - (font->public.max_advance_width << 6);
 					if (adjust > left)
 						adjust = left;
 					left -= adjust;
@@ -527,6 +523,7 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 			}
 		}
 		
+		FT_Bitmap local;
 		int size = _compute_xrender_bitmap_size(&local, glyphslot, mode, glyph_transform ? &font->info.matrix : NULL);
 		if (size < 0)
 			continue;
@@ -548,8 +545,8 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 		
 		// If the glyph is relatively large (> 1% of server memory),
 		// don't send it until necessary.
-		if (!need_bitmaps && size>info.max_glyph_memory/100)
-			continue;
+		//if (!need_bitmaps && size>info.max_glyph_memory/100)
+		//	continue;
 		
 		unsigned char bufBitmap[size]; // I hope there's enough stack space owo
 		memset(bufBitmap, 0, size);
@@ -571,14 +568,14 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 		Glyph glyph = glyphindex;
 		
 		xftg->picture = 0;
-		xftg->glyph_memory = size + sizeof (XftGlyph);
+		xftg->glyph_memory = sizeof(XftGlyph) + size;
 		if (font->format) {
 			if (!font->glyphset)
 				font->glyphset = XRenderCreateGlyphSet(W.d, font->format);
 			if (mode == FT_RENDER_MODE_MONO) {
 				/* swap bits in each byte */
 				if (BitmapBitOrder(W.d) != MSBFirst) {
-					unsigned char* line = (unsigned char*)bufBitmap;
+					unsigned char* line = bufBitmap;
 					int i = size;
 					
 					while (i--) {
@@ -597,7 +594,7 @@ void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, i
 			}
 			
 			if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA) {
-				// h
+				// all of this is just to take data and turn it into a Picture
 				Pixmap pixmap = XCreatePixmap(W.d, DefaultRootWindow(W.d), local.width, local.rows, 32);
 				GC gc = XCreateGC(W.d, pixmap, 0, NULL);
 				XImage* image = XCreateImage(W.d, W.vis, 32, ZPixmap, 0, (char*)bufBitmap, local.width, local.rows, 32, 0);
@@ -656,7 +653,7 @@ void XftFontUnloadGlyphs(XftFont* pub, const FT_UInt* glyphs, int nglyph) {
 			info.glyph_memory -= xftg->glyph_memory;
 		}
 		free(xftg);
-		XftMemFree(XFT_MEM_GLYPH, sizeof (XftGlyph));
+		XftMemFree(XFT_MEM_GLYPH, sizeof(XftGlyph));
 		font->glyphs[glyphindex] = NULL;
 	}
 	if (font->glyphset && nused)

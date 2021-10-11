@@ -3,11 +3,6 @@
 XftDisplayInfo info;
 
 void XftDisplayInfoInit(void) {
-	int major, minor;
-	XRenderQueryVersion(W.d, &major, &minor);
-	if (major<0 || (major==0 && minor<10))
-		die("Requires xrender >= 0.10");
-	
 	if (XftDebug() & XFT_DBG_RENDER) {
 		print("XftDisplayInfoGet Default visual 0x%x ", (int)W.vis->visualid);
 		if (W.format) {

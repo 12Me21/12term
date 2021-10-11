@@ -2,68 +2,24 @@
 
 struct XftDraw {
 	Drawable drawable;
-	XftClipType clip_type;
-	XftClip clip;
-	int subwindow_mode;
+	//XftClipType clip_type;
+	//XftClip clip;
+	//int subwindow_mode;
+	// this controlled the Picture's .subwindow_mode field but I'm not sure what that does
 	Picture pict;
 };
 
-static void XftDrawRenderPrepare(XftDraw* draw) {
-	unsigned long mask = 0;
-	XRenderPictureAttributes pa;
-	if (draw->subwindow_mode == IncludeInferiors) {
-		pa.subwindow_mode = IncludeInferiors;
-		mask |= CPSubwindowMode;
-	}
-	draw->pict = XRenderCreatePicture(W.d, draw->drawable, W.format, mask, &pa);
-		
-	if (!draw->pict)
-		return; // fail!
-	switch (draw->clip_type) {
-	case XftClipTypeRegion:
-		XRenderSetPictureClipRegion(W.d, draw->pict, draw->clip.region);
-		break;
-	case XftClipTypeRectangles:
-		XRenderSetPictureClipRectangles(W.d, draw->pict, draw->clip.rect->xOrigin,
-		                                draw->clip.rect->yOrigin,
-		                                XftClipRects(draw->clip.rect),
-		                                draw->clip.rect->n);
-		break;
-	case XftClipTypeNone:
-		break;
-	}
-}
-
-XftDraw* XftDrawCreate(Drawable drawable) {
+XftDraw* XftDrawCreate(Px w, Px h) {
 	XftDraw* draw = malloc(sizeof(XftDraw));
-	
-	*draw = (XftDraw){
-		.drawable = drawable,
-		.pict = 0,
-		.clip_type = XftClipTypeNone,
-		.subwindow_mode = ClipByChildren,
-	};
-	XftMemAlloc(XFT_MEM_DRAW, sizeof(XftDraw));
-	
-	XftDrawRenderPrepare(draw);
+	draw->drawable = XCreatePixmap(W.d, W.win, w, h, DefaultDepth(W.d, W.scr));
+	draw->pict = XRenderCreatePicture(W.d, draw->drawable, W.format, 0, NULL);
 	return draw;
 }
 
-void XftDrawChange(XftDraw* draw, Drawable drawable) {
-	if (draw->pict)
-		XRenderFreePicture(W.d, draw->pict);
-	draw->drawable = drawable;
-	XftDrawRenderPrepare(draw);
-}
-
-Drawable XftDrawDrawable(XftDraw* draw) {
-	return draw->drawable;
-}
-
 void XftDrawDestroy(XftDraw* draw) {
-	if (draw->pict)
-		XRenderFreePicture(W.d, draw->pict);
-	switch (draw->clip_type) {
+	XFreePixmap(W.d, draw->drawable);
+	XRenderFreePicture(W.d, draw->pict);
+	/*switch (draw->clip_type) {
 	case XftClipTypeRegion:
 		XDestroyRegion(draw->clip.region);
 		break;
@@ -72,22 +28,23 @@ void XftDrawDestroy(XftDraw* draw) {
 		break;
 	case XftClipTypeNone:
 		break;
-	}
-	XftMemFree(XFT_MEM_DRAW, sizeof(XftDraw));
+		}*/
 	free(draw);
 }
 
-static Picture pict;
+void XftDrawPut(XftDraw* draw, Px x, Px y, Px w, Px h, Px dx, Px dy) {
+	XCopyArea(W.d, draw->drawable, W.win, W.gc, x, y, w, h, dx, dy);
+}
 
 // improve caching here
-Picture XftDrawSrcPicture(const XRenderColor* color) {
+Picture XftDrawSrcPicture(const XRenderColor color) {
 	/*if (pict)
 		XRenderFreePicture(W.d, pict);
 		return pict =XRenderCreateSolidFill(W.d, color);*/
 	
 	// See if there's one already available
 	for (int i=0; i<XFT_NUM_SOLID_COLOR; i++) {
-		if (info.colors[i].pict && info.colors[i].screen == W.scr && !memcmp(color, &info.colors[i].color, sizeof(XRenderColor)))
+		if (info.colors[i].pict && info.colors[i].screen == W.scr && !memcmp(&color, &info.colors[i].color, sizeof(XRenderColor)))
 			return info.colors[i].pict;
 	}
 	// Pick one to replace at random
@@ -98,9 +55,9 @@ Picture XftDrawSrcPicture(const XRenderColor* color) {
 		XRenderFreePicture(W.d, info.colors[i].pict);
 	// Create picture
 	// is it worth caching this anymore?
-	info.colors[i].pict = XRenderCreateSolidFill(W.d, color);
+	info.colors[i].pict = XRenderCreateSolidFill(W.d, &color);
 	
-	info.colors[i].color = *color;
+	info.colors[i].color = color;
 	info.colors[i].screen = W.scr;
 
 	return info.colors[i].pict;
@@ -110,11 +67,11 @@ Picture XftDrawPicture(XftDraw* draw) {
 	return draw->pict;
 }
 
-void XftDrawRect(XftDraw* draw, const XRenderColor* color, int x, int y, unsigned int width, unsigned int height) {
-	XRenderFillRectangle(W.d, PictOpSrc, draw->pict, color, x, y, width, height);
+void XftDrawRect(XftDraw* draw, const XRenderColor color, Px x, Px y, Px width, Px height) {
+	XRenderFillRectangle(W.d, PictOpSrc, draw->pict, &color, x, y, width, height);
 }
 
-bool XftDrawSetClip(XftDraw* draw, Region r) {
+/*bool XftDrawSetClip(XftDraw* draw, Region r) {
 	Region n = NULL;
 	
 	// Check for quick exits
@@ -143,7 +100,7 @@ bool XftDrawSetClip(XftDraw* draw, Region r) {
 		XDestroyRegion (draw->clip.region);
 		break;
 	case XftClipTypeRectangles:
-		free (draw->clip.rect);
+		free(draw->clip.rect);
 		break;
 	case XftClipTypeNone:
 		break;
@@ -168,9 +125,9 @@ bool XftDrawSetClip(XftDraw* draw, Region r) {
 		}
 	}
 	return True;
-}
+	}*/
 
-bool XftDrawSetClipRectangles(XftDraw* draw, int xOrigin, int yOrigin, const XRectangle* rects, int n) {
+/*bool XftDrawSetClipRectangles(XftDraw* draw, int xOrigin, int yOrigin, const XRectangle* rects, int n) {
 	XftClipRect	*new = NULL;
 	
 	// Check for quick exit
@@ -178,7 +135,7 @@ bool XftDrawSetClipRectangles(XftDraw* draw, int xOrigin, int yOrigin, const XRe
 	    draw->clip.rect->n == n &&
 	    (n == 0 || (draw->clip.rect->xOrigin == xOrigin &&
 	                draw->clip.rect->yOrigin == yOrigin)) &&
-	    !memcmp (XftClipRects (draw->clip.rect), rects, n * sizeof (XRectangle))) {
+	    !memcmp (XftClipRects(draw->clip.rect), rects, n * sizeof (XRectangle))) {
 		return True;
 	}
 	
@@ -217,14 +174,4 @@ bool XftDrawSetClipRectangles(XftDraw* draw, int xOrigin, int yOrigin, const XRe
 	}
 	return True;
 }
-
-void XftDrawSetSubwindowMode(XftDraw* draw, int mode) {
-	if (mode == draw->subwindow_mode)
-		return;
-	draw->subwindow_mode = mode;
-	if (draw->pict) {
-		XRenderChangePicture(W.d, draw->pict, CPSubwindowMode, &(XRenderPictureAttributes){
-			.subwindow_mode = mode,
-		});
-	}
-}
+*/
