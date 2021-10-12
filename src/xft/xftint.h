@@ -152,7 +152,8 @@ typedef struct XftDisplayInfo {
 // By default, keep the last 16 unreferenced fonts around to
 // speed reopening them.  Note that the glyph caching code
 // will keep the global memory usage reasonably limited
-#define XFT_DPY_MAX_UNREF_FONTS 16
+//  no
+#define XFT_DPY_MAX_UNREF_FONTS 0
 
 #define XFT_DBG_OPEN	1
 #define XFT_DBG_OPENV 2

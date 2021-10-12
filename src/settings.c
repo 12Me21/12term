@@ -54,7 +54,7 @@ XrmDatabase	db = NULL;
 static bool get_string(char* name, char** out) {
 	XrmValue ret;
 	char* type;
-	if (db && XrmGetResource(db, name, NULL, &type, &ret)) {
+	if (db && XrmGetResource(db, name, "", &type, &ret)) { //I tried passing NULL for the class string but it didn't like that,
 		if (strcmp(type, "String"))
 			return false;
 		// do we need to duplicate this 

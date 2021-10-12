@@ -12,8 +12,7 @@ srcs := $(srcs:=.c)
 lua_version = 5.2
 
 # libs to include with -l<name>
-libs = m rt util
-# m: math
+libs = rt util
 # rt: realtime extensions
 # util: pty stuff
 

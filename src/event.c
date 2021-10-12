@@ -137,7 +137,7 @@ static void on_buttonpress(XEvent* ev) {
 	case 1:; // left click
 		int x, y;
 		if (cell_at(ev->xbutton.x, ev->xbutton.y, &x, &y)) {
-			Cell* c = &T.current->rows[y][x];
+			Cell* c = &T.current->rows[y]->cells[x];
 			if (c->attrs.link && c->attrs.link-1<T.links.length) {
 				char* url = T.links.items[c->attrs.link-1];
 				print("clicked hyperlink to: %s\n", url);

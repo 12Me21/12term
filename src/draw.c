@@ -24,7 +24,7 @@ typedef struct DrawRow {
 
 static DrawRow* rows = NULL;
 
-static Cell* blank_row = NULL;
+static Row* blank_row = NULL;
 
 // cursor
 static XftDraw* cursor_draw = NULL;
@@ -85,9 +85,9 @@ void draw_resize(int width, int height, bool charsize) {
 		rows[y].redraw = true;
 	}
 	
-	REALLOC(blank_row, T.width);
+	resize_row(&blank_row, T.width);
 	for (int x=0; x<T.width; x++)
-		blank_row[x] = (Cell){.attrs={.background={.i=-2}}};
+		blank_row->cells[x] = (Cell){.attrs={.background={.i=-2}}};
 	
 	// char size changing
 	if (charsize) {
@@ -137,10 +137,10 @@ static void draw_cursor(int x, int y) {
 	
 	xim_spot(x, y);
 	
-	Row row = T.current->rows[y];
+	Row* row = T.current->rows[y];
 	Cell temp;
 	if (row && x<T.width)
-		temp = row[x];
+		temp = row->cells[x];
 	else
 		temp = (Cell){0};
 	temp.attrs.color = temp.attrs.background;
@@ -198,25 +198,25 @@ void draw_rotate_rows(int y1, int y2, int amount, bool screen_space) {
 		rows[y].redraw = true;
 }
 
-static bool draw_row(int y, Row row) {
-	if (!memcmp(row, rows[y].cells, sizeof(Cell)*T.width))
+static bool draw_row(int y, Row* row) {
+	// see if row matches what's drawn onscreen
+	if (!memcmp(&row->cells, rows[y].cells, sizeof(Cell)*T.width))
 		return false;
-	
-	memcpy(rows[y].cells, row, T.width*sizeof(Cell));
-	
+	memcpy(rows[y].cells, &row->cells, T.width*sizeof(Cell));
+	// if blank_row was passed (special case for scrollback out of bounds things)
 	if (row==blank_row) {
 		XftDrawRect(rows[y].draw, make_color((Color){.truecolor=true,.rgb=T.background}), 0, 0, W.w, W.ch);
 		return true;
 	}
 	
 	// draw left border background
-	XftDrawRect(rows[y].draw, make_color((Color){.i=-2}), 0, 0, W.border, W.ch);
+	XftDrawRect(rows[y].draw, make_color((Color){.i= row->cont?-3:-2 }), 0, 0, W.border, W.ch);
 	// draw cell backgrounds
-	XRenderColor prev_color = make_color(row[0].attrs.background);
+	XRenderColor prev_color = make_color(row->cells[0].attrs.background);
 	int prev_start = 0;
 	int x;
 	for (x=1; x<T.width; x++) {
-		XRenderColor bg = make_color(row[x].attrs.background);
+		XRenderColor bg = make_color(row->cells[x].attrs.background);
 		if (!same_color(bg, prev_color)) {
 			XftDrawRect(rows[y].draw, prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x-1), W.ch);
 			prev_start = x;
@@ -226,22 +226,24 @@ static bool draw_row(int y, Row row) {
 	XftDrawRect(rows[y].draw, prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x-1), W.ch);
 	// todo: why does the bg color extend too far in fullscreen?
 	// draw right border background
-	XftDrawRect(rows[y].draw, make_color((Color){.i=-2}), W.border+W.cw*T.width, 0, W.border, W.ch);
+	XftDrawRect(rows[y].draw, make_color((Color){.i = row->wrap?-3:-2}), W.border+W.cw*T.width, 0, W.border, W.ch);
+	// 
+		//XftDrawRect(rows[y].draw, make_color((Color){.i = -3}), W.border+W.cw*row->length, 0, W.border, W.ch);
 	
 	// draw text
 	// todo: we need to handle combining chars here!!
 	// 
 	Glyph* specs = rows[y].glyphs;
-	cells_to_glyphs(T.width, row, specs, true);
+	cells_to_glyphs(T.width, row->cells, specs, true);
 	
 	for (int i=0; i<T.width; i++) {
 		if (specs[i].font)
-			draw_glyph(rows[y].draw, W.border+i*W.cw, 0, specs[i], make_color(row[i].attrs.color), row[i].wide==1 ? 2 : 1);
+			draw_glyph(rows[y].draw, W.border+i*W.cw, 0, specs[i], make_color(row->cells[i].attrs.color), row->cells[i].wide==1 ? 2 : 1);
 	}
 	
 	// draw strikethrough and underlines
 	for (int x=0; x<T.width; x++)
-		draw_char_overlays(rows[y].draw, W.border+x*W.cw, row[x]);
+		draw_char_overlays(rows[y].draw, W.border+x*W.cw, row->cells[x]);
 	
 	return true;
 }
@@ -298,7 +300,7 @@ void draw(bool repaint_all) {
 	}
 	for (int y=0; y<T.height; y++) {
 		int ry = row_displayed_at(y);
-		Row row = get_row(ry);
+		Row* row = get_row(ry);
 		if (!row)
 			row = blank_row;
 		

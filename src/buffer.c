@@ -13,7 +13,7 @@
 Term T;
 
 static struct history {
-	Row* rows; // data
+	Row** rows; // array of pointers
 	int size; // length of ring buffer
 		
 	int scroll; // visual scroll position
@@ -29,8 +29,17 @@ static void init_palette(void) {
 	memcpy(T.palette, settings.palette, sizeof(T.palette));
 }
 
+static void free_history(void) {
+	if (history.rows) {
+		for (int i=1; i<=history.length; i++)
+			FREE(history.rows[(history.head-i+history.size) % history.size]);
+	}
+}
+
 // clear + init
 void init_history(void) {
+	free_history();
+	
 	history.size = settings.saveLines;
 	ALLOC(history.rows, history.size);
 	
@@ -40,10 +49,10 @@ void init_history(void) {
 	T.scroll = 0;
 }
 
-static void clear_row(Row row, int start, bool bce) {
+static void clear_row(Row* row, int start, bool bce) {
 	for (int i=start; i<T.width; i++) {
 		// todo: check for wide char halves!
-		row[i] = (Cell){
+		row->cells[i] = (Cell){
 			.chr=0,
 			.attrs = {
 				.color = T.c.attrs.color,
@@ -51,6 +60,8 @@ static void clear_row(Row row, int start, bool bce) {
 			},
 		};
 	}
+	row->wrap = false;
+	row->cont = false;
 }
 
 void term_free(void) {
@@ -59,6 +70,7 @@ void term_free(void) {
 			free(T.buffers[i].rows[y]);
 	}
 	free(T.tabs);
+	free_history();
 }
 
 static void incwrap(int* x, int range) {
@@ -88,6 +100,13 @@ static void push_history(int y) {
 		T.scroll++;
 }
 
+Row* resize_row(Row** row, int size) {
+	*row = realloc(*row, sizeof(Row) + sizeof(Cell)*size);
+	(*row)->wrap = false;
+	(*row)->cont = false;
+	return *row;
+}
+
 void term_resize(int width, int height) {
 	if (width != T.width) {
 		int old_width = T.width;
@@ -96,7 +115,7 @@ void term_resize(int width, int height) {
 		// todo: option to re-wrap text?
 		for (int i=0; i<2; i++) {
 			for (int y=0; y<T.height; y++) {
-				REALLOC(T.buffers[i].rows[y], T.width);
+				resize_row(&T.buffers[i].rows[y], T.width);
 				if (T.width > old_width)
 					clear_row(T.buffers[i].rows[y], old_width, true);
 			}
@@ -110,8 +129,8 @@ void term_resize(int width, int height) {
 		T.c.x = limit(T.c.x, 0, T.width); //note this is NOT width-1, since cursor is allowed to be in the right margin
 		// resize history rows
 		for (int i=1; i<=history.length; i++) {
-			Row* row = &history.rows[(history.head-i+history.size) % history.size];
-			REALLOC(*row, T.width);
+			Row** row = &history.rows[(history.head-i+history.size) % history.size];
+			resize_row(row, T.width);
 			if (T.width > old_width)
 				clear_row(*row, old_width, true);
 		}
@@ -142,13 +161,15 @@ void term_resize(int width, int height) {
 		T.height = height;
 		// alt buffer: add rows at bottom
 		for (int y=old_height; y<T.height; y++) {
-			ALLOC(T.buffers[1].rows[y], T.width);
+			T.buffers[1].rows[y] = NULL;
+			resize_row(&T.buffers[1].rows[y], T.width);
 			clear_row(T.buffers[1].rows[y], 0, true);
 		}
 		// main buffer: also add rows at bottom
 		// todo: option to move lines out of history instead?
 		for (int y=old_height; y<T.height; y++) {
-			ALLOC(T.buffers[0].rows[y], T.width);
+			T.buffers[0].rows[y] = NULL;
+			resize_row(&T.buffers[0].rows[y], T.width);
 			clear_row(T.buffers[0].rows[y], 0, true);
 		}
 	}
@@ -182,8 +203,9 @@ void clear_region(int x1, int y1, int x2, int y2) {
 	// todo: handle wide chars
 	
 	for (int y=y1; y<y2; y++) {
+		Row* row = T.current->rows[y];
 		for (int x=x1; x<x2; x++) {
-			T.current->rows[y][x] = (Cell){
+			row->cells[x] = (Cell){
 				.chr=0,
 				.attrs = {
 					.color = T.c.attrs.color,
@@ -191,6 +213,11 @@ void clear_region(int x1, int y1, int x2, int y2) {
 				},
 			};
 		}
+		// only unset these flags if the region goes to the edge
+		if (x1<=0)
+			row->cont = false;
+		if (x2>=T.width)
+			row->wrap = false;
 	}
 }
 
@@ -317,7 +344,7 @@ static void scroll_up_internal(int amount, bool bce) {
 		for (int y=y1; y<y1+amount; y++) {
 		// if we are on the main screen, and the scroll region starts at the top of the screen, we add the lines to the history list.
 			push_history(y);
-			ALLOC(T.current->rows[y], T.width);
+			T.current->rows[y] = malloc(sizeof(Row) + sizeof(Cell)*T.width);
 		}
 	shift_rows(y1, y2, -amount, bce);
 }
@@ -404,7 +431,7 @@ int cursor_down(int amount) {
 }
 
 static int add_combining_char(int x, int y, Char c) {
-	Cell* dest = &T.current->rows[y][x];
+	Cell* dest = &T.current->rows[y]->cells[x];
 	if (x<0)
 		return 0; //if printing in the first column
 	if (dest->wide==-1) {
@@ -451,7 +478,7 @@ static int char_width(Char c) {
 
 static void erase_wc_left(int x, int y) {
 	if (x+1 < T.width) {
-		Cell* dest = &T.current->rows[y][x+1];
+		Cell* dest = &T.current->rows[y]->cells[x+1];
 		if (dest->wide==-1) {
 			*dest = (Cell){
 				.attrs = dest->attrs,
@@ -463,7 +490,7 @@ static void erase_wc_left(int x, int y) {
 
 static void erase_wc_right(int x, int y) {
 	if (x-1 >= 0) {
-		Cell* dest = &T.current->rows[y][x-1];
+		Cell* dest = &T.current->rows[y]->cells[x-1];
 		if (dest->wide==1) {
 			*dest = (Cell){
 				.attrs = dest->attrs,
@@ -501,12 +528,15 @@ void put_char(Char c) {
 		width = 1;
 	}
 	
+	// wrap
 	if (T.c.x+width > T.width) {
+		T.current->rows[T.c.y]->wrap = true;
 		forward_index(1);
 		T.c.x = 0;
+		T.current->rows[T.c.y]->cont = true;
 	}
 	
-	Cell* dest = &T.current->rows[T.c.y][T.c.x];
+	Cell* dest = &T.current->rows[T.c.y]->cells[T.c.x];
 	if (dest->wide==1)
 		erase_wc_left(T.c.x, T.c.y);
 	else if (dest->wide==-1)
@@ -543,7 +573,8 @@ void put_char(Char c) {
 		dest->wide = 0;
 	
 	T.c.x += width;
-	
+	//	if (T.current->rows[T.c.y]->length<T.c.x)
+	//		T.current->rows[T.c.y]->length = T.c.x;
 }
 
 void backspace(void) {
@@ -573,9 +604,9 @@ void delete_chars(int n) {
 	n = limit(n, 0, T.width-T.c.x);
 	if (!n)
 		return;
-	Row line = T.current->rows[T.c.y];
-	memmove(&line[T.c.x], &line[T.c.x+n], sizeof(Cell)*(T.width-T.c.x-n));
-	clear_row(T.current->rows[T.c.y], T.width-n, true);
+	Row* line = T.current->rows[T.c.y];
+	memmove(&line->cells[T.c.x], &line->cells[T.c.x+n], sizeof(Cell)*(T.width-T.c.x-n));
+	clear_row(line, T.width-n, true);
 }
 
 void insert_blank(int n) {
@@ -586,8 +617,8 @@ void insert_blank(int n) {
 	int dst = T.c.x + n;
 	int src = T.c.x;
 	int size = T.width - dst;
-	Row line = T.current->rows[T.c.y];
-	memmove(&line[dst], &line[src], size * sizeof(Cell));
+	Row* line = T.current->rows[T.c.y];
+	memmove(&line->cells[dst], &line->cells[src], size * sizeof(Cell));
 	clear_region(src, T.c.y, dst, T.c.y+1);
 }
 
@@ -687,7 +718,7 @@ bool move_scrollback(int amount) {
 }
 
 // get a row from the current screen (if y ≥ 0) or the history buffer (if y < 0). returns NULL if n is out of range
-Row get_row(int y) {
+Row* get_row(int y) {
 	if (y>=0 && y<T.height)
 		return T.current->rows[y];
 	if (y<0 && -y <= history.length) // history is "-1 indexed"

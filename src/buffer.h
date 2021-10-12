@@ -46,14 +46,19 @@ typedef struct Cell {
 	int8_t wide: 2; //0 = normal, 1 = left half of wide char, -1 = right half (chr=0)
 } Cell;
 
-// compressed version of cells, used for history buffer (todo)
-// combining chars will be stored as separate cells
-typedef struct HistoryCell {
-	Char chr;
-	Attrs attrs;
-} HistoryCell;
+// TODO: make a compressed version of this for storing history cells?
 
-typedef Cell* Row;
+typedef struct Row {
+	//int length; //todo
+	// when printing a char causes the cursor to wrap to the next line,
+	// the `wrap` flag is set on the old line, and `cont` is set on the new line
+	// (TODO) when the terminal is resized, lines are spliced together if:
+	// a line has the `wrap` flag set, AND the following line as the `cont` flag set
+	// they are then re-wrapped, with the splits marked using the same flags.
+	//int length; // where newline
+	bool wrap, cont;
+	Cell cells[]; // allocated after struct
+} Row;
 
 // the cursor keeps track of a position as well as the attributes
 #define Cursor Cursor_
@@ -65,7 +70,7 @@ typedef struct Cursor {
 
 // the main or alternate buffer.
 typedef struct Buffer {
-	Row* rows;
+	Row** rows;
 } Buffer;
 
 // all terminal properties
@@ -115,6 +120,7 @@ void term_resize(int width, int height);
 void set_scrollback(int pos);
 bool move_scrollback(int amount);
 void dirty_all(void);
-Row get_row(int y);
+Row* get_row(int y);
+Row* resize_row(Row** row, int size);
 
 extern Term T;

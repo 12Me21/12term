@@ -95,7 +95,8 @@ __attribute__((noreturn)) void sleep_forever(bool hangup) {
 	fonts_free();
 	
 	draw_free();
-	//FcFini(); // aaa
+	
+	FcFini();
 	
 	XCloseDisplay(W.d);
 	
