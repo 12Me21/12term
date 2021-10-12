@@ -248,8 +248,7 @@ static FcChar32 _XftHashSize(FcChar32 num_unicode) {
 	return hash;
 }
 
-FT_Face XftLockFace(XftFont* public) {
-	XftFontInt* font = (XftFontInt*)public;
+FT_Face XftLockFace(XftFont* font) {
 	XftFontInfo* fi = &font->info;
 	FT_Face face = _XftLockFile(fi->file);
 	// Make sure the face is usable at the requested size
@@ -260,8 +259,7 @@ FT_Face XftLockFace(XftFont* public) {
 	return face;
 }
 
-void XftUnlockFace(XftFont* public) {
-	XftFontInt* font = (XftFontInt*)public;
+void XftUnlockFace(XftFont* font) {
 	_XftUnlockFile(font->info.file);
 }
 
@@ -533,11 +531,11 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	// Sometimes the glyphs are numbered 1..n, other times 0..n-1,
 	// accept either numbering scheme by making room in the table
 	int num_glyphs = face->num_glyphs + 1;
-	int alloc_size = (sizeof(XftFontInt) +
+	int alloc_size = (sizeof(XftFont) +
 	                  num_glyphs * sizeof(XftGlyph*) +
 	                  hash_value * sizeof(XftUcsHash));
 	
-	XftFontInt* font = XftMalloc(XFT_MEM_FONT, alloc_size);
+	XftFont* font = XftMalloc(XFT_MEM_FONT, alloc_size);
 	if (!font)
 		goto bail2;
 	
@@ -573,30 +571,30 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 		else
 			height = face->size->metrics.height >> 6;
 	}
-	font->public.ascent = ascent;
-	font->public.descent = descent;
-	font->public.height = height;
+	font->ascent = ascent;
+	font->descent = descent;
+	font->height = height;
 
 	if (fi->char_width)
-		font->public.max_advance_width = fi->char_width;
+		font->max_advance_width = fi->char_width;
 	else {
 		if (fi->transform) {
 			FT_Vector vector;
 			vector.x = face->size->metrics.max_advance;
 			vector.y = 0;
 			FT_Vector_Transform (&vector, &fi->matrix);
-			font->public.max_advance_width = vector.x >> 6;
+			font->max_advance_width = vector.x >> 6;
 		} else
-			font->public.max_advance_width = face->size->metrics.max_advance >> 6;
+			font->max_advance_width = face->size->metrics.max_advance >> 6;
 	}
-	font->public.charset = charset;
-	font->public.pattern = pattern;
+	font->charset = charset;
+	font->pattern = pattern;
 
 	// Management fields
 	font->ref = 1;
 	
 	font->next = info.fonts;
-	info.fonts = &font->public;
+	info.fonts = font;
 	
 	// Copy the info over
 	font->info = *fi;
@@ -634,7 +632,7 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	
 	_XftUnlockFile(fi->file);
 	
-	return &font->public;
+	return font;
 	
  bail2:
 	FcCharSetDestroy(charset);
@@ -654,9 +652,7 @@ XftFont* XftFontOpenPattern(FcPattern* pattern) {
 	return font;
 }
 
-static void XftFontDestroy(XftFont* public) {
-	XftFontInt* font = (XftFontInt*)public;
-	
+static void XftFontDestroy(XftFont* font) {
 	/* note reduction in memory use */
 	info.glyph_memory -= font->glyph_memory;
 	/* Clean up the info */
@@ -675,54 +671,48 @@ static void XftFontDestroy(XftFont* public) {
 	}
 	
 	/* Free the pattern and the charset */
-	FcPatternDestroy(font->public.pattern);
-	FcCharSetDestroy(font->public.charset);
+	FcPatternDestroy(font->pattern);
+	FcCharSetDestroy(font->charset);
 	
 	/* Finally, free the font structure */
-	XftMemFree(XFT_MEM_FONT, sizeof(XftFontInt) +
+	XftMemFree(XFT_MEM_FONT, sizeof(XftFont) +
 	           font->num_glyphs * sizeof(XftGlyph*) +
 	           font->hash_value * sizeof(XftUcsHash));
 	free(font);
 }
 // i think i've been incorrectly marking these as static
 static XftFont* XftFontFindNthUnref(int n) {
-	XftFont* public;
-	XftFontInt* font;
-	for (public=info.fonts; public; public=font->next) {
-		font = (XftFontInt*)public;
+	XftFont* font;
+	for (font=info.fonts; font; font=font->next) {
 		if (!font->ref && !n--)
 			break;
 	}
-	return public;
+	return font;
 }
 
 void XftFontManageMemory(void) {
 	while (info.num_unref_fonts > info.max_unref_fonts) {
-		XftFont* public = XftFontFindNthUnref(rand() % info.num_unref_fonts);
-		XftFontInt* font = (XftFontInt*)public;
-		
-		if (XftDebug () & XFT_DBG_CACHE)
-			printf ("freeing unreferenced font %s/%d size %dx%d\n",
-			        font->info.file->file, font->info.file->id,
-			        (int) font->info.xsize >> 6, (int) font->info.ysize >> 6);
+		XftFont* font = XftFontFindNthUnref(rand() % info.num_unref_fonts);
+		if (XftDebug() & XFT_DBG_CACHE)
+			printf("freeing unreferenced font %s/%d size %dx%d\n",
+			       font->info.file->file, font->info.file->id,
+			       (int)font->info.xsize >> 6, (int)font->info.ysize >> 6);
 		
 		XftFont** prev;
 		/* Unhook from display list */
-		for (prev = &info.fonts; *prev; prev = &(*(XftFontInt**)prev)->next) {
-			if (*prev == public) {
+		for (prev = &info.fonts; *prev; prev = &(*prev)->next) {
+			if (*prev == font) {
 				*prev = font->next;
 				break;
 			}
 		}
 		/* Destroy the font */
-		XftFontDestroy(public);
+		XftFontDestroy(font);
 		--info.num_unref_fonts;
 	}
 }
 
-void XftFontClose(XftFont* public) {
-	XftFontInt* font = (XftFontInt*)public;
-	
+void XftFontClose(XftFont* font) {
 	if (--font->ref != 0)
 		return;
 	

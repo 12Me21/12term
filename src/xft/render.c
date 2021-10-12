@@ -8,17 +8,16 @@
 // x,y - destination position
 // g - glyph id
 // cw - width of character cell (this is messy. maybe would be better to pass the CENTER x coordinate
-void XftGlyphRender1(int op, XRenderColor col, XftFont* pub, Picture dst, int x, int y, FT_UInt g, int cw) {
-	XftFontInt* font = (XftFontInt*)pub;
+void XftGlyphRender1(int op, XRenderColor col, XftFont* font, Picture dst, int x, int y, FT_UInt g, int cw) {
 	if (!font->format)
 		return;
 	
 	// Load missing glyphs
 	FT_UInt missing[1];
 	int nmissing = 0;
-	FcBool glyphs_loaded = XftFontCheckGlyph(pub, true, g, missing, &nmissing);
+	FcBool glyphs_loaded = XftFontCheckGlyph(font, true, g, missing, &nmissing);
 	if (nmissing)
-		XftFontLoadGlyphs(pub, true, missing, nmissing);
+		XftFontLoadGlyphs(font, true, missing, nmissing);
 	
 	if (!font->glyphset)
 		goto bail1;
@@ -36,5 +35,5 @@ void XftGlyphRender1(int op, XRenderColor col, XftFont* pub, Picture dst, int x,
 	}
  bail1:
 	if (glyphs_loaded)
-		_XftFontManageMemory(pub);
+		_XftFontManageMemory(font);
 }

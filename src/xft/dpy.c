@@ -45,9 +45,7 @@ void XftDisplayInfoInit(void) {
 
 static void _XftDisplayValidateMemory(void) {
 	unsigned long glyph_memory = 0;
-	XftFontInt* font;
-	for (XftFont* public=info.fonts; public; public=font->next) {
-		font = (XftFontInt*)public;
+	for (XftFont* font=info.fonts; font; font=font->next) {
 		glyph_memory += font->glyph_memory;
 	}
 	if (glyph_memory != info.glyph_memory)
@@ -67,15 +65,13 @@ void _XftDisplayManageMemory(void) {
 	
 	while (info.glyph_memory > info.max_glyph_memory) {
 		unsigned long glyph_memory = rand() % info.glyph_memory;
-		XftFont* public = info.fonts;
-		while (public) {
-			XftFontInt* font = (XftFontInt*)public;
-			
+		XftFont* font = info.fonts;
+		while (font) {
 			if (font->glyph_memory > glyph_memory) {
-				_XftFontUncacheGlyph(public);
+				_XftFontUncacheGlyph(font);
 				break;
 			}
-			public = font->next;
+			font = font->next;
 			glyph_memory -= font->glyph_memory;
 		}
 	}
