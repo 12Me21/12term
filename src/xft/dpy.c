@@ -35,8 +35,6 @@ void XftDisplayInfoInit(void) {
 	if (XftDebug() & XFT_DBG_CACHE)
 		print("global max unref fonts %d\n", info.max_unref_fonts);
 	
-	memset(info.fontHash, '\0', sizeof(XftFont*)*XFT_NUM_FONT_HASH);
-	
 	// bail1:
 	if (XftDebug() & XFT_DBG_RENDER) {
 		print("XftDisplayInfoGet failed to initialize, Xft unhappy :(\n");

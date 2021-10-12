@@ -83,7 +83,6 @@ struct XftFontInfo {
 typedef struct XftFontInt {
 	XftFont public;		/* public fields */
 	XftFont* next;		/* all fonts on display */
-	XftFont* hash_next; // fonts in this hash chain
 	XftFontInfo info;	// Data from pattern
 	int ref;	// reference count
 	// Per-glyph information, indexed by glyph ID
@@ -130,8 +129,6 @@ typedef struct XftSolidColor {
 
 #define XFT_NUM_SOLID_COLOR 16
 
-#define XFT_NUM_FONT_HASH 127
-
 typedef struct XftDisplayInfo {
 	XExtCodes* codes;
 	FcPattern* defaults;
@@ -141,7 +138,6 @@ typedef struct XftDisplayInfo {
 	int num_unref_fonts;
 	int max_unref_fonts;
 	XftSolidColor colors[XFT_NUM_SOLID_COLOR];
-	XftFont* fontHash[XFT_NUM_FONT_HASH];
 } XftDisplayInfo;
 
 // By default, use no more than 4 meg of server memory total, and no

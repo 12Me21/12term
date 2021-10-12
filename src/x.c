@@ -96,7 +96,7 @@ __attribute__((noreturn)) void sleep_forever(bool hangup) {
 	
 	draw_free();
 	
-	FcFini();
+	//FcFini();
 	
 	XCloseDisplay(W.d);
 	

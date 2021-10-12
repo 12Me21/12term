@@ -462,16 +462,6 @@ bool XftFontInfoEqual(const XftFontInfo* a, const XftFontInfo* b) {
 }
 
 XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
-	// Find a matching previously opened font
-	XftFont** bucket = &info.fontHash[fi->hash % XFT_NUM_FONT_HASH];
-	for (XftFontInt* font = (XftFontInt*)*bucket; font; font=(XftFontInt*)font->hash_next)
-		if (XftFontInfoEqual(&font->info, fi)) {
-			if (!font->ref++)
-				--info.num_unref_fonts;
-			FcPatternDestroy(pattern);
-			return &font->public;
-		}
-	
 	// No existing font, create another.
 	if (XftDebug () & XFT_DBG_CACHE)
 		printf ("New font %s/%d size %dx%d\n",
@@ -608,9 +598,6 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	font->next = info.fonts;
 	info.fonts = &font->public;
 	
-	font->hash_next = *bucket;
-	*bucket = &font->public;
-	
 	// Copy the info over
 	font->info = *fi;
 	
@@ -724,15 +711,6 @@ void XftFontManageMemory(void) {
 		for (prev = &info.fonts; *prev; prev = &(*(XftFontInt**)prev)->next) {
 			if (*prev == public) {
 				*prev = font->next;
-				break;
-			}
-		}
-		/* Unhook from hash list */
-		for (prev = &info.fontHash[font->info.hash % XFT_NUM_FONT_HASH];
-		     *prev;
-		     prev = &(*(XftFontInt**)prev)->hash_next) {
-			if (*prev == public) {
-				*prev = font->hash_next;
 				break;
 			}
 		}
