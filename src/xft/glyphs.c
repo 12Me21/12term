@@ -566,51 +566,42 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 		
 		xftg->picture = 0;
 		xftg->glyph_memory = sizeof(XftGlyph) + size;
-		if (font->format) {
-			if (!font->glyphset)
-				font->glyphset = XRenderCreateGlyphSet(W.d, font->format);
-			if (mode == FT_RENDER_MODE_MONO) {
-				/* swap bits in each byte */
-				if (BitmapBitOrder(W.d) != MSBFirst) {
-					unsigned char* line = bufBitmap;
-					int i = size;
+		if (!font->glyphset)
+			font->glyphset = XRenderCreateGlyphSet(W.d, font->format);
+		if (mode == FT_RENDER_MODE_MONO) {
+			/* swap bits in each byte */
+			if (BitmapBitOrder(W.d) != MSBFirst) {
+				unsigned char* line = bufBitmap;
+				int i = size;
 					
-					while (i--) {
-						int c = *line;
-						// fancy
-						c = (c<<1 & 0xAA) | (c>>1 & 0x55);
-						c = (c<<2 & 0xCC) | (c>>2 & 0x33);
-						c = (c<<4 & 0xF0) | (c>>4 & 0x0F);
-						*line++ = c;
-					}
+				while (i--) {
+					int c = *line;
+					// fancy
+					c = (c<<1 & 0xAA) | (c>>1 & 0x55);
+					c = (c<<2 & 0xCC) | (c>>2 & 0x33);
+					c = (c<<4 & 0xF0) | (c>>4 & 0x0F);
+					*line++ = c;
 				}
-			} else if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA || mode != FT_RENDER_MODE_NORMAL) {
-				/* invert ARGB <=> BGRA */
-				if (ImageByteOrder(W.d) != XftNativeByteOrder())
-					XftSwapCARD32((CARD32*)bufBitmap, size/4);
 			}
-			
-			if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA) {
-				// all of this is just to take data and turn it into a Picture
-				Pixmap pixmap = XCreatePixmap(W.d, DefaultRootWindow(W.d), local.width, local.rows, 32);
-				GC gc = XCreateGC(W.d, pixmap, 0, NULL);
-				XImage* image = XCreateImage(W.d, W.vis, 32, ZPixmap, 0, (char*)bufBitmap, local.width, local.rows, 32, 0);
-				XPutImage(W.d, pixmap, gc, image, 0, 0, 0, 0, local.width, local.rows);
-				xftg->picture = XRenderCreatePicture(W.d, pixmap, font->format, 0, NULL);
-				image->data = NULL; // this is probably safe...
-				XDestroyImage(image);
-				XFreeGC(W.d, gc);
-				XFreePixmap(W.d, pixmap);
-			} else
-				XRenderAddGlyphs(W.d, font->glyphset, &glyph, &xftg->metrics, 1, (char*)bufBitmap, size);
-		} else {
-			if (size) {
-				xftg->bitmap = malloc(size);
-				if (xftg->bitmap)
-					memcpy(xftg->bitmap, bufBitmap, size);
-			} else
-				xftg->bitmap = NULL;
+		} else if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA || mode != FT_RENDER_MODE_NORMAL) {
+			/* invert ARGB <=> BGRA */
+			if (ImageByteOrder(W.d) != XftNativeByteOrder())
+				XftSwapCARD32((CARD32*)bufBitmap, size/4);
 		}
+			
+		if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA) {
+			// all of this is just to take data and turn it into a Picture
+			Pixmap pixmap = XCreatePixmap(W.d, DefaultRootWindow(W.d), local.width, local.rows, 32);
+			GC gc = XCreateGC(W.d, pixmap, 0, NULL);
+			XImage* image = XCreateImage(W.d, W.vis, 32, ZPixmap, 0, (char*)bufBitmap, local.width, local.rows, 32, 0);
+			XPutImage(W.d, pixmap, gc, image, 0, 0, 0, 0, local.width, local.rows);
+			xftg->picture = XRenderCreatePicture(W.d, pixmap, font->format, 0, NULL);
+			image->data = NULL; // this is probably safe...
+			XDestroyImage(image);
+			XFreeGC(W.d, gc);
+			XFreePixmap(W.d, pixmap);
+		} else
+			XRenderAddGlyphs(W.d, font->glyphset, &glyph, &xftg->metrics, 1, (char*)bufBitmap, size);
 		
 		font->glyph_memory += xftg->glyph_memory;
 		info.glyph_memory += xftg->glyph_memory;
@@ -631,19 +622,14 @@ void XftFontUnloadGlyphs(XftFont* font, const FT_UInt* glyphs, int nglyph) {
 		if (!xftg)
 			continue;
 		if (xftg->glyph_memory) {
-			if (font->format) {
-				if (xftg->picture)
-					XRenderFreePicture(W.d, xftg->picture);
-				else if (font->glyphset) {
-					glyphBuf[nused++] = (Glyph)glyphindex;
-					if (nused == sizeof(glyphBuf) / sizeof(glyphBuf[0])) {
-						XRenderFreeGlyphs(W.d, font->glyphset, glyphBuf, nused);
-						nused = 0;
-					}
+			if (xftg->picture)
+				XRenderFreePicture(W.d, xftg->picture);
+			else if (font->glyphset) {
+				glyphBuf[nused++] = (Glyph)glyphindex;
+				if (nused == sizeof(glyphBuf) / sizeof(glyphBuf[0])) {
+					XRenderFreeGlyphs(W.d, font->glyphset, glyphBuf, nused);
+					nused = 0;
 				}
-			} else {
-				if (xftg->bitmap)
-					free (xftg->bitmap);
 			}
 			font->glyph_memory -= xftg->glyph_memory;
 			info.glyph_memory -= xftg->glyph_memory;
@@ -665,7 +651,6 @@ bool XftFontCheckGlyph(XftFont* font, bool need_bitmaps, FT_UInt glyph, FT_UInt*
 			xftg = XftMalloc(XFT_MEM_GLYPH, sizeof(XftGlyph));
 			if (!xftg)
 				return false;
-			xftg->bitmap = NULL;
 			xftg->glyph_memory = 0;
 			font->glyphs[glyph] = xftg;
 		}

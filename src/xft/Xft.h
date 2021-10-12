@@ -26,7 +26,6 @@ typedef struct XftUcsHash {
 // Glyphs are stored in this structure
 typedef struct XftGlyph {
 	XGlyphInfo metrics;
-	void* bitmap;
 	unsigned long glyph_memory;
 	Picture picture;
 } XftGlyph;

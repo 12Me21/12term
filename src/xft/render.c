@@ -9,9 +9,6 @@
 // g - glyph id
 // cw - width of character cell (this is messy. maybe would be better to pass the CENTER x coordinate
 void XftGlyphRender1(int op, XRenderColor col, XftFont* font, Picture dst, int x, int y, FT_UInt g, int cw) {
-	if (!font->format)
-		return;
-	
 	// Load missing glyphs
 	FT_UInt missing[1];
 	int nmissing = 0;

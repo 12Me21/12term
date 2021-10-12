@@ -663,11 +663,7 @@ static void XftFontDestroy(XftFont* font) {
 	/* Free the glyphs */
 	for (int i=0; i<font->num_glyphs; i++) {
 		XftGlyph* xftg = font->glyphs[i];
-		if (xftg) {
-			if (xftg->bitmap)
-				free(xftg->bitmap);
-			free(xftg);
-		}
+		free(xftg);
 	}
 	
 	/* Free the pattern and the charset */
