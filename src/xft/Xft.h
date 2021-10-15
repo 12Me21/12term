@@ -32,6 +32,8 @@ typedef struct XftFontInfo {
 	struct XftFtFile* file; // face source
 	// Rendering options
 	FT_F26Dot6 xsize, ysize; // pixel size
+	
+	// these need to be FcBool because some functions output using pointers to these
 	FcBool antialias;	// doing antialiasing
 	FcBool embolden; // force emboldening
 	FcBool color; // contains color glyphs
@@ -115,12 +117,6 @@ void XftGlyphExtents(XftFont* pub, const FT_UInt* glyphs, int nglyphs, XGlyphInf
 void XftTextExtents32(XftFont* pub, const FcChar32* string, int len, XGlyphInfo* extents);
 
 /* xftfreetype.c */
-
-FT_Face XftLockFace(XftFont* pub);
-void XftUnlockFace(XftFont* pub);
-XftFontInfo* XftFontInfoCreate(const FcPattern* pattern);
-void XftFontInfoDestroy(XftFontInfo* fi);
-bool XftFontInfoEqual(const XftFontInfo* a, const XftFontInfo* b);
 XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi);
 XftFont* XftFontOpenPattern(FcPattern* pattern);
 void XftFontClose(XftFont* pub);

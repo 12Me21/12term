@@ -10,7 +10,7 @@ typedef struct XftFtFile {
 	struct XftFtFile* next;
 	int ref; // number of font infos using this file
 	
-	char* file;	// file name
+	char* filename;
 	int id; // font index within that file
 	
 	FT_F26Dot6 xsize;	// current xsize setting
@@ -20,6 +20,7 @@ typedef struct XftFtFile {
 	int lock; // lock count; can't unload unless 0
 	FT_Face face; // pointer to face; only valid when lock
 } XftFtFile;
+// todo: all this locking stuff is probably unncessesary now
 
 // A hash table translates Unicode values into glyph indicies
 typedef struct XftUcsHash {
@@ -28,35 +29,34 @@ typedef struct XftUcsHash {
 } XftUcsHash;
 
 // List of all open files (each face in a file is managed separately)
-static XftFtFile* _XftFtFiles;
+static XftFtFile* xft_files = NULL;
 static int XftMaxFreeTypeFiles = 5;
 
-static XftFtFile* _XftGetFile(const FcChar8* file, int id) {
+// create a new XftFtFile from a filename and an id
+static XftFtFile* xft_get_file(const char* filename, int id) {
 	XftFtFile* f;
-	for (f = _XftFtFiles; f; f = f->next) {
-		if (!strcmp(f->file, (char*)file) && f->id == id) {
+	for (f = xft_files; f; f = f->next) {
+		if (!strcmp(f->filename, filename) && f->id == id) {
 			++f->ref;
-			if (XftDebug () & XFT_DBG_REF)
-				printf ("FontFile %s/%d matches existing (%d)\n",
-				        file, id, f->ref);
+			if (XftDebug() & XFT_DBG_REF)
+				printf("FontFile %s/%d matches existing (%d)\n",
+				       filename, id, f->ref);
 			return f;
 		}
 	}
-	// hmm so this is safe because char doesn't have alignment limits, but
-	// i wonder if there is a safe way to do this for larger data types?
-	f = XftMalloc(XFT_MEM_FILE, sizeof(XftFtFile)+strlen((char*)file)+1);
+	f = XftMalloc(XFT_MEM_FILE, sizeof(XftFtFile)+strlen(filename)+1);
 	if (!f)
 		return NULL;
 	
 	if (XftDebug() & XFT_DBG_REF)
-		printf("FontFile %s/%d matches new\n", file, id);
-	f->next = _XftFtFiles;
-	_XftFtFiles = f;
+		printf("FontFile %s/%d matches new\n", filename, id);
+	f->next = xft_files;
+	xft_files = f;
 	
 	f->ref = 1;
 	
-	f->file = (char*)&f[1];
-	strcpy(f->file, (char*)file);
+	f->filename = (char*)&f[1];
+	strcpy(f->filename, filename);
 	f->id = id;
 	
 	f->lock = 0;
@@ -67,7 +67,8 @@ static XftFtFile* _XftGetFile(const FcChar8* file, int id) {
 	return f;
 }
 
-static XftFtFile* _XftGetFaceFile(FT_Face face) {
+// create a new XftFtFile from an existing face
+static XftFtFile* xft_make_face_file(FT_Face face) {
 	XftFtFile* f = XftMalloc(XFT_MEM_FILE, sizeof(XftFtFile));
 	if (!f)
 		return NULL;
@@ -76,7 +77,7 @@ static XftFtFile* _XftGetFaceFile(FT_Face face) {
 	
 	f->ref = 1;
 	
-	f->file = NULL;
+	f->filename = NULL;
 	f->id = 0;
 	f->lock = 0;
 	f->face = face;
@@ -88,7 +89,7 @@ static XftFtFile* _XftGetFaceFile(FT_Face face) {
 
 static int _XftNumFiles(void) {
 	int count = 0;
-	for (XftFtFile* f=_XftFtFiles; f; f=f->next)
+	for (XftFtFile* f=xft_files; f; f=f->next)
 		if (f->face && !f->lock)
 			++count;
 	return count;
@@ -97,7 +98,7 @@ static int _XftNumFiles(void) {
 static XftFtFile* _XftNthFile(int n) {
 	int count = 0;
 	XftFtFile* f;
-	for (f=_XftFtFiles; f; f=f->next)
+	for (f=xft_files; f; f=f->next)
 		if (f->face && !f->lock)
 			if (count++ == n)
 				break;
@@ -111,7 +112,7 @@ static void _XftUncacheFiles(void) {
 		if (f) {
 			if (XftDebug() & XFT_DBG_REF)
 				printf("Discard file %s/%d from cache\n",
-				        f->file, f->id);
+				        f->filename, f->id);
 			FT_Done_Face(f->face);
 			f->face = NULL;
 		}
@@ -122,8 +123,8 @@ static FT_Face _XftLockFile(XftFtFile* f) {
 	++f->lock;
 	if (!f->face) {
 		if (XftDebug() & XFT_DBG_REF)
-			printf("Loading file %s/%d\n", f->file, f->id);
-		if (FT_New_Face(ft_library, f->file, f->id, &f->face))
+			printf("Loading file %s/%d\n", f->filename, f->id);
+		if (FT_New_Face(ft_library, f->filename, f->id, &f->face))
 			--f->lock;
 		
 		f->xsize = 0;
@@ -140,7 +141,7 @@ static void _XftLockError(const char* reason) {
 
 static void _XftUnlockFile(XftFtFile* f) {
 	if (--f->lock < 0)
-		_XftLockError ("too many file unlocks");
+		_XftLockError("too many file unlocks");
 }
 
 static bool matrix_equal(FT_Matrix* a, FT_Matrix* b) {
@@ -153,7 +154,7 @@ static FT_F26Dot6 dist(FT_F26Dot6 a, FT_F26Dot6 b) {
 	return b-a;
 }
 
-bool _XftSetFace(XftFtFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* matrix) {
+static bool _XftSetFace(XftFtFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* matrix) {
 	FT_Face face = f->face;
 	
 	if (f->xsize != xsize || f->ysize != ysize) {
@@ -206,8 +207,8 @@ static void _XftReleaseFile(XftFtFile* f) {
 		return;
 	if (f->lock)
 		_XftLockError ("Attempt to close locked file");
-	if (f->file) {
-		for (XftFtFile** prev = &_XftFtFiles; *prev; prev = &(*prev)->next) {
+	if (f->filename) {
+		for (XftFtFile** prev = &xft_files; *prev; prev = &(*prev)->next) {
 			if (*prev == f) {
 				*prev = f->next;
 				break;
@@ -216,7 +217,7 @@ static void _XftReleaseFile(XftFtFile* f) {
 		if (f->face)
 			FT_Done_Face(f->face);
 	}
-	XftMemFree(XFT_MEM_FILE, sizeof(XftFtFile) + (f->file ? strlen(f->file)+1 : 0));
+	XftMemFree(XFT_MEM_FILE, sizeof(XftFtFile) + (f->filename ? strlen(f->filename)+1 : 0));
 	free(f);
 }
 
@@ -293,9 +294,9 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 	
 	FT_Face face;
 	if (filename)
-		fi->file = _XftGetFile(filename, id);
+		fi->file = xft_get_file((char*)filename, id);
 	else if (FcPatternGetFTFace(pattern, FC_FT_FACE, 0, &face) == FcResultMatch && face)
-		fi->file = _XftGetFaceFile(face);
+		fi->file = xft_make_face_file(face);
 	if (!fi->file)
 		goto bail0;
 	
@@ -448,34 +449,11 @@ static void XftFontInfoEmpty(XftFontInfo* fi) {
 		_XftReleaseFile(fi->file);
 }
 
-XftFontInfo* XftFontInfoCreate(const FcPattern* pattern) {
-	XftFontInfo* fi = XftMalloc(XFT_MEM_FONT, sizeof(XftFontInfo));
-	if (!fi)
-		return NULL;
-
-	if (!XftFontInfoFill(pattern, fi)) {
-		free(fi);
-		XftMemFree(XFT_MEM_FONT, sizeof(XftFontInfo));
-		fi = NULL;
-	}
-	return fi;
-}
-
-void XftFontInfoDestroy(XftFontInfo* fi) {
-	XftFontInfoEmpty(fi);
-	XftMemFree(XFT_MEM_FONT, sizeof(XftFontInfo));
-	free(fi);
-}
-
-bool XftFontInfoEqual(const XftFontInfo* a, const XftFontInfo* b) {
-	return memcmp(a, b, sizeof(XftFontInfo))==0;
-}
-
 XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	// No existing font, create another.
 	if (XftDebug () & XFT_DBG_CACHE)
 		printf ("New font %s/%d size %dx%d\n",
-		        fi->file->file, fi->file->id,
+		        fi->file->filename, fi->file->id,
 		        (int) fi->xsize >> 6, (int) fi->ysize >> 6);
 	int max_glyph_memory;
 	if (FcPatternGetInteger(pattern, XFT_MAX_GLYPH_MEMORY, 0,
@@ -703,7 +681,7 @@ void XftFontManageMemory(void) {
 		XftFont* font = XftFontFindNthUnref(rand() % info.num_unref_fonts);
 		if (XftDebug() & XFT_DBG_CACHE)
 			printf("freeing unreferenced font %s/%d size %dx%d\n",
-			       font->info.file->file, font->info.file->id,
+			       font->info.file->filename, font->info.file->id,
 			       (int)font->info.xsize >> 6, (int)font->info.ysize >> 6);
 		
 		XftFont** prev;

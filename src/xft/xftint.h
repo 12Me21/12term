@@ -84,6 +84,8 @@ void _XftDisplayManageMemory(void);
 
 /* xftfreetype.c */
 void XftFontManageMemory(void);
+FT_Face XftLockFace(XftFont* pub);
+void XftUnlockFace(XftFont* pub);
 
 /* xftglyph.c */
 void _XftFontUncacheGlyph(XftFont* public);
