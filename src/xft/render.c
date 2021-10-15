@@ -43,7 +43,8 @@ void XftGlyphRender1(int op, XRenderColor col, XftFont* font, Picture dst, float
 	float half = glyph->metrics.xOff / 2.0f;
 	int bx = (int)(x - half + 0.5);
 	if (glyph->picture) {
-		XRenderComposite(W.d, PictOpOver, glyph->picture, None, dst, 0, 0, 0, 0, bx + glyph->metrics.x, y - glyph->metrics.y, glyph->metrics.width, glyph->metrics.height);
+		XRenderComposite(W.d, op, glyph->picture, None, dst, 0, 0, 0, 0,
+			bx + glyph->metrics.x, y - glyph->metrics.y, glyph->metrics.width, glyph->metrics.height);
 	} else {
 		Picture src = XftDrawSrcPicture(col);
 		XRenderCompositeString32(W.d, op, src, dst, font->format, font->glyphset, 0, 0, bx, y, (unsigned int[]){wire}, 1);

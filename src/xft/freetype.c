@@ -2,11 +2,6 @@
 
 FT_Library ft_library;
 
-#define FT_Matrix_Equal(a,b)	((a)->xx == (b)->xx && \
-				 (a)->yy == (b)->yy && \
-				 (a)->xy == (b)->xy && \
-				 (a)->yx == (b)->yx)
-
 // List of all open files (each face in a file is managed separately)
 static XftFtFile* _XftFtFiles;
 static int XftMaxFreeTypeFiles = 5;
@@ -123,8 +118,15 @@ static void _XftUnlockFile(XftFtFile* f) {
 		_XftLockError ("too many file unlocks");
 }
 
-#define X_SIZE(face,i) ((face)->available_sizes[i].x_ppem)
-#define Y_SIZE(face,i) ((face)->available_sizes[i].y_ppem)
+static bool matrix_equal(FT_Matrix* a, FT_Matrix* b) {
+	return a->xx==b->xx && a->yy==b->yy && a->xy==b->xy && a->yx==b->yx;
+}
+
+static FT_F26Dot6 dist(FT_F26Dot6 a, FT_F26Dot6 b) {
+	if (a>b)
+		return a-b;
+	return b-a;
+}
 
 bool _XftSetFace(XftFtFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* matrix) {
 	FT_Face face = f->face;
@@ -136,19 +138,14 @@ bool _XftSetFace(XftFtFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* ma
 		// Bitmap only faces must match exactly, so find the closest
 		// one (height dominant search)
 		if (!(face->face_flags & FT_FACE_FLAG_SCALABLE)) {
-			int best = 0;
-			
-#define xft_abs(a)	((a) < 0 ? -(a) : (a))
-#define dist(a,b)	(xft_abs((a)-(b)))
+			FT_Bitmap_Size* best = &face->available_sizes[0];
 			
 			for (int i=1; i<face->num_fixed_sizes; i++) {
-				if (dist (ysize, Y_SIZE(face,i)) <
-				    dist (ysize, Y_SIZE(face, best)) ||
-				    (dist (ysize, Y_SIZE(face, i)) ==
-				     dist (ysize, Y_SIZE(face, best)) &&
-				     dist (xsize, X_SIZE(face, i)) <
-				     dist (xsize, X_SIZE(face, best)))) {
-					best = i;
+				FT_Bitmap_Size* si = &face->available_sizes[i];
+				if (dist(ysize, si->y_ppem) < dist(ysize, best->y_ppem) ||
+				    (dist(ysize, si->y_ppem) == dist(ysize, best->y_ppem) &&
+				     dist(xsize, si->x_ppem) < dist(xsize, best->x_ppem))) {
+					best = si;
 				}
 			}
 			// Freetype 2.1.7 and earlier used width/height
@@ -156,29 +153,23 @@ bool _XftSetFace(XftFtFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* ma
 			// This has been fixed for 2.1.8.  Because BDF and PCF
 			// files have but a single strike per file, we can
 			// simply try both sizes.
-			if (FT_Set_Char_Size (face, face->available_sizes[best].x_ppem,
-			                      face->available_sizes[best].y_ppem, 0, 0) != 0
-			    &&
-			    FT_Set_Char_Size (face, face->available_sizes[best].width << 6,
-			                      face->available_sizes[best].height << 6,
-			                      0, 0) != 0) {
+			if (FT_Set_Char_Size(face, best->x_ppem, best->y_ppem, 0, 0) != 0 &&
+			    FT_Set_Char_Size(face, best->width<<6, best->height<<6, 0, 0) != 0)
 				return False;
-			}
 		} else {
-			if (FT_Set_Char_Size (face, xsize, ysize, 0, 0)) {
+			if (FT_Set_Char_Size(face, xsize, ysize, 0, 0))
 				return False;
-			}
 		}
 		f->xsize = xsize;
 		f->ysize = ysize;
 	}
-	if (!FT_Matrix_Equal (&f->matrix, matrix)) {
+	if (!matrix_equal(&f->matrix, matrix)) {
 		if (XftDebug() & XFT_DBG_GLYPH)
 			printf ("Set face matrix to (%g,%g,%g,%g)\n",
-			        (double) matrix->xx / 0x10000,
-			        (double) matrix->xy / 0x10000,
-			        (double) matrix->yx / 0x10000,
-			        (double) matrix->yy / 0x10000);
+			        (double)matrix->xx / 0x10000,
+			        (double)matrix->xy / 0x10000,
+			        (double)matrix->yx / 0x10000,
+			        (double)matrix->yy / 0x10000);
 		FT_Set_Transform(face, matrix, NULL);
 		f->matrix = *matrix;
 	}
