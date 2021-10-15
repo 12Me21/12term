@@ -2,6 +2,25 @@
 
 FT_Library ft_library;
 
+// Many fonts can share the same underlying face data; this
+// structure references that.  Note that many faces may in fact
+// live in the same font file; that is irrelevant to this structure
+// which is concerned only with the individual faces themselves
+typedef struct XftFtFile {
+	struct XftFtFile* next;
+	int ref; // number of font infos using this file
+	
+	char* file;	// file name
+	int id; // font index within that file
+	
+	FT_F26Dot6 xsize;	// current xsize setting
+	FT_F26Dot6 ysize;	// current ysize setting
+	FT_Matrix matrix;	// current matrix setting
+	
+	int lock; // lock count; can't unload unless 0
+	FT_Face face; // pointer to face; only valid when lock
+} XftFtFile;
+
 // List of all open files (each face in a file is managed separately)
 static XftFtFile* _XftFtFiles;
 static int XftMaxFreeTypeFiles = 5;
