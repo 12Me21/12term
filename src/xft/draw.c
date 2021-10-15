@@ -76,11 +76,11 @@ void XftDrawRect(XftDraw* draw, const XRenderColor color, Px x, Px y, Px width, 
 	
 	// Check for quick exits
 	if (!r && draw->clip_type == XftClipTypeNone)
-		return True;
+		return true;
 	
 	if (r && draw->clip_type == XftClipTypeRegion &&
 	    XEqualRegion(r, draw->clip.region)) {
-		return True;
+		return true;
 	}
 	
 	// Duplicate the region so future changes can be short circuited
@@ -89,7 +89,7 @@ void XftDrawRect(XftDraw* draw, const XRenderColor color, Px x, Px y, Px width, 
 		if (n) {
 			if (!XUnionRegion(n, r, n)) {
 				XDestroyRegion(n);
-				return False;
+				return false;
 			}
 		}
 	}
@@ -124,7 +124,7 @@ void XftDrawRect(XftDraw* draw, const XRenderColor color, Px x, Px y, Px width, 
 			                     });
 		}
 	}
-	return True;
+	return true;
 	}*/
 
 /*bool XftDrawSetClipRectangles(XftDraw* draw, int xOrigin, int yOrigin, const XRectangle* rects, int n) {
@@ -136,13 +136,13 @@ void XftDrawRect(XftDraw* draw, const XRenderColor color, Px x, Px y, Px width, 
 	    (n == 0 || (draw->clip.rect->xOrigin == xOrigin &&
 	                draw->clip.rect->yOrigin == yOrigin)) &&
 	    !memcmp (XftClipRects(draw->clip.rect), rects, n * sizeof (XRectangle))) {
-		return True;
+		return true;
 	}
 	
 	// Duplicate the region so future changes can be short circuited
 	new = malloc(sizeof(XftClipRect)+ n*sizeof(XRectangle));
 	if (!new)
-		return False;
+		return false;
 	
 	new->n = n;
 	new->xOrigin = xOrigin;
@@ -172,6 +172,6 @@ void XftDrawRect(XftDraw* draw, const XRenderColor color, Px x, Px y, Px width, 
 			XftClipRects(new),
 			new->n);
 	}
-	return True;
+	return true;
 }
 */

@@ -155,10 +155,10 @@ bool _XftSetFace(XftFtFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* ma
 			// simply try both sizes.
 			if (FT_Set_Char_Size(face, best->x_ppem, best->y_ppem, 0, 0) != 0 &&
 			    FT_Set_Char_Size(face, best->width<<6, best->height<<6, 0, 0) != 0)
-				return False;
+				return false;
 		} else {
 			if (FT_Set_Char_Size(face, xsize, ysize, 0, 0))
-				return False;
+				return false;
 		}
 		f->xsize = xsize;
 		f->ysize = ysize;
@@ -173,7 +173,7 @@ bool _XftSetFace(XftFtFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* ma
 		FT_Set_Transform(face, matrix, NULL);
 		f->matrix = *matrix;
 	}
-	return True;
+	return true;
 }
 
 static void _XftReleaseFile(XftFtFile* f) {
