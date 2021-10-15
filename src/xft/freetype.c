@@ -425,13 +425,13 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 		fi->spacing = FC_MONO;
 	
 	// Step over hash value in the structure
-	FcChar32 hash = 0;
+	/*FcChar32 hash = 0;
 	FcChar32* hashp = (FcChar32*)fi+1;
 	int nhash = (sizeof(XftFontInfo) / sizeof(FcChar32)) - 1;
 	
 	while (nhash--)
 		hash += *hashp++;
-	fi->hash = hash;
+		fi->hash = hash;*/
 
 	// All done
 	return true;
@@ -465,10 +465,6 @@ void XftFontInfoDestroy(XftFontInfo* fi) {
 	XftFontInfoEmpty(fi);
 	XftMemFree(XFT_MEM_FONT, sizeof(XftFontInfo));
 	free(fi);
-}
-
-FcChar32 XftFontInfoHash(const XftFontInfo* fi) {
-	return fi->hash;
 }
 
 bool XftFontInfoEqual(const XftFontInfo* a, const XftFontInfo* b) {

@@ -28,7 +28,7 @@ typedef struct XftGlyph {
 // needed to create a unique font object.
 typedef struct XftFontInfo {
 	// Hash value (not include in hash value computation)
-	FcChar32	hash;
+	//FcChar32	hash;
 	struct XftFtFile* file; // face source
 	// Rendering options
 	FT_F26Dot6 xsize, ysize; // pixel size
@@ -120,7 +120,6 @@ FT_Face XftLockFace(XftFont* pub);
 void XftUnlockFace(XftFont* pub);
 XftFontInfo* XftFontInfoCreate(const FcPattern* pattern);
 void XftFontInfoDestroy(XftFontInfo* fi);
-FcChar32 XftFontInfoHash(const XftFontInfo* fi);
 bool XftFontInfoEqual(const XftFontInfo* a, const XftFontInfo* b);
 XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi);
 XftFont* XftFontOpenPattern(FcPattern* pattern);
