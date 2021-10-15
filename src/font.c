@@ -106,7 +106,7 @@ void load_fonts(const utf8* fontstr, double fontsize) {
 		time_log("loaded font");
 	}
 	
-	W.font_ascent = fonts[0].ascent;
+	W.font_baseline = fonts[0].ascent;
 	
 	// messy. remember to call update_charsize 
 	W.cw = ceil(fonts[0].width);
@@ -210,8 +210,8 @@ void cells_to_glyphs(int len, Cell cells[len], Glyph glyphs[len], bool cache) {
 				.font = font,
 				.glyph = glyph,
 				//.x = -extents.x, // todo: set this so the glyph is centered
-				.x = 0,
-				.y = W.font_ascent,//_font->ascent, //(xfont->ascent+xfont->descent-W.ch)/2+W.ch-xfont->descent, // todo: adjust this to minimize vertical clipping in tall fallback fonts, perhaps?
+				//				.x = 0,
+				//				.y = W.font_ascent,//_font->ascent, //(xfont->ascent+xfont->descent-W.ch)/2+W.ch-xfont->descent, // todo: adjust this to minimize vertical clipping in tall fallback fonts, perhaps?
 				// really the char cell height should probably be ascent+descent, but idk uhh
 				.chr = chr,
 				.style = style,

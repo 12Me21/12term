@@ -42,7 +42,7 @@ void XftGlyphExtents(XftFont* font, const FT_UInt* glyphs, int nglyphs, XGlyphIn
 		if (xftg)
 			*extents = xftg->metrics;
 		else
-			memset (extents, '\0', sizeof (*extents));
+			memset (extents, '\0', sizeof(*extents));
 	} else {
 		int x = 0;
 		int y = 0;

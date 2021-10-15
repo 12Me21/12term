@@ -17,8 +17,8 @@ typedef struct {
 typedef struct Glyph {
 	FT_UInt glyph;
 	XftFont* font; //null if glyph is empty
-	Px x;
-	Px y;
+	//	Px x;
+	//	Px y;
 	//bool wide;
 	// keys for caching
 	Char chr;

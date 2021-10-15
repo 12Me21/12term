@@ -25,7 +25,7 @@ typedef struct Xw {
 	
 	bool ligatures; // unused
 	
-	int font_ascent; // n
+	int font_baseline; // 
 	
 	union {
 		Atom atoms_0; // this gives us a pointer to the start of the atoms struct, so we can initialize them all with one function call. (see init_atoms())

@@ -5,10 +5,9 @@
 // col - color (only used for normal monochrome glyphs)
 // pub - font
 // dst - destination picture
-// x,y - destination position
+// x,y - destination position (center, baseline)
 // g - glyph id
-// cw - width of character cell (this is messy. maybe would be better to pass the CENTER x coordinate
-void XftGlyphRender1(int op, XRenderColor col, XftFont* font, Picture dst, int x, int y, FT_UInt g, int cw) {
+void XftGlyphRender1(int op, XRenderColor col, XftFont* font, Picture dst, float x, int y, FT_UInt g) {
 	// Load missing glyphs
 	FT_UInt missing[1];
 	int nmissing = 0;
@@ -23,12 +22,12 @@ void XftGlyphRender1(int op, XRenderColor col, XftFont* font, Picture dst, int x
 		wire = 0;
 	
 	XftGlyph* glyph = font->glyphs[wire];
-	Px center = (cw - glyph->metrics.xOff)/2;
+	float half = glyph->metrics.xOff / 2.0f;
 	if (glyph->picture) {
-		XRenderComposite(W.d, PictOpOver, glyph->picture, None, dst, 0, 0, 0, 0, x - glyph->metrics.x + center, y-glyph->metrics.y, glyph->metrics.width, glyph->metrics.height);
+		XRenderComposite(W.d, PictOpOver, glyph->picture, None, dst, 0, 0, 0, 0, (int)(x - half) + glyph->metrics.x, y-glyph->metrics.y, glyph->metrics.width, glyph->metrics.height);
 	} else {
 		Picture src = XftDrawSrcPicture(col);
-		XRenderCompositeString32(W.d, op, src, dst, font->format, font->glyphset, 0, 0, x + center, y, (unsigned int[]){wire}, 1);
+		XRenderCompositeString32(W.d, op, src, dst, font->format, font->glyphset, 0, 0, (int)(x - half), y, (unsigned int[]){wire}, 1);
 	}
  bail1:
 	if (glyphs_loaded)

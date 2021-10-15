@@ -105,7 +105,7 @@ static int same_color(XRenderColor a, XRenderColor b) {
 static void draw_glyph(XftDraw* draw, Px x, Px y, Glyph g, XRenderColor col, int w) {
 	if (!g.font)
 		return;
-	XftGlyphRender1(PictOpOver, col, g.font, XftDrawPicture(draw), x+g.x, y+g.y, g.glyph, W.cw*w);
+	XftGlyphRender1(PictOpOver, col, g.font, XftDrawPicture(draw), x+(W.cw*w)/2.0, y+W.font_baseline, g.glyph);
 }
 
 // todo: make these thicker depending on dpi/fontsize
@@ -124,10 +124,10 @@ static void draw_char_overlays(XftDraw* draw, Px winx, Cell c) {
 	
 	if (underline) {
 		XRenderColor col = make_color(underline_color);
-		XftDrawRect(draw, col, winx, W.font_ascent+1, width*W.cw, underline);
+		XftDrawRect(draw, col, winx, W.font_baseline+1, width*W.cw, underline);
 	}
 	if (c.attrs.strikethrough) {
-		XftDrawRect(draw, make_color(c.attrs.color), winx, W.font_ascent*2/3, width*W.cw, 1);
+		XftDrawRect(draw, make_color(c.attrs.color), winx, W.font_baseline*2/3, width*W.cw, 1);
 	}
 }
 
