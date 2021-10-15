@@ -14,26 +14,22 @@
 
 #include "../x.h"
 
-/*
- * Internal version of the font with private data
- */
-
-typedef enum XftClipType {
+/*typedef enum XftClipType {
 	XftClipTypeNone, XftClipTypeRegion, XftClipTypeRectangles
-} XftClipType;
+} XftClipType
 
 typedef struct XftClipRect {
 	int xOrigin;
 	int yOrigin;
 	int n;
-} XftClipRect;
+	} XftClipRect;
 
 #define XftClipRects(cr) ((XRectangle*) ((cr)+1))
 
 typedef union XftClip {
 	XftClipRect* rect;
 	Region region;
-} XftClip;
+} XftClip;*/
 
 typedef struct XftSolidColor {
 	XRenderColor color;
@@ -44,8 +40,6 @@ typedef struct XftSolidColor {
 #define XFT_NUM_SOLID_COLOR 16
 
 typedef struct XftDisplayInfo {
-	XExtCodes* codes;
-	FcPattern* defaults;
 	XftFont* fonts;
 	unsigned long glyph_memory;
 	unsigned long max_glyph_memory;

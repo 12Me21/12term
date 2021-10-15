@@ -21,6 +21,12 @@ typedef struct XftFtFile {
 	FT_Face face; // pointer to face; only valid when lock
 } XftFtFile;
 
+// A hash table translates Unicode values into glyph indicies
+typedef struct XftUcsHash {
+	FcChar32 ucs4;
+	FT_UInt glyph;
+} XftUcsHash;
+
 // List of all open files (each face in a file is managed separately)
 static XftFtFile* _XftFtFiles;
 static int XftMaxFreeTypeFiles = 5;
@@ -724,4 +730,33 @@ void XftFontClose(XftFont* font) {
 	
 	++info.num_unref_fonts;
 	XftFontManageMemory();
+}
+
+FT_UInt XftCharIndex(XftFont* font, FcChar32 ucs4) {
+	if (!font->hash_value)
+		return 0;
+	FcChar32	ent = ucs4 % font->hash_value;
+	FcChar32	offset = 0;
+	while (font->hash_table[ent].ucs4 != ucs4) {
+		if (font->hash_table[ent].ucs4 == (FcChar32)~0) {
+			if (!XftCharExists(font, ucs4))
+				return 0;
+			FT_Face face = XftLockFace(font);
+			if (!face)
+				return 0;
+			font->hash_table[ent].ucs4 = ucs4;
+			font->hash_table[ent].glyph = FcFreeTypeCharIndex(face, ucs4);
+			XftUnlockFace(font);
+			break;
+		}
+		if (!offset) {
+			offset = ucs4 % font->rehash_value;
+			if (!offset)
+				offset = 1;
+		}
+		ent += offset;
+		if (ent >= font->hash_value)
+			ent -= font->hash_value;
+	}
+	return font->hash_table[ent].glyph;
 }

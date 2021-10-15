@@ -17,12 +17,6 @@
 
 extern FT_Library	ft_library;
 
-// A hash table translates Unicode values into glyph indicies
-typedef struct XftUcsHash {
-	FcChar32 ucs4;
-	FT_UInt glyph;
-} XftUcsHash;
-
 // Glyphs are stored in this structure
 typedef struct XftGlyph {
 	XGlyphInfo metrics;
@@ -30,14 +24,12 @@ typedef struct XftGlyph {
 	Picture picture;
 } XftGlyph;
 
-typedef struct XftFtFile XftFtFile;
-
 // This structure holds the data extracted from a pattern
 // needed to create a unique font object.
 typedef struct XftFontInfo {
 	// Hash value (not include in hash value computation)
 	FcChar32	hash;
-	XftFtFile* file; // face source
+	struct XftFtFile* file; // face source
 	// Rendering options
 	FT_F26Dot6 xsize, ysize; // pixel size
 	FcBool antialias;	// doing antialiasing
@@ -69,7 +61,7 @@ typedef struct XftFont {
 	int num_glyphs; // size of glyphs/bitmaps arrays
 	// Hash table to get from Unicode value to glyph ID
 	// This array follows the glyphs in memory
-	XftUcsHash* hash_table;
+	struct XftUcsHash* hash_table;
 	int hash_value;
 	int rehash_value;
 	// X specific fields
