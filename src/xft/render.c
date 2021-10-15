@@ -26,17 +26,16 @@
 // dst - destination picture
 // x,y - destination position (center, baseline)
 // g - glyph id
-void XftGlyphRender1(int op, XRenderColor col, XftFont* font, float x, int y, FT_UInt g) {
+void XftGlyphRender1(int op, XRenderColor col, XftFont* font, Picture dst, float x, int y, FT_UInt wire) {
 	// Load missing glyphs
 	FT_UInt missing[1];
 	int nmissing = 0;
-	FcBool glyphs_loaded = XftFontCheckGlyph(font, true, g, missing, &nmissing);
+	FcBool glyphs_loaded = XftFontCheckGlyph(font, true, wire, missing, &nmissing);
 	if (nmissing)
 		XftFontLoadGlyphs(font, true, missing, nmissing);
 	
 	if (!font->glyphset)
 		goto bail1;
-	Glyph wire = (Glyph)g;
 	if (wire>=font->num_glyphs || !font->glyphs[wire])
 		wire = 0;
 	
