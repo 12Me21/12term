@@ -26,9 +26,13 @@ static int native_byte_order(void) {
 	return MSBFirst;
 }
 
+static inline unsigned int pack(unsigned char a, unsigned char b, unsigned char c, unsigned char d) {
+	return a | b<<8 | c<<16 | d<<24;
+}
+
 static void swap_card32(CARD32* data, int u) {
 	while (u--) {
-		*data = (*data>>24 & 0xFF) | (*data>>16 & 0xFF)<<8 | (*data>>8 & 0xFF)<<16 | (*data & 0xFF)<<24;
+		*data = pack(*data>>24 & 0xFF, *data>>16 & 0xFF, *data>>8 & 0xFF, *data & 0xFF);
 		data++;
 	}
 }
@@ -207,10 +211,6 @@ static void _scaled_fill_xrender_bitmap(FT_Bitmap* target, FT_Bitmap* source, co
 			}
 		}
 	}
-}
-
-static inline unsigned int pack(unsigned char a, unsigned char b, unsigned char c, unsigned char d) {
-	return a | b<<8 | c<<16 | d<<24;
 }
 
 /* this functions converts the glyph bitmap found in a FT_GlyphSlot

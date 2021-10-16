@@ -1,11 +1,9 @@
 #include "xftint.h"
 
+// really this is just a helper function for creating a Picture given a width/height. this can be absorbed into draw.c soon
+
 struct XftDraw {
 	Drawable drawable;
-	//XftClipType clip_type;
-	//XftClip clip;
-	//int subwindow_mode;
-	// this controlled the Picture's .subwindow_mode field but I'm not sure what that does
 	Picture pict;
 };
 
@@ -19,48 +17,11 @@ XftDraw* XftDrawCreate(Px w, Px h) {
 void XftDrawDestroy(XftDraw* draw) {
 	XFreePixmap(W.d, draw->drawable);
 	XRenderFreePicture(W.d, draw->pict);
-	/*switch (draw->clip_type) {
-	case XftClipTypeRegion:
-		XDestroyRegion(draw->clip.region);
-		break;
-	case XftClipTypeRectangles:
-		free(draw->clip.rect);
-		break;
-	case XftClipTypeNone:
-		break;
-		}*/
 	free(draw);
 }
 
 void XftDrawPut(XftDraw* draw, Px x, Px y, Px w, Px h, Px dx, Px dy) {
 	XCopyArea(W.d, draw->drawable, W.win, W.gc, x, y, w, h, dx, dy);
-}
-
-// improve caching here
-Picture XftDrawSrcPicture(const XRenderColor color) {
-	/*if (pict)
-		XRenderFreePicture(W.d, pict);
-		return pict =XRenderCreateSolidFill(W.d, color);*/
-	
-	// See if there's one already available
-	for (int i=0; i<XFT_NUM_SOLID_COLOR; i++) {
-		if (info.colors[i].pict && info.colors[i].screen == W.scr && !memcmp(&color, &info.colors[i].color, sizeof(XRenderColor)))
-			return info.colors[i].pict;
-	}
-	// Pick one to replace at random
-	int i = (unsigned int)rand() % XFT_NUM_SOLID_COLOR;
-	
-	// Free any existing entry
-	if (info.colors[i].pict)
-		XRenderFreePicture(W.d, info.colors[i].pict);
-	// Create picture
-	// is it worth caching this anymore?
-	info.colors[i].pict = XRenderCreateSolidFill(W.d, &color);
-	
-	info.colors[i].color = color;
-	info.colors[i].screen = W.scr;
-
-	return info.colors[i].pict;
 }
 
 Picture XftDrawPicture(XftDraw* draw) {
