@@ -80,10 +80,6 @@ typedef struct XftGlyphFont {
 	FT_UInt glyph;
 } XftGlyphFont;
 
-/* xftcolor.c */
-unsigned long XftColorAllocValue(const XRenderColor* color);
-Picture XftDrawSrcPicture(const XRenderColor color);
-
 /* xftdpy.c */
 bool XftDefaultSet(FcPattern* defaults);
 void XftDefaultSubstitute(FcPattern* pattern);
@@ -113,3 +109,4 @@ FT_UInt XftCharIndex(XftFont* pub, FcChar32 ucs4);
 
 // eee
 void XftGlyphRender1(int op, XRenderColor col, XftFont* font, Picture dst, float x, int y, FT_UInt g);
+Picture XftDrawSrcPicture(const XRenderColor color);

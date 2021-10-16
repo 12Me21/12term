@@ -6,10 +6,10 @@ all: $(output) terminfo
 # all the .c files
 srcdir = src
 srcs = x tty debug buffer ctlseqs keymap csi draw font event settings icon clipboard #lua
-srcs += xft/color xft/dbg xft/dpy xft/extent xft/freetype xft/glyphs xft/init xft/render
-srcs := $(srcs:=.c)
+srcs += xft/dbg xft/dpy xft/extent xft/freetype xft/glyphs xft/init xft/render
+srcs := $(srcs:=.c) #append .c to names
 
-lua_version = 5.2
+#lua_version = 5.2
 
 # libs to include with -l<name>
 libs = rt util
@@ -25,7 +25,7 @@ pkgs = x11 xrender freetype2 fontconfig #lua$(lua_version) #//harfbuzz
 
 
 CFLAGS+= -g # include debug symbols
-#CFLAGS+= -Os
+#CFLAGS+= -s -Os
 CFLAGS+= -Wall -Wextra -pedantic -std=c11 # turn on a bunch of warnings
 CFLAGS+= -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -Wno-parentheses -Wno-char-subscripts # disable these warnings
 CFLAGS+= -Werror=implicit-function-declaration -Werror=incompatible-pointer-types # make these warnings into errors

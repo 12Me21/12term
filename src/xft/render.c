@@ -1,5 +1,32 @@
 #include "xftint.h"
 
+// improve caching here
+Picture XftDrawSrcPicture(const XRenderColor color) {
+	/*if (pict)
+		XRenderFreePicture(W.d, pict);
+		return pict =XRenderCreateSolidFill(W.d, color);*/
+	
+	// See if there's one already available
+	for (int i=0; i<XFT_NUM_SOLID_COLOR; i++) {
+		if (info.colors[i].pict && info.colors[i].screen == W.scr && !memcmp(&color, &info.colors[i].color, sizeof(XRenderColor)))
+			return info.colors[i].pict;
+	}
+	// Pick one to replace at random
+	int i = (unsigned int)rand() % XFT_NUM_SOLID_COLOR;
+	
+	// Free any existing entry
+	if (info.colors[i].pict)
+		XRenderFreePicture(W.d, info.colors[i].pict);
+	// Create picture
+	// is it worth caching this anymore?
+	info.colors[i].pict = XRenderCreateSolidFill(W.d, &color);
+	
+	info.colors[i].color = color;
+	info.colors[i].screen = W.scr;
+
+	return info.colors[i].pict;
+}
+
 // this function uses the intersection of the baseline and the center line as the origin
 // ⎛note that the ascent and descent may vary depending on the font.       ⎞
 // ⎜so even if a font is the correct height, it may not fit within the cell⎟

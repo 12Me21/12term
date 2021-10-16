@@ -65,7 +65,14 @@ static void draw_rect(XftDraw draw, Color color, Px x, Px y, Px width, Px height
 
 unsigned long alloc_color(Color c) {
 	XRenderColor x = make_color(c);
-	return XftColorAllocValue(&x);
+	XColor xc = {
+		.red = x.red,
+		.green = x.green,
+		.blue = x.blue,
+		//.flags = ?
+	};
+	XAllocColor(W.d, W.cmap, &xc);
+	return xc.pixel;
 }
 
 static XftDraw draw_create(Px w, Px h) {
@@ -124,10 +131,10 @@ static int same_color(Color ca, Color cb) {
 }
 
 // todo: allow drawing multiple at once for efficiency?
-static void draw_glyph(XftDraw draw, Px x, Px y, Glyph g, XRenderColor col, int w) {
+static void draw_glyph(XftDraw draw, Px x, Px y, Glyph g, Color col, int w) {
 	if (!g.font)
 		return;
-	XftGlyphRender1(PictOpOver, col, g.font, draw.pict, x+(W.cw*w)/2.0, y+W.font_baseline, g.glyph);
+	XftGlyphRender1(PictOpOver, make_color(col), g.font, draw.pict, x+(W.cw*w)/2.0, y+W.font_baseline, g.glyph);
 }
 
 // todo: make these thicker depending on dpi/fontsize
@@ -175,7 +182,7 @@ static void draw_cursor(int x, int y) {
 	if (temp.chr) {
 		Glyph spec[1];
 		cells_to_glyphs(1, &temp, spec, false);
-		draw_glyph(cursor_draw, 0, 0, spec[0], make_color(temp.attrs.color), width);
+		draw_glyph(cursor_draw, 0, 0, spec[0], temp.attrs.color, width);
 	}
 	
 	draw_char_overlays(cursor_draw, 0, temp);
@@ -248,18 +255,16 @@ static bool draw_row(int y, Row* row) {
 	// todo: why does the bg color extend too far in fullscreen?
 	// draw right border background
 	draw_rect(rows[y].draw, (Color){.i = row->wrap?-3:-2}, W.border+W.cw*T.width, 0, W.border, W.ch);
-	// 
-		//XftDrawRect(rows[y].draw, make_color((Color){.i = -3}), W.border+W.cw*row->length, 0, W.border, W.ch);
+	//draw_rect(rows[y].draw, (Color){.i = -3}, W.border+W.cw*row->length, 0, W.border, W.ch);
 	
 	// draw text
 	// todo: we need to handle combining chars here!!
-	// 
 	Glyph* specs = rows[y].glyphs;
 	cells_to_glyphs(T.width, row->cells, specs, true);
 	
 	for (int i=0; i<T.width; i++) {
 		if (specs[i].font)
-			draw_glyph(rows[y].draw, W.border+i*W.cw, 0, specs[i], make_color(row->cells[i].attrs.color), row->cells[i].wide==1 ? 2 : 1);
+			draw_glyph(rows[y].draw, W.border+i*W.cw, 0, specs[i], row->cells[i].attrs.color, row->cells[i].wide==1 ? 2 : 1);
 	}
 	
 	// draw strikethrough and underlines

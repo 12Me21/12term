@@ -14,7 +14,7 @@ typedef struct Glyph {
 	Char chr;
 	char style; // whether bold/italic etc.
 	// when turning cells into glyphs, if the prev 2 values match the new cell's, the cached glyph is used
-	// todo: we need to store x position here because of combining chars
+	// todo: we need to store which cell the glyph is in, so we can handle combining chars
 	int x;
 } Glyph;
 
