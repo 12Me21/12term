@@ -277,7 +277,7 @@ int main(int argc, char* argv[argc+1]) {
 	
 	font_init();
 	
-	time_log("init xft");
+	time_log("init font libraries");
 		
 	load_fonts(settings.faceName, settings.faceSize);
 	

@@ -13,7 +13,6 @@
 #define Font Font_
 typedef struct {
 	Px width, height;
-	Px ascent, descent;
 	
 	XftFont* font;
 	FcFontSet* set;
@@ -35,7 +34,7 @@ static int ceildiv(int a, int b) {
 }
 
 //load one font face
-static bool load_font(Font* f, FcPattern* pattern, bool bold, bool italic) {
+static bool load_font(Font* f, FcPattern* pattern, bool bold, bool italic, bool get_width) {
 	FcPattern* configured = FcPatternDuplicate(pattern);
 	if (!configured)
 		return false;
@@ -65,19 +64,21 @@ static bool load_font(Font* f, FcPattern* pattern, bool bold, bool italic) {
 	
 	// calculate the average char width
 	// (this also serves to load all ascii glyphs immediately)
-	int len = 95;
-	Char ascii_printable[len];
-	for (int i=0; i<len; i++)
-		ascii_printable[i] = ' '+i;
-	XGlyphInfo extents;
-	XftTextExtents32(f->font, (FcChar32*)ascii_printable, len, &extents);
-	f->width = ceildiv(extents.xOff, len);
+	//if (get_width) {
+		int len = 95;
+		Char ascii_printable[len];
+		for (int i=0; i<len; i++)
+			ascii_printable[i] = ' '+i;
+		XGlyphInfo extents;
+		XftTextExtents32(f->font, (FcChar32*)ascii_printable, len, &extents);
+		f->width = ceildiv(extents.xOff, len);
+		//}
 	
 	f->set = NULL;
 	f->pattern = configured;
-	f->ascent = f->font->ascent;
-	f->descent = f->font->descent;
-	f->height = f->ascent + f->descent;
+	//f->ascent = f->font->ascent;
+	//f->descent = f->font->descent;
+	f->height = f->font->ascent + f->font->descent;
 	
 	return true;
 }
@@ -101,12 +102,12 @@ void load_fonts(const utf8* fontstr, double fontsize) {
 	}
 	
 	for (int i=0; i<4; i++) {
-		if (!load_font(&fonts[i], pattern, i&1, i&2))
+		if (!load_font(&fonts[i], pattern, i&1, i&2, i==0))
 			die("failed to load font");
 		time_log("loaded font");
 	}
 	
-	W.font_baseline = fonts[0].ascent;
+	W.font_baseline = fonts[0].font->ascent;
 	
 	// messy. remember to call update_charsize 
 	W.cw = ceil(fonts[0].width);

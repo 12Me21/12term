@@ -76,12 +76,6 @@ typedef struct XftFont {
 
 typedef struct XftDraw XftDraw;
 
-typedef struct XftGlyphFontSpec {
-	XftFont* font;
-	FT_UInt glyph;
-	short	x, y;
-} XftGlyphFontSpec;
-
 // ghhh
 typedef struct XftGlyphFont {
 	XftFont* font;

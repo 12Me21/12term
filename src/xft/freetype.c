@@ -33,7 +33,7 @@ static XftFtFile* xft_files = NULL;
 static int XftMaxFreeTypeFiles = 5;
 
 // create a new XftFtFile from a filename and an id
-static XftFtFile* xft_get_file(const char* filename, int id) {
+static XftFtFile* get_file(const char* filename, int id) {
 	XftFtFile* f;
 	for (f = xft_files; f; f = f->next) {
 		if (!strcmp(f->filename, filename) && f->id == id) {
@@ -68,7 +68,7 @@ static XftFtFile* xft_get_file(const char* filename, int id) {
 }
 
 // create a new XftFtFile from an existing face
-static XftFtFile* xft_make_face_file(FT_Face face) {
+static XftFtFile* make_face_file(FT_Face face) {
 	XftFtFile* f = XftMalloc(XFT_MEM_FILE, sizeof(XftFtFile));
 	if (!f)
 		return NULL;
@@ -87,7 +87,7 @@ static XftFtFile* xft_make_face_file(FT_Face face) {
 	return f;
 }
 
-static int _XftNumFiles(void) {
+static int num_files(void) {
 	int count = 0;
 	for (XftFtFile* f=xft_files; f; f=f->next)
 		if (f->face && !f->lock)
@@ -95,7 +95,7 @@ static int _XftNumFiles(void) {
 	return count;
 }
 
-static XftFtFile* _XftNthFile(int n) {
+static XftFtFile* nth_file(int n) {
 	int count = 0;
 	XftFtFile* f;
 	for (f=xft_files; f; f=f->next)
@@ -105,10 +105,10 @@ static XftFtFile* _XftNthFile(int n) {
 	return f;
 }
 
-static void _XftUncacheFiles(void) {
+static void uncache_files(void) {
 	int n;
-	while ((n = _XftNumFiles()) > XftMaxFreeTypeFiles) {
-		XftFtFile* f = _XftNthFile(rand() % n);
+	while ((n = num_files()) > XftMaxFreeTypeFiles) {
+		XftFtFile* f = nth_file(rand() % n);
 		if (f) {
 			if (XftDebug() & XFT_DBG_REF)
 				printf("Discard file %s/%d from cache\n",
@@ -119,7 +119,7 @@ static void _XftUncacheFiles(void) {
 	}
 }
 
-static FT_Face _XftLockFile(XftFtFile* f) {
+static FT_Face lock_file(XftFtFile* f) {
 	++f->lock;
 	if (!f->face) {
 		if (XftDebug() & XFT_DBG_REF)
@@ -130,18 +130,18 @@ static FT_Face _XftLockFile(XftFtFile* f) {
 		f->xsize = 0;
 		f->ysize = 0;
 		f->matrix.xx = f->matrix.xy = f->matrix.yx = f->matrix.yy = 0;
-		_XftUncacheFiles();
+		uncache_files();
 	}
 	return f->face;
 }
 
-static void _XftLockError(const char* reason) {
+static void lock_error(const char* reason) {
 	fprintf(stderr, "Xft: locking error %s\n", reason);
 }
 
-static void _XftUnlockFile(XftFtFile* f) {
+static void unlock_file(XftFtFile* f) {
 	if (--f->lock < 0)
-		_XftLockError("too many file unlocks");
+		lock_error("too many file unlocks");
 }
 
 static bool matrix_equal(FT_Matrix* a, FT_Matrix* b) {
@@ -154,7 +154,7 @@ static FT_F26Dot6 dist(FT_F26Dot6 a, FT_F26Dot6 b) {
 	return b-a;
 }
 
-static bool _XftSetFace(XftFtFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* matrix) {
+static bool set_face(XftFtFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* matrix) {
 	FT_Face face = f->face;
 	
 	if (f->xsize != xsize || f->ysize != ysize) {
@@ -202,11 +202,11 @@ static bool _XftSetFace(XftFtFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Mat
 	return true;
 }
 
-static void _XftReleaseFile(XftFtFile* f) {
+static void release_file(XftFtFile* f) {
 	if (--f->ref != 0)
 		return;
 	if (f->lock)
-		_XftLockError ("Attempt to close locked file");
+		lock_error("Attempt to close locked file");
 	if (f->filename) {
 		for (XftFtFile** prev = &xft_files; *prev; prev = &(*prev)->next) {
 			if (*prev == f) {
@@ -224,7 +224,7 @@ static void _XftReleaseFile(XftFtFile* f) {
 /*
  * Find a prime larger than the minimum reasonable hash size
  */
-static FcChar32 _XftSqrt(FcChar32 a) {
+static FcChar32 xft_sqrt(FcChar32 a) {
 	FcChar32 l = 2;
 	FcChar32 h = a/2;
 	while ((h-l) > 1) {
@@ -237,7 +237,7 @@ static FcChar32 _XftSqrt(FcChar32 a) {
 	return h;
 }
 
-static bool _XftIsPrime (FcChar32 i) {
+static bool is_prime(FcChar32 i) {
 	FcChar32	l, t;
 	
 	if (i < 2)
@@ -247,44 +247,40 @@ static bool _XftIsPrime (FcChar32 i) {
 			return true;
 		return false;
 	}
-	l = _XftSqrt(i) + 1;
+	l = xft_sqrt(i) + 1;
 	for (t = 3; t <= l; t += 2)
 		if (i % t == 0)
 			return false;
 	return true;
 }
 
-static FcChar32 _XftHashSize(FcChar32 num_unicode) {
+static FcChar32 hash_size(FcChar32 num_unicode) {
 	// at least 31.25% extra space
 	FcChar32	hash = num_unicode + (num_unicode>>2) + (num_unicode>>4);
 	
 	if ((hash&1) == 0)
 		hash++;
-	while (!_XftIsPrime(hash))
+	while (!is_prime(hash))
 		hash += 2;
 	return hash;
 }
 
 FT_Face XftLockFace(XftFont* font) {
 	XftFontInfo* fi = &font->info;
-	FT_Face face = _XftLockFile(fi->file);
+	FT_Face face = lock_file(fi->file);
 	// Make sure the face is usable at the requested size
-	if (face && !_XftSetFace(fi->file, fi->xsize, fi->ysize, &fi->matrix)) {
-		_XftUnlockFile(fi->file);
+	if (face && !set_face(fi->file, fi->xsize, fi->ysize, &fi->matrix)) {
+		unlock_file(fi->file);
 		face = NULL;
 	}
 	return face;
 }
 
 void XftUnlockFace(XftFont* font) {
-	_XftUnlockFile(font->info.file);
+	unlock_file(font->info.file);
 }
 
 static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
-	// Initialize the whole XftFontInfo so that padding doesn't interfere with
-	// hash or XftFontInfoEqual().
-	memset(fi, '\0', sizeof(*fi));
-	
 	// Find the associated file
 	FcChar8* filename = NULL;
 	FcPatternGetString(pattern, FC_FILE, 0, &filename);
@@ -294,9 +290,9 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 	
 	FT_Face face;
 	if (filename)
-		fi->file = xft_get_file((char*)filename, id);
+		fi->file = get_file((char*)filename, id);
 	else if (FcPatternGetFTFace(pattern, FC_FT_FACE, 0, &face) == FcResultMatch && face)
-		fi->file = xft_make_face_file(face);
+		fi->file = make_face_file(face);
 	if (!fi->file)
 		goto bail0;
 	
@@ -425,20 +421,11 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 	if (fi->char_width)
 		fi->spacing = FC_MONO;
 	
-	// Step over hash value in the structure
-	/*FcChar32 hash = 0;
-	FcChar32* hashp = (FcChar32*)fi+1;
-	int nhash = (sizeof(XftFontInfo) / sizeof(FcChar32)) - 1;
-	
-	while (nhash--)
-		hash += *hashp++;
-		fi->hash = hash;*/
-
 	// All done
 	return true;
 
  bail1:
-	_XftReleaseFile(fi->file);
+	release_file(fi->file);
 	fi->file = NULL;
  bail0:
 	return false;
@@ -446,39 +433,37 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 
 static void XftFontInfoEmpty(XftFontInfo* fi) {
 	if (fi->file)
-		_XftReleaseFile(fi->file);
+		release_file(fi->file);
 }
 
 XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	// No existing font, create another.
-	if (XftDebug () & XFT_DBG_CACHE)
-		printf ("New font %s/%d size %dx%d\n",
-		        fi->file->filename, fi->file->id,
-		        (int) fi->xsize >> 6, (int) fi->ysize >> 6);
+	if (XftDebug() & XFT_DBG_CACHE)
+		printf("New font %s/%d size %dx%d\n",
+		       fi->file->filename, fi->file->id,
+		       (int) fi->xsize >> 6, (int) fi->ysize >> 6);
 	int max_glyph_memory;
 	if (FcPatternGetInteger(pattern, XFT_MAX_GLYPH_MEMORY, 0,
-	                         &max_glyph_memory) != FcResultMatch)
+	                        &max_glyph_memory) != FcResultMatch)
 		max_glyph_memory = XFT_FONT_MAX_GLYPH_MEMORY;
 	
-	FT_Face face = _XftLockFile(fi->file);
+	FT_Face face = lock_file(fi->file);
 	if (!face)
 		goto bail0;
 	
-	if (!_XftSetFace(fi->file, fi->xsize, fi->ysize, &fi->matrix))
+	if (!set_face(fi->file, fi->xsize, fi->ysize, &fi->matrix))
 		goto bail1;
 
-    /*
-     * Get the set of Unicode codepoints covered by the font.
-     * If the incoming pattern doesn't provide this data, go
-     * off and compute it.  Yes, this is expensive, but it's
-     * required to map Unicode to glyph indices.
-     */
+	// Get the set of Unicode codepoints covered by the font.
+	// If the incoming pattern doesn't provide this data, go
+	// off and compute it.  Yes, this is expensive, but it's
+	// required to map Unicode to glyph indices.
 	FcCharSet* charset;
 	if (FcPatternGetCharSet(pattern, FC_CHARSET, 0, &charset) == FcResultMatch)
 		charset = FcCharSetCopy(charset);
 	else
 		charset = FcFreeTypeCharSet(face, FcConfigGetBlanks(NULL));
-
+	
 	bool antialias = fi->antialias;
 	if (!(face->face_flags & FT_FACE_FLAG_SCALABLE))
 		antialias = false;
@@ -486,6 +471,7 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	bool color = FT_HAS_COLOR(face);
 	XRenderPictFormat* format;
 	// Find the appropriate picture format
+	// we should probably cache the format list
 	if (color)
 		format = XRenderFindStandardFormat(W.d, PictStandardARGB32);
 	else if (antialias) {
@@ -505,12 +491,12 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	if (!format)
 		goto bail2;
 	
-	FcChar32 num_unicode;
-	FcChar32 hash_value;
-	FcChar32 rehash_value;
+	FcChar32 num_unicode = 0;
+	FcChar32 hash_value = 0;
+	FcChar32 rehash_value = 0;
 	if (charset) {
 		num_unicode = FcCharSetCount(charset);
-		hash_value = _XftHashSize(num_unicode);
+		hash_value = hash_size(num_unicode);
 		rehash_value = hash_value-2;
 	} else {
 		num_unicode = 0;
@@ -550,7 +536,7 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 		else {
 			vector.x = 0;
 			vector.y = face->size->metrics.height;
-			FT_Vector_Transform (&vector, &fi->matrix);
+			FT_Vector_Transform(&vector, &fi->matrix);
 			height = vector.y >> 6;
 		}
 	} else {
@@ -564,7 +550,7 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	font->ascent = ascent;
 	font->descent = descent;
 	font->height = height;
-
+	
 	if (fi->char_width)
 		font->max_advance_width = fi->char_width;
 	else {
@@ -579,7 +565,7 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	}
 	font->charset = charset;
 	font->pattern = pattern;
-
+	
 	// Management fields
 	font->ref = 1;
 	
@@ -620,14 +606,14 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	font->glyph_memory = 0;
 	font->max_glyph_memory = max_glyph_memory;
 	
-	_XftUnlockFile(fi->file);
+	unlock_file(fi->file);
 	
 	return font;
 	
  bail2:
 	FcCharSetDestroy(charset);
  bail1:
-	_XftUnlockFile(fi->file);
+	unlock_file(fi->file);
  bail0:
 	return NULL;
 }

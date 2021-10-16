@@ -195,7 +195,7 @@ static void _scaled_fill_xrender_bitmap(FT_Bitmap* target, FT_Bitmap* source, co
 	}
 }
 
-static unsigned int pack(unsigned char a, unsigned char b, unsigned char c, unsigned char d) {
+static inline unsigned int pack(unsigned char a, unsigned char b, unsigned char c, unsigned char d) {
 	return a | b<<8 | c<<16 | d<<24;
 }
 

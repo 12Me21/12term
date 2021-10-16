@@ -135,7 +135,6 @@ void term_resize(int width, int height) {
 				clear_row(*row, old_width, true);
 		}
 	}
-	
 	// height decrease
 	if (height < T.height) {
 		int diff = T.height-height;
@@ -173,7 +172,6 @@ void term_resize(int width, int height) {
 			clear_row(T.buffers[0].rows[y], 0, true);
 		}
 	}
-	
 	// todo: how do we handle the scrolling regions?
 	T.scroll_top = 0;
 	T.scroll_bottom = T.height;
