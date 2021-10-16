@@ -16,33 +16,11 @@ typedef struct XftDraw {
 	Picture pict;
 } XftDraw;
 
-XftDraw XftDrawCreate(Px w, Px h) {
-	Drawable d = XCreatePixmap(W.d, W.win, w, h, DefaultDepth(W.d, W.scr));
-	return (XftDraw){
-		.drawable = d,
-		.pict = XRenderCreatePicture(W.d, d, W.format, 0, NULL),
-	};
-}
-
-void XftDrawDestroy(XftDraw draw) {
-	XFreePixmap(W.d, draw.drawable);
-	XRenderFreePicture(W.d, draw.pict);
-}
-
-void XftDrawPut(XftDraw draw, Px x, Px y, Px w, Px h, Px dx, Px dy) {
-	XCopyArea(W.d, draw.drawable, W.win, W.gc, x, y, w, h, dx, dy);
-}
-
-void XftDrawRect(XftDraw draw, const XRenderColor color, Px x, Px y, Px width, Px height) {
-	XRenderFillRectangle(W.d, PictOpSrc, draw.pict, &color, x, y, width, height);
-}
-
 typedef struct DrawRow {
 	// cache of the glyphs and cells
 	Cell* cells;
 	Glyph* glyphs;
 	// framebuffer
-	Pixmap pix;
 	XftDraw draw;
 	// to force a redraw 
 	bool redraw;
@@ -57,8 +35,6 @@ static XftDraw cursor_draw = {0, 0};
 static int cursor_width;
 static int cursor_y;
 
-// todo: cache the palette colors?
-// or perhaps store them as xftcolor internally
 static XRenderColor make_color(Color c) {
 	RGBColor rgb;
 	if (c.truecolor)
@@ -82,10 +58,29 @@ static XRenderColor make_color(Color c) {
 	};
 }
 
+static void draw_rect(XftDraw draw, Color color, Px x, Px y, Px width, Px height) {
+	XRenderColor c = make_color(color);
+	XRenderFillRectangle(W.d, PictOpSrc, draw.pict, &c, x, y, width, height);
+}
+
 unsigned long alloc_color(Color c) {
 	XRenderColor x = make_color(c);
 	return XftColorAllocValue(&x);
 }
+
+static XftDraw draw_create(Px w, Px h) {
+	Drawable d = XCreatePixmap(W.d, W.win, w, h, DefaultDepth(W.d, W.scr));
+	return (XftDraw){
+		.drawable = d,
+		.pict = XRenderCreatePicture(W.d, d, W.format, 0, NULL),
+	};
+}
+
+static void draw_destroy(XftDraw draw) {
+	XFreePixmap(W.d, draw.drawable);
+	XRenderFreePicture(W.d, draw.pict);
+}
+// todo: add _replace back? this only gets used on resize so is it worth it, idk?
 
 // these are only used to track the old size in this function
 static int drawn_width = -1, drawn_height = -1;
@@ -94,7 +89,7 @@ void draw_resize(int width, int height, bool charsize) {
 		for (int i=0; i<drawn_height; i++) {
 			FREE(rows[i].glyphs);
 			FREE(rows[i].cells);
-			XftDrawDestroy(rows[i].draw);
+			draw_destroy(rows[i].draw);
 		}
 	}
 	drawn_height = height;
@@ -107,7 +102,7 @@ void draw_resize(int width, int height, bool charsize) {
 			rows[y].glyphs[x] = (Glyph){0}; // mreh
 			rows[y].cells[x] = (Cell){0}; //ehnnnn
 		}
-		rows[y].draw = XftDrawCreate(W.w, W.ch);
+		rows[y].draw = draw_create(W.w, W.ch);
 		rows[y].redraw = true;
 	}
 	
@@ -118,12 +113,13 @@ void draw_resize(int width, int height, bool charsize) {
 	// char size changing
 	if (charsize) {
 		if (cursor_draw.drawable)
-			XftDrawDestroy(cursor_draw);
-		cursor_draw = XftDrawCreate(W.cw*2, W.ch);
+			draw_destroy(cursor_draw);
+		cursor_draw = draw_create(W.cw*2, W.ch);
 	}
 }
 
-static int same_color(XRenderColor a, XRenderColor b) {
+static int same_color(Color ca, Color cb) {
+	XRenderColor a = make_color(ca), b = make_color(cb);
 	return a.red==b.red && a.green==b.green && a.blue==b.blue && a.alpha==b.alpha;
 }
 
@@ -149,11 +145,10 @@ static void draw_char_overlays(XftDraw draw, Px winx, Cell c) {
 	}
 	
 	if (underline) {
-		XRenderColor col = make_color(underline_color);
-		XftDrawRect(draw, col, winx, W.font_baseline+1, width*W.cw, underline);
+		draw_rect(draw, underline_color, winx, W.font_baseline+1, width*W.cw, underline);
 	}
 	if (c.attrs.strikethrough) {
-		XftDrawRect(draw, make_color(c.attrs.color), winx, W.font_baseline*2/3, width*W.cw, 1);
+		draw_rect(draw, c.attrs.color, winx, W.font_baseline*2/3, width*W.cw, 1);
 	}
 }
 
@@ -174,7 +169,7 @@ static void draw_cursor(int x, int y) {
 	int width = temp.wide==1 ? 2 : 1;
 	
 	// draw background
-	XftDrawRect(cursor_draw, make_color((Color){.i=-3}), 0, 0, W.cw*width, W.ch);
+	draw_rect(cursor_draw, (Color){.i=-3}, 0, 0, W.cw*width, W.ch);
 	
 	// draw char
 	if (temp.chr) {
@@ -231,28 +226,28 @@ static bool draw_row(int y, Row* row) {
 	memcpy(rows[y].cells, &row->cells, T.width*sizeof(Cell));
 	// if blank_row was passed (special case for scrollback out of bounds things)
 	if (row==blank_row) {
-		XftDrawRect(rows[y].draw, make_color((Color){.truecolor=true,.rgb=T.background}), 0, 0, W.w, W.ch);
+		draw_rect(rows[y].draw, (Color){.truecolor=true,.rgb=T.background}, 0, 0, W.w, W.ch);
 		return true;
 	}
 	
 	// draw left border background
-	XftDrawRect(rows[y].draw, make_color((Color){.i= row->cont?-3:-2 }), 0, 0, W.border, W.ch);
+	draw_rect(rows[y].draw, (Color){.i= row->cont?-3:-2}, 0, 0, W.border, W.ch);
 	// draw cell backgrounds
-	XRenderColor prev_color = make_color(row->cells[0].attrs.background);
+	Color prev_color = row->cells[0].attrs.background;
 	int prev_start = 0;
 	int x;
 	for (x=1; x<T.width; x++) {
-		XRenderColor bg = make_color(row->cells[x].attrs.background);
+		Color bg = row->cells[x].attrs.background;
 		if (!same_color(bg, prev_color)) {
-			XftDrawRect(rows[y].draw, prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x-1), W.ch);
+			draw_rect(rows[y].draw, prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x-1), W.ch);
 			prev_start = x;
 			prev_color = bg;
 		}
 	}
-	XftDrawRect(rows[y].draw, prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x-1), W.ch);
+	draw_rect(rows[y].draw, prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x-1), W.ch);
 	// todo: why does the bg color extend too far in fullscreen?
 	// draw right border background
-	XftDrawRect(rows[y].draw, make_color((Color){.i = row->wrap?-3:-2}), W.border+W.cw*T.width, 0, W.border, W.ch);
+	draw_rect(rows[y].draw, (Color){.i = row->wrap?-3:-2}, W.border+W.cw*T.width, 0, W.border, W.ch);
 	// 
 		//XftDrawRect(rows[y].draw, make_color((Color){.i = -3}), W.border+W.cw*row->length, 0, W.border, W.ch);
 	
@@ -280,15 +275,19 @@ static int row_displayed_at(int y) {
 	return y;
 }
 
+static void draw_put(XftDraw draw, Px x, Px y, Px w, Px h, Px dx, Px dy) {
+	XCopyArea(W.d, draw.drawable, W.win, W.gc, x, y, w, h, dx, dy);
+}
+
 void copy_cursor_part(Px x, Px y, Px w, Px h, int cx, int cy) {
-	XftDrawPut(cursor_draw, x, y, w, h, W.border+cx*W.cw+x, W.border+W.ch*cy+y);
+	draw_put(cursor_draw, x, y, w, h, W.border+cx*W.cw+x, W.border+W.ch*cy+y);
 }
 
 // todo: vary thickness of cursors and lines based on font size
 
 // todo: keep better track of where cursor is rendered
 static void paint_row(int y) {
-	XftDrawPut(rows[y].draw, 0, 0, W.w, W.ch, 0, W.border+W.ch*y);
+	draw_put(rows[y].draw, 0, 0, W.w, W.ch, 0, W.border+W.ch*y);
 	if (T.show_cursor && row_displayed_at(y)==T.c.y) {
 		switch (T.cursor_shape) {
 		case 0: // filled box
