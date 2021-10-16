@@ -11,13 +11,39 @@
 #include "draw2.h"
 #include "event.h"
 
+typedef struct XftDraw {
+	Drawable drawable;
+	Picture pict;
+} XftDraw;
+
+XftDraw XftDrawCreate(Px w, Px h) {
+	Drawable d = XCreatePixmap(W.d, W.win, w, h, DefaultDepth(W.d, W.scr));
+	return (XftDraw){
+		.drawable = d,
+		.pict = XRenderCreatePicture(W.d, d, W.format, 0, NULL),
+	};
+}
+
+void XftDrawDestroy(XftDraw draw) {
+	XFreePixmap(W.d, draw.drawable);
+	XRenderFreePicture(W.d, draw.pict);
+}
+
+void XftDrawPut(XftDraw draw, Px x, Px y, Px w, Px h, Px dx, Px dy) {
+	XCopyArea(W.d, draw.drawable, W.win, W.gc, x, y, w, h, dx, dy);
+}
+
+void XftDrawRect(XftDraw draw, const XRenderColor color, Px x, Px y, Px width, Px height) {
+	XRenderFillRectangle(W.d, PictOpSrc, draw.pict, &color, x, y, width, height);
+}
+
 typedef struct DrawRow {
 	// cache of the glyphs and cells
 	Cell* cells;
 	Glyph* glyphs;
 	// framebuffer
 	Pixmap pix;
-	XftDraw* draw;
+	XftDraw draw;
 	// to force a redraw 
 	bool redraw;
 } DrawRow;
@@ -27,7 +53,7 @@ static DrawRow* rows = NULL;
 static Row* blank_row = NULL;
 
 // cursor
-static XftDraw* cursor_draw = NULL;
+static XftDraw cursor_draw = {0, 0};
 static int cursor_width;
 static int cursor_y;
 
@@ -91,7 +117,7 @@ void draw_resize(int width, int height, bool charsize) {
 	
 	// char size changing
 	if (charsize) {
-		if (cursor_draw)
+		if (cursor_draw.drawable)
 			XftDrawDestroy(cursor_draw);
 		cursor_draw = XftDrawCreate(W.cw*2, W.ch);
 	}
@@ -102,14 +128,14 @@ static int same_color(XRenderColor a, XRenderColor b) {
 }
 
 // todo: allow drawing multiple at once for efficiency?
-static void draw_glyph(XftDraw* draw, Px x, Px y, Glyph g, XRenderColor col, int w) {
+static void draw_glyph(XftDraw draw, Px x, Px y, Glyph g, XRenderColor col, int w) {
 	if (!g.font)
 		return;
-	XftGlyphRender1(PictOpOver, col, g.font, XftDrawPicture(draw), x+(W.cw*w)/2.0, y+W.font_baseline, g.glyph);
+	XftGlyphRender1(PictOpOver, col, g.font, draw.pict, x+(W.cw*w)/2.0, y+W.font_baseline, g.glyph);
 }
 
 // todo: make these thicker depending on dpi/fontsize
-static void draw_char_overlays(XftDraw* draw, Px winx, Cell c) {
+static void draw_char_overlays(XftDraw draw, Px winx, Cell c) {
 	int underline = c.attrs.underline;
 	if (!(underline || c.attrs.strikethrough || c.attrs.link))
 		return;

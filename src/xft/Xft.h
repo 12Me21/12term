@@ -74,8 +74,6 @@ typedef struct XftFont {
 	unsigned long max_glyph_memory;
 } XftFont;
 
-typedef struct XftDraw XftDraw;
-
 // ghhh
 typedef struct XftGlyphFont {
 	XftFont* font;
@@ -84,26 +82,12 @@ typedef struct XftGlyphFont {
 
 /* xftcolor.c */
 unsigned long XftColorAllocValue(const XRenderColor* color);
+Picture XftDrawSrcPicture(const XRenderColor color);
 
 /* xftdpy.c */
 bool XftDefaultSet(FcPattern* defaults);
 void XftDefaultSubstitute(FcPattern* pattern);
 void XftDisplayInfoInit(void);
-
-/* xftdraw.c */
-XftDraw* XftDrawCreate(Px w, Px h);
-
-Drawable XftDrawDrawable(XftDraw* draw);
-
-void XftDrawDestroy(XftDraw* draw);
-
-Picture XftDrawPicture(XftDraw* draw);
-
-Picture XftDrawSrcPicture(const XRenderColor color);
-
-void XftDrawRect(XftDraw* draw, const XRenderColor color, Px x, Px y, Px width, Px height);
-
-void XftDrawPut(XftDraw* draw, Px x, Px y, Px w, Px h, Px dx, Px dy);
 
 /* xftextent.c */
 
