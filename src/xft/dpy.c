@@ -43,7 +43,7 @@ void XftDisplayInfoInit(void) {
 
 // Reduce memory usage in X server
 
-static void _XftDisplayValidateMemory(void) {
+static void validate_memory(void) {
 	unsigned long glyph_memory = 0;
 	for (XftFont* font=info.fonts; font; font=font->next) {
 		glyph_memory += font->glyph_memory;
@@ -52,7 +52,7 @@ static void _XftDisplayValidateMemory(void) {
 		print("Display glyph cache incorrect has %ld bytes, should have %ld\n", info.glyph_memory, glyph_memory);
 }
 
-void _XftDisplayManageMemory(void) {
+void xft_manage_memory(void) {
 	if (!info.max_glyph_memory)
 		return;
 	
@@ -60,7 +60,7 @@ void _XftDisplayManageMemory(void) {
 		if (info.glyph_memory > info.max_glyph_memory)
 			print("Reduce global memory from %ld to %ld\n",
 			      info.glyph_memory, info.max_glyph_memory);
-		_XftDisplayValidateMemory();
+		validate_memory();
 	}
 	
 	while (info.glyph_memory > info.max_glyph_memory) {
@@ -68,7 +68,7 @@ void _XftDisplayManageMemory(void) {
 		XftFont* font = info.fonts;
 		while (font) {
 			if (font->glyph_memory > glyph_memory) {
-				_XftFontUncacheGlyph(font);
+				xft_font_uncache_glyph(font);
 				break;
 			}
 			font = font->next;
@@ -76,5 +76,5 @@ void _XftDisplayManageMemory(void) {
 		}
 	}
 	if (XftDebug() & XFT_DBG_CACHE)
-		_XftDisplayValidateMemory();
+		validate_memory();
 }

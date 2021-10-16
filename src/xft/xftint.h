@@ -80,26 +80,20 @@ typedef struct XftDisplayInfo {
 int XftDebug(void);
 
 /* xftdpy.c */
-void _XftDisplayManageMemory(void);
+void xft_manage_memory(void);
 
 /* xftfreetype.c */
-void XftFontManageMemory(void);
 FT_Face XftLockFace(XftFont* pub);
 void XftUnlockFace(XftFont* pub);
 
 /* xftglyph.c */
-void _XftFontUncacheGlyph(XftFont* public);
-void _XftFontManageMemory(XftFont* public);
+void xft_font_uncache_glyph(XftFont* public);
+void xft_font_manage_memory(XftFont* public);
 
 /* xftinit.c */
 void XftMemReport(void);
 void XftMemAlloc(int kind, int size);
 void* XftMalloc(int kind, size_t size);
 void XftMemFree(int kind, int size);
-
-/* xftswap.c */
-int XftNativeByteOrder(void);
-void XftSwapCARD32(CARD32* data, int n);
-void XftSwapImage(XImage* image);
 
 extern XftDisplayInfo info;

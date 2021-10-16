@@ -51,5 +51,5 @@ void XftGlyphRender1(int op, XRenderColor col, XftFont* font, Picture dst, float
 	}
  bail1:
 	if (glyphs_loaded)
-		_XftFontManageMemory(font);
+		xft_font_manage_memory(font);
 }

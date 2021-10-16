@@ -662,7 +662,8 @@ static XftFont* XftFontFindNthUnref(int n) {
 	return font;
 }
 
-void XftFontManageMemory(void) {
+// different from xft_font_manage_memory
+static void font_manage_memory(void) {
 	while (info.num_unref_fonts > info.max_unref_fonts) {
 		XftFont* font = XftFontFindNthUnref(rand() % info.num_unref_fonts);
 		if (XftDebug() & XFT_DBG_CACHE)
@@ -689,7 +690,7 @@ void XftFontClose(XftFont* font) {
 		return;
 	
 	++info.num_unref_fonts;
-	XftFontManageMemory();
+	font_manage_memory();
 }
 
 FT_UInt XftCharIndex(XftFont* font, FcChar32 ucs4) {

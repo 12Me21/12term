@@ -19,6 +19,20 @@ static void _XftFontValidateMemory(XftFont* font) {
 		print("Font glyph cache incorrect has %ld bytes, should have %ld\n", font->glyph_memory, glyph_memory);
 }
 
+static int native_byte_order(void) {
+	int whichbyte = 1;
+	if (*((char*)&whichbyte))
+		return LSBFirst;
+	return MSBFirst;
+}
+
+static void swap_card32(CARD32* data, int u) {
+	while (u--) {
+		*data = (*data>>24 & 0xFF) | (*data>>16 & 0xFF)<<8 | (*data>>8 & 0xFF)<<16 | (*data & 0xFF)<<24;
+		data++;
+	}
+}
+
 /* we sometimes need to convert the glyph bitmap in a FT_GlyphSlot
  * into a different format. For example, we want to convert a
  * FT_PIXEL_MODE_LCD or FT_PIXEL_MODE_LCD_V bitmap into a 32-bit
@@ -585,8 +599,8 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 			}
 		} else if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA || mode != FT_RENDER_MODE_NORMAL) {
 			/* invert ARGB <=> BGRA */
-			if (ImageByteOrder(W.d) != XftNativeByteOrder())
-				XftSwapCARD32((CARD32*)bufBitmap, size/4);
+			if (ImageByteOrder(W.d) != native_byte_order())
+				swap_card32((CARD32*)bufBitmap, size/4);
 		}
 			
 		if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA) {
@@ -674,7 +688,7 @@ bool XftCharExists(XftFont* font, FcChar32 ucs4) {
 
 // Pick a random glyph from the font and remove it from the cache
 // hey uh this is not a valid function name!!!!
-void _XftFontUncacheGlyph(XftFont* font) {
+void xft_font_uncache_glyph(XftFont* font) {
 	if (!font->glyph_memory)
 		return;
 	
@@ -699,7 +713,7 @@ void _XftFontUncacheGlyph(XftFont* font) {
 		_XftFontValidateMemory(font);
 }
 
-void _XftFontManageMemory(XftFont* font) {
+void xft_font_manage_memory(XftFont* font) {
 	if (font->max_glyph_memory) {
 		if (XftDebug() & XFT_DBG_CACHE) {
 			if (font->glyph_memory > font->max_glyph_memory)
@@ -708,7 +722,7 @@ void _XftFontManageMemory(XftFont* font) {
 					font->glyph_memory, font->max_glyph_memory);
 		}
 		while (font->glyph_memory > font->max_glyph_memory)
-			_XftFontUncacheGlyph(font);
+			xft_font_uncache_glyph(font);
 	}
-	_XftDisplayManageMemory();
+	xft_manage_memory();
 }

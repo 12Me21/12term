@@ -79,7 +79,7 @@ void XftGlyphExtents(XftFont* font, const FT_UInt* glyphs, int nglyphs, XGlyphIn
 		extents->yOff = y;
 	}
 	if (glyphs_loaded)
-		_XftFontManageMemory(font);
+		xft_font_manage_memory(font);
 }
 
 void XftTextExtents32(XftFont* font, const FcChar32* string, int len, XGlyphInfo* extents) {
