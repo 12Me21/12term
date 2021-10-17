@@ -8,10 +8,10 @@
 #include FT_GLYPH_H
 
 // Validate the memory info for a font
-static void _XftFontValidateMemory(XftFont* font) {
+static void font_validate_memory(XftFont* font) {
 	unsigned long glyph_memory = 0;
-	for (FT_UInt glyphindex=0; glyphindex<font->num_glyphs; glyphindex++) {
-		XftGlyph* xftg = font->glyphs[glyphindex];
+	for (FT_UInt i=0; i<font->num_glyphs; i++) {
+		XftGlyph* xftg = font->glyphs[i];
 		if (xftg)
 			glyph_memory += xftg->glyph_memory;
 	}
@@ -19,17 +19,16 @@ static void _XftFontValidateMemory(XftFont* font) {
 		print("Font glyph cache incorrect has %ld bytes, should have %ld\n", font->glyph_memory, glyph_memory);
 }
 
+// messy
 static int native_byte_order(void) {
 	int whichbyte = 1;
 	if (*((char*)&whichbyte))
 		return LSBFirst;
 	return MSBFirst;
 }
-
 static inline unsigned int pack(unsigned char a, unsigned char b, unsigned char c, unsigned char d) {
 	return a | b<<8 | c<<16 | d<<24;
 }
-
 static void swap_card32(CARD32* data, int u) {
 	while (u--) {
 		*data = pack(*data>>24 & 0xFF, *data>>16 & 0xFF, *data>>8 & 0xFF, *data & 0xFF);
@@ -69,10 +68,12 @@ static int _compute_xrender_bitmap_size(FT_Bitmap* target, FT_GlyphSlot slot, FT
 	int width = ftbit->width;
 	int height = ftbit->rows;
 	
-	FT_Vector vector;
+	
 	if (matrix && mode == FT_RENDER_MODE_NORMAL) {
-		vector.x = ftbit->width;
-		vector.y = ftbit->rows;
+		FT_Vector vector = {
+			.x = ftbit->width,
+			.y = ftbit->rows,
+		};
 		FT_Vector_Transform(&vector, matrix);
 		
 		width = vector.x;
@@ -158,9 +159,7 @@ static void _scaled_fill_xrender_bitmap(FT_Bitmap* target, FT_Bitmap* source, co
 	FT_Matrix_Invert(&inverse);
 	
 	// compute how many source pixels a target pixel spans
-	FT_Vector vector;
-	vector.x = 1;
-	vector.y = 1;
+	FT_Vector vector = {.x=1, .y=1};
 	FT_Vector_Transform(&vector, &inverse);
 	int sampling_width = vector.x / 2;
 	int sampling_height = vector.y / 2;
@@ -172,8 +171,6 @@ static void _scaled_fill_xrender_bitmap(FT_Bitmap* target, FT_Bitmap* source, co
 	unsigned char* dst_line = target->buffer;
 	for (int h=height; h>0; h--, dst_line+=pitch) {
 		for (int x=0; x<width; x++) {
-			unsigned char* src;
-			
 			// compute target pixel location in source space
 			vector.x = (x            * 0x10000) + 0x10000 / 2;
 			vector.y = ((height - h) * 0x10000) + 0x10000 / 2;
@@ -181,19 +178,21 @@ static void _scaled_fill_xrender_bitmap(FT_Bitmap* target, FT_Bitmap* source, co
 			vector.x = clamp(FT_RoundFix(vector.x) / 0x10000, 0, source->width - 1);
 			vector.y = clamp(FT_RoundFix(vector.y) / 0x10000, 0, source->rows  - 1);
 			
+			unsigned char* src;
 			switch (source->pixel_mode) {
-			case FT_PIXEL_MODE_MONO: /* convert mono to 8-bit gray, scale using nearest pixel */
+				// convert mono to 8-bit gray, scale using nearest pixel
+			case FT_PIXEL_MODE_MONO: 
 				src = src_buf + (vector.y*src_pitch);
 				if (src[vector.x>>3] & (0x80 >> (vector.x & 7)) )
 					dst_line[x] = 0xFF;
 				break;
-				
-			case FT_PIXEL_MODE_GRAY: /* scale using nearest pixel */
+				// scale using nearest pixel
+			case FT_PIXEL_MODE_GRAY: 
 				src = src_buf + (vector.y * src_pitch);
 				dst_line[x] = src[vector.x];
 				break;
-				
-			case FT_PIXEL_MODE_BGRA: /* scale by averaging all relevant source pixels, keep BGRA format */ {
+				// scale by averaging all relevant source pixels, keep BGRA format
+			case FT_PIXEL_MODE_BGRA: {
 				int bgra[4] = {0};
 				for (int sample_y = -sampling_height; sample_y < sampling_height + 1; ++sample_y) {
 					int src_y = clamp(vector.y + sample_y, 0, source->rows - 1);
@@ -214,21 +213,18 @@ static void _scaled_fill_xrender_bitmap(FT_Bitmap* target, FT_Bitmap* source, co
 	}
 }
 
-/* this functions converts the glyph bitmap found in a FT_GlyphSlot
- * into a different format (see _compute_xrender_bitmap_size)
- *
- * you should call this function after _compute_xrender_bitmap_size
- *
- * target :: target bitmap descriptor. Note that its 'buffer' pointer
- *           must point to memory allocated by the caller
- *
- * slot   :: the glyph slot containing the source bitmap
- *
- * mode   :: the requested final rendering mode
- *
- * bgr    :: boolean, set if BGR or VBGR pixel ordering is needed
- */
-static void _fill_xrender_bitmap(FT_Bitmap* target, FT_GlyphSlot slot, FT_Render_Mode mode, int bgr) {
+/* 
+  this functions converts the glyph bitmap found in a FT_GlyphSlot
+  into a different format (see _compute_xrender_bitmap_size)
+ 
+  you should call this function after _compute_xrender_bitmap_size
+*/
+static void _fill_xrender_bitmap(
+	FT_Bitmap* target, // target bitmap descriptor. Note that its 'buffer' pointer must point to memory allocated by the caller
+	FT_GlyphSlot slot, // the glyph slot containing the source bitmap
+	FT_Render_Mode mode, // the requested final rendering mode
+	int bgr // boolean, set if BGR or VBGR pixel ordering is needed
+) {
 	FT_Bitmap* ftbit = &slot->bitmap;
 	int src_pitch = ftbit->pitch;
 	unsigned char*	srcLine = ftbit->buffer;
@@ -243,39 +239,50 @@ static void _fill_xrender_bitmap(FT_Bitmap* target, FT_GlyphSlot slot, FT_Render
 	switch (ftbit->pixel_mode) {
 	case FT_PIXEL_MODE_MONO:
 		if (subpixel) { // convert mono to ARGB32 values
-			for (int h=height; h>0; h--, srcLine += src_pitch, dstLine += pitch) {
+			for (int y=0; y<height; y++) {
 				for (int x=0; x<width; x++) {
 					if (srcLine[x>>3] & (0x80 >> (x & 7)))
 						((unsigned int*)dstLine)[x] = 0xffffffffU;
 				}
+				srcLine += src_pitch;
+				dstLine += pitch;
 			}
 		} else if (mode == FT_RENDER_MODE_NORMAL) { // convert mono to 8-bit gray
-			for (int h=height; h>0; h--, srcLine += src_pitch, dstLine += pitch) {
+			for (int h=0; h<height; h++) {
 				for (int x=0; x<width; x++) {
 					if (srcLine[x>>3] & (0x80 >> (x & 7)))
 						dstLine[x] = 0xff;
 				}
+				srcLine += src_pitch;
+				dstLine += pitch;
 			}
 		} else { // copy mono to mono
 			int bytes = (width+7) >> 3;
-			for (int h=height; h>0; h--, srcLine += src_pitch, dstLine += pitch )
+			for (int h=0; h<height; h++) {
 				memcpy(dstLine, srcLine, bytes);
+				srcLine += src_pitch;
+				dstLine += pitch;
+			}
 		}
 		break;
 		
 	case FT_PIXEL_MODE_GRAY:
 		if (subpixel)  /* convert gray to ARGB32 values */ {
-			for (int h=height; h>0; h--, srcLine += src_pitch, dstLine += pitch) {
+			for (int h=0; h<height; h++) {
 				unsigned int* dst = (unsigned int*)dstLine;
-				
 				for (int x=0; x<width; x++) {
 					unsigned int pix = srcLine[x];
 					dst[x] = pack(pix, pix, pix, pix);
 				}
+				srcLine += src_pitch;
+				dstLine += pitch;
 			}
 		} else { // copy gray into gray
-			for (int h=height; h>0; h--, srcLine += src_pitch, dstLine += pitch)
+			for (int h=0; h<height; h++) {
 				memcpy(dstLine, srcLine, width);
+				srcLine += src_pitch;
+				dstLine += pitch;
+			}
 		}
 		break;
 		
@@ -287,23 +294,25 @@ static void _fill_xrender_bitmap(FT_Bitmap* target, FT_GlyphSlot slot, FT_Render
 	case FT_PIXEL_MODE_LCD:
 		if (!bgr) {
 			/* convert horizontal RGB into ARGB32 */
-			for (int h=height; h>0; h--, srcLine += src_pitch, dstLine += pitch ) {
+			for (int h=0; h<height; h++) {
 				unsigned char* src = srcLine;
 				unsigned int* dst = (unsigned int*)dstLine;
-				
-				for (int x = 0; x < width; x++, src += 3 ) {
+				for (int x=0; x<width; x++, src+=3) {
 					dst[x] = pack(src[2], src[1], src[0], src[1]); // is this supposed to be 3?
 				}
+				srcLine += src_pitch;
+				dstLine += pitch;
 			}
 		} else {
 			/* convert horizontal BGR into ARGB32 */
-			for (int h=height; h>0; h--, srcLine += src_pitch, dstLine += pitch) {
+			for (int h=0; h<height; h++) {
 				unsigned char* src = srcLine;
 				unsigned int* dst = (unsigned int*)dstLine;
-				
 				for (int x=0; x<width; x++, src+=3) {
 					dst[x] = pack(src[0], src[1], src[2], src[1]);
 				}
+				srcLine += src_pitch;
+				dstLine += pitch;
 			}
 		}
 		break;
@@ -366,7 +375,7 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 			continue;
 		
 		if (XftDebug() & XFT_DBG_CACHE)
-			_XftFontValidateMemory(font);
+			font_validate_memory(font);
 		// Check to see if this glyph has just been loaded,
 		// this happens when drawing the same glyph twice
 		// in a single string
@@ -622,7 +631,7 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 		font->glyph_memory += xftg->glyph_memory;
 		info.glyph_memory += xftg->glyph_memory;
 		if (XftDebug() & XFT_DBG_CACHE)
-			_XftFontValidateMemory(font);
+			font_validate_memory(font);
 		if (XftDebug() & XFT_DBG_CACHEV)
 			print("Caching glyph 0x%x size %ld\n", glyphindex, xftg->glyph_memory);
 	}
@@ -693,7 +702,7 @@ void xft_font_uncache_glyph(XftFont* font) {
 	glyph_memory = rand() % font->glyph_memory;
 	
 	if (XftDebug() & XFT_DBG_CACHE)
-		_XftFontValidateMemory(font);
+		font_validate_memory(font);
 	for (FT_UInt glyphindex=0; glyphindex<font->num_glyphs; glyphindex++) {
 		XftGlyph* xftg = font->glyphs[glyphindex];
 		if (xftg) {
@@ -707,7 +716,7 @@ void xft_font_uncache_glyph(XftFont* font) {
 		}
 	}
 	if (XftDebug() & XFT_DBG_CACHE)
-		_XftFontValidateMemory(font);
+		font_validate_memory(font);
 }
 
 void xft_font_manage_memory(XftFont* font) {
