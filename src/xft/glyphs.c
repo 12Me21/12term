@@ -213,6 +213,8 @@ static void _scaled_fill_xrender_bitmap(FT_Bitmap* target, FT_Bitmap* source, co
 	}
 }
 
+#define FOR(var, end) for (int var=0; var<end; var++)
+
 /* 
   this functions converts the glyph bitmap found in a FT_GlyphSlot
   into a different format (see _compute_xrender_bitmap_size)
@@ -239,8 +241,8 @@ static void _fill_xrender_bitmap(
 	switch (ftbit->pixel_mode) {
 	case FT_PIXEL_MODE_MONO:
 		if (subpixel) { // convert mono to ARGB32 values
-			for (int y=0; y<height; y++) {
-				for (int x=0; x<width; x++) {
+			FOR (y, height) {
+				FOR (x, width) {
 					if (srcLine[x>>3] & (0x80 >> (x & 7)))
 						((unsigned int*)dstLine)[x] = 0xffffffffU;
 				}
@@ -248,8 +250,8 @@ static void _fill_xrender_bitmap(
 				dstLine += pitch;
 			}
 		} else if (mode == FT_RENDER_MODE_NORMAL) { // convert mono to 8-bit gray
-			for (int h=0; h<height; h++) {
-				for (int x=0; x<width; x++) {
+			FOR (y, height) {
+				FOR (x, width) {
 					if (srcLine[x>>3] & (0x80 >> (x & 7)))
 						dstLine[x] = 0xff;
 				}
@@ -258,19 +260,18 @@ static void _fill_xrender_bitmap(
 			}
 		} else { // copy mono to mono
 			int bytes = (width+7) >> 3;
-			for (int h=0; h<height; h++) {
+			FOR (y, height) {
 				memcpy(dstLine, srcLine, bytes);
 				srcLine += src_pitch;
 				dstLine += pitch;
 			}
 		}
 		break;
-		
 	case FT_PIXEL_MODE_GRAY:
 		if (subpixel)  /* convert gray to ARGB32 values */ {
-			for (int h=0; h<height; h++) {
+			FOR (y, height) {
 				unsigned int* dst = (unsigned int*)dstLine;
-				for (int x=0; x<width; x++) {
+				FOR (x, width) {
 					unsigned int pix = srcLine[x];
 					dst[x] = pack(pix, pix, pix, pix);
 				}
@@ -278,64 +279,70 @@ static void _fill_xrender_bitmap(
 				dstLine += pitch;
 			}
 		} else { // copy gray into gray
-			for (int h=0; h<height; h++) {
+			FOR (y, height) {
 				memcpy(dstLine, srcLine, width);
 				srcLine += src_pitch;
 				dstLine += pitch;
 			}
 		}
 		break;
-		
 	case FT_PIXEL_MODE_BGRA: /* Preserve BGRA format */
-		for (int h=height; h>0; h--, srcLine += src_pitch, dstLine += pitch)
+		FOR (y, height) {
 			memcpy(dstLine, srcLine, width*4);
+			srcLine += src_pitch;
+			dstLine += pitch;
+		}
 		break;
-		
 	case FT_PIXEL_MODE_LCD:
 		if (!bgr) {
 			/* convert horizontal RGB into ARGB32 */
-			for (int h=0; h<height; h++) {
+			FOR (y, height) {
 				unsigned char* src = srcLine;
 				unsigned int* dst = (unsigned int*)dstLine;
-				for (int x=0; x<width; x++, src+=3) {
+				FOR (x, width) {
 					dst[x] = pack(src[2], src[1], src[0], src[1]); // is this supposed to be 3?
+					src += 3;
 				}
 				srcLine += src_pitch;
 				dstLine += pitch;
 			}
 		} else {
 			/* convert horizontal BGR into ARGB32 */
-			for (int h=0; h<height; h++) {
+			FOR (y, height) {
 				unsigned char* src = srcLine;
 				unsigned int* dst = (unsigned int*)dstLine;
-				for (int x=0; x<width; x++, src+=3) {
+				FOR (x, width) {
 					dst[x] = pack(src[0], src[1], src[2], src[1]);
+					src += 3;
 				}
 				srcLine += src_pitch;
 				dstLine += pitch;
 			}
 		}
 		break;
-
 	default:  /* FT_PIXEL_MODE_LCD_V */
 		/* convert vertical RGB into ARGB32 */
 		if (!bgr) {
-			for (int h=height; h>0; h--, srcLine+=3*src_pitch, dstLine+=pitch) {
+			FOR (y, height) {
 				unsigned char* src = srcLine;
 				unsigned int* dst = (unsigned int*)dstLine;
-				
-				for (int x=0; x<width; x++, src+=1) {
+				FOR (x, width) {
 					dst[x] = pack(src[src_pitch*2], src[src_pitch], src[0], src[src_pitch]); // repeated values here are not a typo, i checked carefully
+					src += 1;
 				}
+				srcLine += 3*src_pitch;
+				dstLine += pitch;
 			}
 		} else {
-			for (int h=height; h>0; h--, srcLine+=3*src_pitch, dstLine+=pitch ) {
+			FOR (y, height) {
 				unsigned char* src = srcLine;
 				unsigned int* dst = (unsigned int*)dstLine;
-				
-				for (int x=0; x<width; x++, src+=1) {
+				FOR (x, width) {
 					dst[x] = pack(src[0], src[src_pitch], src[src_pitch*2], src[src_pitch]);
+					src += 1;
 				}
+				srcLine += 3*src_pitch;
+				dstLine += pitch;
 			}
 		}
 	}
