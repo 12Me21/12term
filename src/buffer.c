@@ -3,6 +3,7 @@
 #define _XOPEN_SOURCE 600
 #include <wchar.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "common.h"
 #include "buffer.h"

@@ -213,6 +213,7 @@ static void rotate(int amount, int length, DrawRow start[length]) {
 // rotate rows around.
 // if `screen_space` is set, don't adjust for scrollback position
 void draw_rotate_rows(int y1, int y2, int amount, bool screen_space) {
+	return;
 	if (!screen_space && T.current==&T.buffers[0]) {
 		y1 -= T.scroll;
 		y2 -= T.scroll;
@@ -228,6 +229,8 @@ void draw_rotate_rows(int y1, int y2, int amount, bool screen_space) {
 
 static bool draw_row(int y, Row* row) {
 	// see if row matches what's drawn onscreen
+	// todo: we don't store the wrap flags in here.
+	// so if you're debugging and want them visible, you must remove this line too
 	if (!memcmp(&row->cells, rows[y].cells, sizeof(Cell)*T.width))
 		return false;
 	memcpy(rows[y].cells, &row->cells, T.width*sizeof(Cell));
@@ -238,7 +241,7 @@ static bool draw_row(int y, Row* row) {
 	}
 	
 	// draw left border background
-	draw_rect(rows[y].draw, (Color){.i= row->cont?-3:-2}, 0, 0, W.border, W.ch);
+	draw_rect(rows[y].draw, (Color){.i= /*row->cont?-3:*/-2}, 0, 0, W.border, W.ch);
 	// draw cell backgrounds
 	Color prev_color = row->cells[0].attrs.background;
 	int prev_start = 0;
@@ -254,7 +257,7 @@ static bool draw_row(int y, Row* row) {
 	draw_rect(rows[y].draw, prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x-1), W.ch);
 	// todo: why does the bg color extend too far in fullscreen?
 	// draw right border background
-	draw_rect(rows[y].draw, (Color){.i = row->wrap?-3:-2}, W.border+W.cw*T.width, 0, W.border, W.ch);
+	draw_rect(rows[y].draw, (Color){.i = /*row->wrap?-3:*/-2}, W.border+W.cw*T.width, 0, W.border, W.ch);
 	//draw_rect(rows[y].draw, (Color){.i = -3}, W.border+W.cw*row->length, 0, W.border, W.ch);
 	
 	// draw text
