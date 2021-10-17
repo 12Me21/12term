@@ -26,7 +26,7 @@ void XftDisplayInfoInit(void) {
 	info.fonts = NULL;
 	
 	info.glyph_memory = 0;
-	info.max_glyph_memory = XFT_DPY_MAX_GLYPH_MEMORY;//XftDefaultGetInteger(XFT_MAX_GLYPH_MEMORY, XFT_DPY_MAX_GLYPH_MEMORY);
+	info.max_glyph_memory = (4 * 1024 * 1024);
 	if (XftDebug() & XFT_DBG_CACHE)
 		print("global max cache memory %ld\n", info.max_glyph_memory);
 	

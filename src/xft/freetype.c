@@ -443,8 +443,7 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 		       fi->file->filename, fi->file->id,
 		       (int) fi->xsize >> 6, (int) fi->ysize >> 6);
 	int max_glyph_memory;
-	if (FcPatternGetInteger(pattern, XFT_MAX_GLYPH_MEMORY, 0,
-	                        &max_glyph_memory) != FcResultMatch)
+	if (FcPatternGetInteger(pattern, XFT_MAX_GLYPH_MEMORY, 0, &max_glyph_memory) != FcResultMatch)
 		max_glyph_memory = XFT_FONT_MAX_GLYPH_MEMORY;
 	
 	FT_Face face = lock_file(fi->file);

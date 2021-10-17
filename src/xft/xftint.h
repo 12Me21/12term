@@ -14,23 +14,6 @@
 
 #include "../x.h"
 
-/*typedef enum XftClipType {
-	XftClipTypeNone, XftClipTypeRegion, XftClipTypeRectangles
-} XftClipType
-
-typedef struct XftClipRect {
-	int xOrigin;
-	int yOrigin;
-	int n;
-	} XftClipRect;
-
-#define XftClipRects(cr) ((XRectangle*) ((cr)+1))
-
-typedef union XftClip {
-	XftClipRect* rect;
-	Region region;
-} XftClip;*/
-
 typedef struct XftSolidColor {
 	XRenderColor color;
 	int screen; //we keep this because i think it uses -1 for invalid
@@ -50,7 +33,6 @@ typedef struct XftDisplayInfo {
 
 // By default, use no more than 4 meg of server memory total, and no
 // more than 1 meg for any one font
-#define XFT_DPY_MAX_GLYPH_MEMORY (4 * 1024 * 1024)
 #define XFT_FONT_MAX_GLYPH_MEMORY (1024 * 1024)
 
 // By default, keep the last 16 unreferenced fonts around to

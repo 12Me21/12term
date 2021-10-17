@@ -147,6 +147,7 @@ static inline int clamp(int x, int min, int max) {
  *
  * matrix :: the scaling matrix to apply
  */
+//  vcectors ...
 static void _scaled_fill_xrender_bitmap(FT_Bitmap* target, FT_Bitmap* source, const FT_Matrix* matrix) {
 	unsigned char* src_buf = source->buffer;
 	int src_pitch = source->pitch;
@@ -556,6 +557,7 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 		
 		// If the glyph is relatively large (> 1% of server memory),
 		// don't send it until necessary.
+		// we always need bitmaps hehehe
 		//if (!need_bitmaps && size>info.max_glyph_memory/100)
 		//	continue;
 		
@@ -628,29 +630,24 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 }
 
 void XftFontUnloadGlyphs(XftFont* font, const FT_UInt* glyphs, int nglyph) {
-	Glyph	glyphBuf[1024];
+	Glyph	glyphBuf[nglyph];
 	int nused = 0;
-	while (nglyph--) {
-		FT_UInt glyphindex = *glyphs++;
-		XftGlyph* xftg = font->glyphs[glyphindex];
+	for (int i=0; i<nglyph; i++) {
+		XftGlyph* xftg = font->glyphs[glyphs[i]];
 		if (!xftg)
 			continue;
 		if (xftg->glyph_memory) {
 			if (xftg->picture)
 				XRenderFreePicture(W.d, xftg->picture);
 			else if (font->glyphset) {
-				glyphBuf[nused++] = (Glyph)glyphindex;
-				if (nused == sizeof(glyphBuf) / sizeof(glyphBuf[0])) {
-					XRenderFreeGlyphs(W.d, font->glyphset, glyphBuf, nused);
-					nused = 0;
-				}
+				glyphBuf[nused++] = (Glyph)glyphs[i];
 			}
 			font->glyph_memory -= xftg->glyph_memory;
 			info.glyph_memory -= xftg->glyph_memory;
 		}
 		free(xftg);
 		XftMemFree(XFT_MEM_GLYPH, sizeof(XftGlyph));
-		font->glyphs[glyphindex] = NULL;
+		font->glyphs[glyphs[i]] = NULL;
 	}
 	if (font->glyphset && nused)
 		XRenderFreeGlyphs(W.d, font->glyphset, glyphBuf, nused);
