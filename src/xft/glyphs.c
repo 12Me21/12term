@@ -130,21 +130,19 @@ static int _compute_xrender_bitmap_size(
 	return pitch * height;
 }
 
-/* this functions converts the glyph bitmap found in a FT_GlyphSlot
- * into a different format while scaling by applying the given matrix
- * (see _compute_xrender_bitmap_size)
- *
- * you should call this function after _compute_xrender_bitmap_size
- *
- * target :: target bitmap descriptor. Note that its 'buffer' pointer
- *           must point to memory allocated by the caller
- *
- * source :: the source bitmap descriptor
- *
- * matrix :: the scaling matrix to apply
- */
+/*
+this function converts the glyph bitmap found in a FT_GlyphSlot
+into a different format while scaling by applying the given matrix
+(see _compute_xrender_bitmap_size)
+
+you should call this function after _compute_xrender_bitmap_size
+*/
 //  vcectors ...
-static void _scaled_fill_xrender_bitmap(FT_Bitmap* target, FT_Bitmap* source, const FT_Matrix* matrix) {
+static void _scaled_fill_xrender_bitmap(
+	FT_Bitmap* target, // target bitmap descriptor. Note that its 'buffer' pointer must point to memory allocated by the caller
+	FT_Bitmap* source, // the source bitmap descriptor
+	const FT_Matrix* matrix // the scaling matrix to apply
+) {
 	unsigned char* src_buf = source->buffer;
 	int src_pitch = source->pitch;
 	if (src_pitch<0)
@@ -412,7 +410,7 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 		if (transform) {
 			// calculate the true width by transforming all four corners.
 			left = right = top = bottom = 0;
-			for (int xc = 0; xc <= 1; xc ++) {
+			for (int xc = 0; xc <= 1; xc++) {
 				for (int yc = 0; yc <= 1; yc++) {
 					vector.x = glyphslot->metrics.horiBearingX + xc * glyphslot->metrics.width;
 					vector.y = glyphslot->metrics.horiBearingY - yc * glyphslot->metrics.height;
@@ -527,14 +525,15 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 				if (ftbit->pitch < 0)
 					line -= ftbit->pitch*(height-1);
 				
-				for (int y = 0; y < height; y++) {
+				FOR (y, height) {
 					if (font->info.antialias) {
 						static const char den[] = {" .:;=+*#"};
-						for (int x = 0; x < width; x++)
+						FOR (x, width) {
 							print("%c", den[line[x] >> 5]);
+						}
 					} else {
-						for (int x = 0; x < width * 8; x++) {
-							print("%c", line[x>>3] & (1 << (x & 7)) ? '#' : ' ');
+						FOR (x, width*8) {
+							print("%c", line[x/8] & (1<<x%8) ? '#' : ' ');
 						}
 					}
 					print("|\n");
@@ -662,6 +661,10 @@ void XftFontUnloadGlyphs(XftFont* font, const FT_UInt* glyphs, int nglyph) {
 		XRenderFreeGlyphs(W.d, font->glyphset, glyphBuf, nused);
 }
 
+// check if glyph exists
+// also outputs to the array `missing` at index `nmissing`
+// `missing` is expected to have a length of XFT_NMISSING
+// if this array is full, all items in `missing` are loaded immediately, and `nmissing` is set back to 0
 bool XftFontCheckGlyph(XftFont* font, bool need_bitmaps, FT_UInt glyph, FT_UInt* missing, int* nmissing) {
 	if (glyph >= font->num_glyphs)
 		return false;
