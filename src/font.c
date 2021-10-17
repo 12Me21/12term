@@ -128,7 +128,7 @@ static int frclen = 0;
 
 // this is gross and I don't fully understand how it works
 static void find_fallback_font(Char chr, int style, XftFont** xfont, FT_UInt* glyph) {
-	print("finding fallback font for %d\n", chr);
+	//print("finding fallback font for %d\n", chr);
 	// Fallback on font cache, search the font cache for match.
 	for (int f=0; f<frclen; f++) {
 		*glyph = XftCharIndex(frc[f].font, chr);

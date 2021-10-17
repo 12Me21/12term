@@ -696,7 +696,6 @@ bool XftCharExists(XftFont* font, FcChar32 ucs4) {
 }
 
 // Pick a random glyph from the font and remove it from the cache
-// hey uh this is not a valid function name!!!!
 void xft_font_uncache_glyph(XftFont* font) {
 	if (!font->glyph_memory)
 		return;
