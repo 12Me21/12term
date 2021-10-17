@@ -35,31 +35,34 @@ static void swap_card32(CARD32* data, int u) {
 		data++;
 	}
 }
+static int round_up(int n, int to) {
+	n += to-1;
+	n /= to;
+	n *= to;
+	return n;
+}
 
-/* we sometimes need to convert the glyph bitmap in a FT_GlyphSlot
- * into a different format. For example, we want to convert a
- * FT_PIXEL_MODE_LCD or FT_PIXEL_MODE_LCD_V bitmap into a 32-bit
- * ARGB or ABGR bitmap.
- *
- * this function prepares a target descriptor for this operation.
- *
- * input :: target bitmap descriptor. The function will set its
- *          'width', 'rows' and 'pitch' fields, and only these
- *
- * slot  :: the glyph slot containing the source bitmap. this
- *          function assumes that slot->format == FT_GLYPH_FORMAT_BITMAP
- *
- * mode  :: the requested final rendering mode. supported values are
- *          MONO, NORMAL (i.e. gray), LCD and LCD_V
- *
- * the function returns the size in bytes of the corresponding buffer,
- * it's up to the caller to allocate the corresponding memory block
- * before calling _fill_xrender_bitmap
- *
- * it also returns -1 in case of error (e.g. incompatible arguments,
- * like trying to convert a gray bitmap into a monochrome one)
- */
-static int _compute_xrender_bitmap_size(FT_Bitmap* target, FT_GlyphSlot slot, FT_Render_Mode mode, FT_Matrix* matrix) {
+/* 
+we sometimes need to convert the glyph bitmap in a FT_GlyphSlot
+into a different format. For example, we want to convert a
+FT_PIXEL_MODE_LCD or FT_PIXEL_MODE_LCD_V bitmap into a 32-bit
+ARGB or ABGR bitmap.
+
+this function prepares a target descriptor for this operation.
+
+the function returns the size in bytes of the corresponding buffer,
+it's up to the caller to allocate the corresponding memory block
+before calling _fill_xrender_bitmap
+
+it also returns -1 in case of error (e.g. incompatible arguments,
+like trying to convert a gray bitmap into a monochrome one)
+*/
+static int _compute_xrender_bitmap_size(
+	FT_Bitmap* target, // target bitmap descriptor. The function will set its 'width', 'rows' and 'pitch' fields, and only these
+	FT_GlyphSlot slot, // the glyph slot containing the source bitmap. this function assumes that slot->format == FT_GLYPH_FORMAT_BITMAP
+	FT_Render_Mode mode, // the requested final rendering mode. supported values are MONO, NORMAL (i.e. gray), LCD and LCD_V
+	FT_Matrix* matrix
+) {
 	if (slot->format != FT_GLYPH_FORMAT_BITMAP)
 		return -1;
 	
@@ -68,31 +71,31 @@ static int _compute_xrender_bitmap_size(FT_Bitmap* target, FT_GlyphSlot slot, FT
 	int width = ftbit->width;
 	int height = ftbit->rows;
 	
-	
 	if (matrix && mode == FT_RENDER_MODE_NORMAL) {
 		FT_Vector vector = {
 			.x = ftbit->width,
 			.y = ftbit->rows,
 		};
 		FT_Vector_Transform(&vector, matrix);
-		
 		width = vector.x;
 		height = vector.y;
 	}
-	int pitch = (width+3) & ~3;
+	int pitch;
 	
 	switch (ftbit->pixel_mode) {
 	case FT_PIXEL_MODE_MONO:
 		if (mode == FT_RENDER_MODE_MONO) {
-			pitch = (((width+31) & ~31) >> 3);
+			pitch = round_up(width, 32) / 8;
 			break;
 		}
 		/* fall-through */
 	case FT_PIXEL_MODE_GRAY:
 		if (mode == FT_RENDER_MODE_LCD || mode == FT_RENDER_MODE_LCD_V) {
-			/* each pixel is replicated into a 32-bit ARGB value */
-			pitch = width*4;
+			// each pixel is replicated into a 32-bit ARGB value
+			pitch = width * 4;
+			break;
 		}
+		pitch = round_up(width, 4);
 		break;
 		
 	case FT_PIXEL_MODE_BGRA:
@@ -102,17 +105,17 @@ static int _compute_xrender_bitmap_size(FT_Bitmap* target, FT_GlyphSlot slot, FT
 	case FT_PIXEL_MODE_LCD:
 		if (mode != FT_RENDER_MODE_LCD)
 			return -1;
-		/* horz pixel triplets are packed into 32-bit ARGB values */
+		// horz pixel triplets are packed into 32-bit ARGB values
 		width /= 3;
-		pitch = width*4;
+		pitch = width * 4;
 		break;
 		
 	case FT_PIXEL_MODE_LCD_V:
 		if (mode != FT_RENDER_MODE_LCD_V)
 			return -1;
-		/* vert pixel triplets are packed into 32-bit ARGB values */
+		// vert pixel triplets are packed into 32-bit ARGB values
 		height /= 3;
-		pitch = width*4;
+		pitch = width * 4;
 		break;
 		
 	default: /* unsupported source format */
@@ -221,6 +224,7 @@ static void _scaled_fill_xrender_bitmap(FT_Bitmap* target, FT_Bitmap* source, co
  
   you should call this function after _compute_xrender_bitmap_size
 */
+// gosh how much of this is really necessary though?
 static void _fill_xrender_bitmap(
 	FT_Bitmap* target, // target bitmap descriptor. Note that its 'buffer' pointer must point to memory allocated by the caller
 	FT_GlyphSlot slot, // the glyph slot containing the source bitmap
@@ -240,26 +244,29 @@ static void _fill_xrender_bitmap(
 	int subpixel = (mode==FT_RENDER_MODE_LCD || mode==FT_RENDER_MODE_LCD_V );
 	switch (ftbit->pixel_mode) {
 	case FT_PIXEL_MODE_MONO:
-		if (subpixel) { // convert mono to ARGB32 values
+		// convert mono to ARGB32 values
+		if (subpixel) { 
 			FOR (y, height) {
 				FOR (x, width) {
-					if (srcLine[x>>3] & (0x80 >> (x & 7)))
+					if (srcLine[x/8] & (0x80 >> x%8))
 						((unsigned int*)dstLine)[x] = 0xffffffffU;
 				}
 				srcLine += src_pitch;
 				dstLine += pitch;
 			}
-		} else if (mode == FT_RENDER_MODE_NORMAL) { // convert mono to 8-bit gray
+			// convert mono to 8-bit gray
+		} else if (mode == FT_RENDER_MODE_NORMAL) {
 			FOR (y, height) {
 				FOR (x, width) {
-					if (srcLine[x>>3] & (0x80 >> (x & 7)))
+					if (srcLine[x/8] & (0x80 >> x%8))
 						dstLine[x] = 0xff;
 				}
 				srcLine += src_pitch;
 				dstLine += pitch;
 			}
-		} else { // copy mono to mono
-			int bytes = (width+7) >> 3;
+			// copy mono to mono
+		} else {
+			int bytes = (width+7) / 8;
 			FOR (y, height) {
 				memcpy(dstLine, srcLine, bytes);
 				srcLine += src_pitch;
@@ -268,17 +275,18 @@ static void _fill_xrender_bitmap(
 		}
 		break;
 	case FT_PIXEL_MODE_GRAY:
-		if (subpixel)  /* convert gray to ARGB32 values */ {
+		// convert gray to ARGB32 values
+		if (subpixel) {
 			FOR (y, height) {
 				unsigned int* dst = (unsigned int*)dstLine;
 				FOR (x, width) {
-					unsigned int pix = srcLine[x];
-					dst[x] = pack(pix, pix, pix, pix);
+					dst[x] = pack(srcLine[x], srcLine[x], srcLine[x], srcLine[x]);
 				}
 				srcLine += src_pitch;
 				dstLine += pitch;
 			}
-		} else { // copy gray into gray
+		// copy gray into gray
+		} else {
 			FOR (y, height) {
 				memcpy(dstLine, srcLine, width);
 				srcLine += src_pitch;
@@ -286,7 +294,8 @@ static void _fill_xrender_bitmap(
 			}
 		}
 		break;
-	case FT_PIXEL_MODE_BGRA: /* Preserve BGRA format */
+	case FT_PIXEL_MODE_BGRA: 
+		// Preserve BGRA format
 		FOR (y, height) {
 			memcpy(dstLine, srcLine, width*4);
 			srcLine += src_pitch;
@@ -294,26 +303,22 @@ static void _fill_xrender_bitmap(
 		}
 		break;
 	case FT_PIXEL_MODE_LCD:
+		// convert horizontal RGB into ARGB32
 		if (!bgr) {
-			/* convert horizontal RGB into ARGB32 */
 			FOR (y, height) {
-				unsigned char* src = srcLine;
 				unsigned int* dst = (unsigned int*)dstLine;
 				FOR (x, width) {
-					dst[x] = pack(src[2], src[1], src[0], src[1]); // is this supposed to be 3?
-					src += 3;
+					dst[x] = pack(srcLine[x*3+2], srcLine[x*3+1], srcLine[x*3], srcLine[x*3+1]); // is this supposed to be 3?
 				}
 				srcLine += src_pitch;
 				dstLine += pitch;
 			}
+		// convert horizontal BGR into ARGB32
 		} else {
-			/* convert horizontal BGR into ARGB32 */
 			FOR (y, height) {
-				unsigned char* src = srcLine;
 				unsigned int* dst = (unsigned int*)dstLine;
 				FOR (x, width) {
-					dst[x] = pack(src[0], src[1], src[2], src[1]);
-					src += 3;
+					dst[x] = pack(srcLine[x*3], srcLine[x*3+1], srcLine[x*3+2], srcLine[x*3+1]);
 				}
 				srcLine += src_pitch;
 				dstLine += pitch;
@@ -321,7 +326,7 @@ static void _fill_xrender_bitmap(
 		}
 		break;
 	default:  /* FT_PIXEL_MODE_LCD_V */
-		/* convert vertical RGB into ARGB32 */
+		// convert vertical RGB into ARGB32
 		if (!bgr) {
 			FOR (y, height) {
 				unsigned char* src = srcLine;
@@ -333,6 +338,7 @@ static void _fill_xrender_bitmap(
 				srcLine += 3*src_pitch;
 				dstLine += pitch;
 			}
+		// vertical RGB to ARGB32
 		} else {
 			FOR (y, height) {
 				unsigned char* src = srcLine;
