@@ -10,6 +10,8 @@
 
 #define LEN(var) (sizeof(var)/sizeof((var)[0]))
 
+#define FOR(var, end) for (int var=0; var<end; var++)
+
 static inline int limit(int x, int min, int max) {
 	if (x<min)
 		return min;

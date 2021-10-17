@@ -130,14 +130,6 @@ static int _compute_xrender_bitmap_size(
 	return pitch * height;
 }
 
-static inline int clamp(int x, int min, int max) {
-	if (x<min)
-		return min;
-	if (x>max)
-		return max;
-	return x;
-}
-
 /* this functions converts the glyph bitmap found in a FT_GlyphSlot
  * into a different format while scaling by applying the given matrix
  * (see _compute_xrender_bitmap_size)
@@ -172,14 +164,14 @@ static void _scaled_fill_xrender_bitmap(FT_Bitmap* target, FT_Bitmap* source, co
 	int height = target->rows;
 	int pitch = target->pitch;
 	unsigned char* dst_line = target->buffer;
-	for (int h=height; h>0; h--, dst_line+=pitch) {
-		for (int x=0; x<width; x++) {
+	FOR (y, height) {
+		FOR (x, width) {
 			// compute target pixel location in source space
-			vector.x = (x            * 0x10000) + 0x10000 / 2;
-			vector.y = ((height - h) * 0x10000) + 0x10000 / 2;
+			vector.x = x*0x10000 + 0x10000/2;
+			vector.y = y*0x10000 + 0x10000/2;
 			FT_Vector_Transform(&vector, &inverse);
-			vector.x = clamp(FT_RoundFix(vector.x) / 0x10000, 0, source->width - 1);
-			vector.y = clamp(FT_RoundFix(vector.y) / 0x10000, 0, source->rows  - 1);
+			vector.x = limit(FT_RoundFix(vector.x)/0x10000, 0, source->width - 1);
+			vector.y = limit(FT_RoundFix(vector.y)/0x10000, 0, source->rows  - 1);
 			
 			unsigned char* src;
 			switch (source->pixel_mode) {
@@ -198,10 +190,10 @@ static void _scaled_fill_xrender_bitmap(FT_Bitmap* target, FT_Bitmap* source, co
 			case FT_PIXEL_MODE_BGRA: {
 				int bgra[4] = {0};
 				for (int sample_y = -sampling_height; sample_y < sampling_height + 1; ++sample_y) {
-					int src_y = clamp(vector.y + sample_y, 0, source->rows - 1);
+					int src_y = limit(vector.y + sample_y, 0, source->rows - 1);
 					src = src_buf + (src_y * src_pitch);
 					for (int sample_x = -sampling_width; sample_x < sampling_width + 1; ++sample_x) {
-						int src_x = clamp(vector.x + sample_x, 0, source->width - 1);
+						int src_x = limit(vector.x + sample_x, 0, source->width - 1);
 						for (int i=0; i<4; ++i)
 							bgra[i] += src[src_x*4+i];
 					}
@@ -213,10 +205,9 @@ static void _scaled_fill_xrender_bitmap(FT_Bitmap* target, FT_Bitmap* source, co
 			}
 			}
 		}
+		dst_line+=pitch;
 	}
 }
-
-#define FOR(var, end) for (int var=0; var<end; var++)
 
 /* 
   this functions converts the glyph bitmap found in a FT_GlyphSlot
@@ -266,7 +257,7 @@ static void _fill_xrender_bitmap(
 			}
 			// copy mono to mono
 		} else {
-			int bytes = (width+7) / 8;
+			int bytes = (width+7)/8;
 			FOR (y, height) {
 				memcpy(dstLine, srcLine, bytes);
 				srcLine += src_pitch;
@@ -329,11 +320,9 @@ static void _fill_xrender_bitmap(
 		// convert vertical RGB into ARGB32
 		if (!bgr) {
 			FOR (y, height) {
-				unsigned char* src = srcLine;
 				unsigned int* dst = (unsigned int*)dstLine;
 				FOR (x, width) {
-					dst[x] = pack(src[src_pitch*2], src[src_pitch], src[0], src[src_pitch]); // repeated values here are not a typo, i checked carefully
-					src += 1;
+					dst[x] = pack(srcLine[x+src_pitch*2], srcLine[x+src_pitch], srcLine[x], srcLine[x+src_pitch]); // repeated values here are not a typo, i checked carefully
 				}
 				srcLine += 3*src_pitch;
 				dstLine += pitch;
@@ -341,11 +330,9 @@ static void _fill_xrender_bitmap(
 		// vertical RGB to ARGB32
 		} else {
 			FOR (y, height) {
-				unsigned char* src = srcLine;
 				unsigned int* dst = (unsigned int*)dstLine;
 				FOR (x, width) {
-					dst[x] = pack(src[0], src[src_pitch], src[src_pitch*2], src[src_pitch]);
-					src += 1;
+					dst[x] = pack(srcLine[x], srcLine[x+src_pitch], srcLine[x+src_pitch*2], srcLine[x+src_pitch]);
 				}
 				srcLine += 3*src_pitch;
 				dstLine += pitch;
