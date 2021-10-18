@@ -80,6 +80,23 @@ static void incwrap(int* x, int range) {
 		*x = 0;
 }
 
+// return: a row removed from history, or NULL
+// this row is owned by the caller
+static Row* pop_history(void) {
+	// check length
+	if (history.length<=0)
+		return NULL;
+	// move head backwards
+	if (history.head>0)
+		history.head--;
+	else
+		history.head = history.size-1;
+	// return item
+	history.length--;
+	// we don't need to set history.rows[history.head] to NULL, i think
+	return history.rows[history.head];
+}
+
 // idea: scroll lock support
 static void push_history(int y) {
 	if (y<0 || y>=T.height)
@@ -101,6 +118,9 @@ static void push_history(int y) {
 		T.scroll++;
 }
 
+// change the number of cells in a Row
+// if *row is NULL, it will be allocated (like realloc)
+// the return value is the same thing assigned to *row
 Row* resize_row(Row** row, int size) {
 	*row = realloc(*row, sizeof(Row) + sizeof(Cell)*size);
 	(*row)->wrap = false;
@@ -136,41 +156,58 @@ void term_resize(int width, int height) {
 				clear_row(*row, old_width, true);
 		}
 	}
-	// height decrease
+	
+	int diff = T.height-height;
+	//// height decrease ////
 	if (height < T.height) {
-		int diff = T.height-height;
-		// alt buffer: free rows at bottom
-		for (int y=height; y<T.height; y++)
-			free(T.buffers[1].rows[y]);
-		// main buffer: put lines into history and shift the rest up
-		for (int y=0; y<diff; y++)
+		int y = 0;
+		// upper rows
+		for (; y<diff; y++) {
+			//print("dr: removing row %d\n", y);
+			// main buffer: put lines into history
 			push_history(y);
-		for (int y=0; y<height; y++)
-			T.buffers[0].rows[y] = T.buffers[0].rows[y+diff];
+			// alt buffer: free
+			free(T.buffers[1].rows[y]);
+		}
+		// lower rows: shift upwards
+		for (; y<T.height; y++) {
+			//print("dr: moving row %d to %d\n", y, y-diff);
+			T.buffers[0].rows[y-diff] = T.buffers[0].rows[y];
+			T.buffers[1].rows[y-diff] = T.buffers[1].rows[y];
+		}
 		// realloc lists of lines
 		T.height = height;
 		REALLOC(T.buffers[1].rows, height);
 		REALLOC(T.buffers[0].rows, height);
 		// adjust cursor position
 		T.c.y = limit(T.c.y-diff, 0, T.height-1);
+		
 	} else if (height > T.height) { // height INCREASE
 		// realloc lists of lines
-		int old_height = T.height;
 		REALLOC(T.buffers[1].rows, height);
 		REALLOC(T.buffers[0].rows, height);
 		T.height = height;
-		// alt buffer: add rows at bottom
-		for (int y=old_height; y<T.height; y++) {
+		int y = T.height-1;
+		// lower rows: shift downwards
+		for (; y >= -diff; y--) {
+			T.buffers[0].rows[y] = T.buffers[0].rows[y+diff];
+			T.buffers[1].rows[y] = T.buffers[1].rows[y+diff];
+		}
+		// move cursor down (remember `diff` will be negative)
+		T.c.y -= diff;
+		/// upper rows:
+		for (; y>=0; y--) {
+			// main buffer: move rows out of history
+			Row* r = pop_history();
+			T.buffers[0].rows[y] = r;
+			resize_row(&T.buffers[0].rows[y], T.width);
+			// if row was not taken from history, we need to clear it
+			if (!r)
+				clear_row(T.buffers[0].rows[y], 0, true);
+			// alt buffer: insert blank row
 			T.buffers[1].rows[y] = NULL;
 			resize_row(&T.buffers[1].rows[y], T.width);
 			clear_row(T.buffers[1].rows[y], 0, true);
-		}
-		// main buffer: also add rows at bottom
-		// todo: option to move lines out of history instead?
-		for (int y=old_height; y<T.height; y++) {
-			T.buffers[0].rows[y] = NULL;
-			resize_row(&T.buffers[0].rows[y], T.width);
-			clear_row(T.buffers[0].rows[y], 0, true);
 		}
 	}
 	// todo: how do we handle the scrolling regions?
@@ -190,6 +227,7 @@ void set_cursor_style(int n) {
 }
 
 void clear_region(int x1, int y1, int x2, int y2) {
+	print("clear region: [%d,%d]-(%d,%d)\n",x1,y1,x2,y2);
 	// todo: warn about this
 	if (x1<0)
 		x1 = 0;
@@ -343,6 +381,7 @@ static void scroll_up_internal(int amount, bool bce) {
 		for (int y=y1; y<y1+amount; y++) {
 		// if we are on the main screen, and the scroll region starts at the top of the screen, we add the lines to the history list.
 			push_history(y);
+			// wait but don't we need to clear this?  memory?
 			T.current->rows[y] = malloc(sizeof(Row) + sizeof(Cell)*T.width);
 		}
 	shift_rows(y1, y2, -amount, bce);
