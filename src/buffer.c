@@ -350,10 +350,8 @@ static void scroll_up_internal(int amount, bool bce) {
 
 void cursor_to(int x, int y) {
 	// todo: is it ok to move the cursor to the offscreen column?
-	x = limit(x, 0, T.width-1);
-	y = limit(y, 0, T.height-1);
-	T.c.x = x;
-	T.c.y = y;
+	T.c.x = limit(x, 0, T.width-1);
+	T.c.y = limit(y, 0, T.height-1);
 }
 
 // these scroll + move the cursor with the scrolled text
@@ -465,7 +463,7 @@ static const Char DEC_GRAPHICS_CHARSET[128] = {
 
 static int char_width(Char c) {
 	int width;
-	if (c<=128) { // assume ascii chars are never wide, to avoid calling wcwidth all the time
+	if (c<128) { // assume ascii chars are never wide, to avoid calling wcwidth all the time // wait this includes control chars though? todo: dont print those unless we already filter them
 		width = 1;
 	} else {
 		width = wcwidth(c);
@@ -686,6 +684,7 @@ void save_cursor(void) {
 
 void restore_cursor(void) {
 	T.c = T.saved_cursor;
+	// we limit here in case the window was resized between when the cursor was saved and now
 	T.c.x = limit(T.c.x, 0, T.width); //note: not width-1!
 	T.c.y = limit(T.c.y, 0, T.height-1);
 }
@@ -698,7 +697,7 @@ void set_scroll_region(int y1, int y2) {
 	y2 = limit(y2, 0, T.height);
 	T.scroll_top = y1;
 	T.scroll_bottom = y2;
-	cursor_to(0, 0); // where is this supposed to move the cursor?
+	cursor_to(0, 0); // todo: where is this supposed to move the cursor?
 }
 
 void set_scrollback(int pos) {

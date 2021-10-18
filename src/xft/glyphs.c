@@ -364,8 +364,8 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 		if (transform) {
 			// calculate the true width by transforming all four corners.
 			left = right = top = bottom = 0;
-			for (int xc = 0; xc <= 1; xc++) {
-				for (int yc = 0; yc <= 1; yc++) {
+			FOR (xc, 2) {
+				FOR (yc, 2) {
 					vector.x = glyphslot->metrics.horiBearingX + xc * glyphslot->metrics.width;
 					vector.y = glyphslot->metrics.horiBearingY - yc * glyphslot->metrics.height;
 					FT_Vector_Transform(&vector, &font->info.matrix);
@@ -389,15 +389,15 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 			top = CEIL(top);
 			// lots of rounding going on here... kinda sus
 		} else {
-			left = FLOOR( glyphslot->metrics.horiBearingX );
-			right = CEIL( glyphslot->metrics.horiBearingX + glyphslot->metrics.width );
+			left = FLOOR(glyphslot->metrics.horiBearingX);
+			right = CEIL(glyphslot->metrics.horiBearingX + glyphslot->metrics.width);
 			
-			top = CEIL( glyphslot->metrics.horiBearingY );
+			top = CEIL(glyphslot->metrics.horiBearingY);
 			bottom = FLOOR( glyphslot->metrics.horiBearingY - glyphslot->metrics.height );
 		}
 		
 		int width = TRUNC(right - left);
-		int height = TRUNC( top - bottom );
+		int height = TRUNC(top - bottom);
 		
 		// Clip charcell glyphs to the bounding box
 		// XXX transformed?
@@ -405,8 +405,7 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 			if (font->info.load_flags & FT_LOAD_VERTICAL_LAYOUT) {
 				if (TRUNC(bottom) > font->max_advance_width) {
 					int adjust = bottom - (font->max_advance_width << 6);
-					if (adjust > top)
-						adjust = top;
+					if (adjust > top) adjust = top;
 					top -= adjust;
 					bottom -= adjust;
 					height = font->max_advance_width;
@@ -414,8 +413,7 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 			} else {
 				if (TRUNC(right) > font->max_advance_width) {
 					int adjust = right - (font->max_advance_width << 6);
-					if (adjust > left)
-						adjust = left;
+					if (adjust > left) adjust = left;
 					left -= adjust;
 					right -= adjust;
 					width = font->max_advance_width;
@@ -435,6 +433,7 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 		
 		if (font->info.spacing >= FC_MONO) {
 			if (transform) {
+				// do we need all this
 				if (font->info.load_flags & FT_LOAD_VERTICAL_LAYOUT) {
 					vector.x = 0;
 					vector.y = -face->size->metrics.max_advance;

@@ -87,7 +87,7 @@ typedef struct Term {
 	Cursor saved_cursor;
 	bool show_cursor;
 	int cursor_shape;
-	bool cursor_blink;
+	bool cursor_blink; // unused, probably will never implement this because it sucks lol
 	
 	RGBColor cursor_color;
 	RGBColor background, foreground; // these can maybe be accessed as palette[-1] and [-2] but don't try it lol
