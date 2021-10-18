@@ -233,8 +233,9 @@ static void _fill_xrender_bitmap(
 	const int pitch = target->pitch;
 	unsigned char*	dstLine = target->buffer;
 	const int subpixel = (mode==FT_RENDER_MODE_LCD || mode==FT_RENDER_MODE_LCD_V );
+	// the compiler should optimize this by moving the for loop inside the switch block
 	FOR (y, height) {
-		unsigned int* dst = (unsigned int*)dstLine;
+		unsigned int* const dst = (unsigned int*)dstLine;
 		switch (ftbit->pixel_mode) {
 		case FT_PIXEL_MODE_MONO:
 			// convert mono to ARGB32 values
@@ -270,31 +271,22 @@ static void _fill_xrender_bitmap(
 			memcpy(dstLine, srcLine, width*4);
 			break;
 		case FT_PIXEL_MODE_LCD:
+			FOR (x, width) {
 			// convert horizontal RGB into ARGB32
-			if (!bgr) {
-				FOR (x, width) {
+				if (!bgr)
 					dst[x] = pack(srcLine[x*3+2], srcLine[x*3+1], srcLine[x*3], srcLine[x*3+1]); // is this supposed to be 3?
-				}
-				// convert horizontal BGR into ARGB32
-			} else {
-				FOR (x, width) {
+				else
 					dst[x] = pack(srcLine[x*3], srcLine[x*3+1], srcLine[x*3+2], srcLine[x*3+1]);
-				}
 			}
 			break;
-		default:  /* FT_PIXEL_MODE_LCD_V */
-			// convert vertical RGB into ARGB32
-			if (!bgr) {
-				FOR (x, width) {
+		case FT_PIXEL_MODE_LCD_V:
+			FOR (x, width) {
+				if (!bgr)
 					dst[x] = pack(srcLine[x+src_pitch*2], srcLine[x+src_pitch], srcLine[x], srcLine[x+src_pitch]); // repeated values here are not a typo, i checked carefully
-				}
-				// vertical RGB to ARGB32
-			} else {
-				FOR (x, width) {
+				else
 					dst[x] = pack(srcLine[x], srcLine[x+src_pitch], srcLine[x+src_pitch*2], srcLine[x+src_pitch]);
-				}
 			}
-			srcLine += (3-1)*src_pitch;
+			srcLine += (3-1)*src_pitch; // adjust for vertical pixels
 		}
 		srcLine += src_pitch;
 		dstLine += pitch;
