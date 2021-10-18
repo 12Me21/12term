@@ -97,11 +97,11 @@ static int num_files(void) {
 
 static XftFtFile* nth_file(int n) {
 	int count = 0;
-	XftFtFile* f;
+	XftFtFile* f = NULL;
 	for (f=xft_files; f; f=f->next)
 		if (f->face && !f->lock)
 			if (count++ == n)
-				break;
+				return f;
 	return f;
 }
 
@@ -497,18 +497,14 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 		num_unicode = FcCharSetCount(charset);
 		hash_value = hash_size(num_unicode);
 		rehash_value = hash_value-2;
-	} else {
-		num_unicode = 0;
-		hash_value = 0;
-		rehash_value = 0;
 	}
 	
 	// Sometimes the glyphs are numbered 1..n, other times 0..n-1,
 	// accept either numbering scheme by making room in the table
 	int num_glyphs = face->num_glyphs + 1;
-	int alloc_size = (sizeof(XftFont) +
-	                  num_glyphs * sizeof(XftGlyph*) +
-	                  hash_value * sizeof(XftUcsHash));
+	int alloc_size = sizeof(XftFont) +
+	                 num_glyphs * sizeof(XftGlyph*) +
+	                 hash_value * sizeof(XftUcsHash);
 	
 	XftFont* font = XftMalloc(XFT_MEM_FONT, alloc_size);
 	if (!font)
@@ -557,7 +553,7 @@ XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 			FT_Vector vector;
 			vector.x = face->size->metrics.max_advance;
 			vector.y = 0;
-			FT_Vector_Transform (&vector, &fi->matrix);
+			FT_Vector_Transform(&vector, &fi->matrix);
 			font->max_advance_width = vector.x >> 6;
 		} else
 			font->max_advance_width = face->size->metrics.max_advance >> 6;
@@ -636,7 +632,7 @@ static void XftFontDestroy(XftFont* font) {
 	if (font->glyphset)
 		XRenderFreeGlyphSet(W.d, font->glyphset);
 	/* Free the glyphs */
-	for (int i=0; i<font->num_glyphs; i++) {
+	FOR (i, font->num_glyphs) {
 		XftGlyph* xftg = font->glyphs[i];
 		free(xftg);
 	}

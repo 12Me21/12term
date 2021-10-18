@@ -84,7 +84,8 @@ void XftGlyphExtents(XftFont* font, const FT_UInt* glyphs, int nglyphs, XGlyphIn
 
 void XftTextExtents32(XftFont* font, const FcChar32* string, int len, XGlyphInfo* extents) {
 	FT_UInt glyphs[len];
-	for (int i=0; i<len; i++)
+	FOR (i, len) {
 		glyphs[i] = XftCharIndex(font, string[i]);
+	}
 	XftGlyphExtents(font, glyphs, len, extents);
 }

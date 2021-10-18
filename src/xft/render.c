@@ -7,7 +7,7 @@ Picture XftDrawSrcPicture(const XRenderColor color) {
 		return pict =XRenderCreateSolidFill(W.d, color);*/
 	
 	// See if there's one already available
-	for (int i=0; i<XFT_NUM_SOLID_COLOR; i++) {
+	FOR (i, XFT_NUM_SOLID_COLOR) {
 		if (info.colors[i].pict && info.colors[i].screen == W.scr && !memcmp(&color, &info.colors[i].color, sizeof(XRenderColor)))
 			return info.colors[i].pict;
 	}

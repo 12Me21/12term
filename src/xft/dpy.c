@@ -19,7 +19,7 @@ void XftDisplayInfoInit(void) {
 			print("No Render format for default visual\n");
 		print("XftDisplayInfoGet initialized");
 	}
-	for (int i=0; i<XFT_NUM_SOLID_COLOR; i++) {
+	FOR (i, XFT_NUM_SOLID_COLOR) {
 		info.colors[i].screen = -1;
 		info.colors[i].pict = 0;
 	}

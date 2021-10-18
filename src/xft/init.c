@@ -24,11 +24,12 @@ void XftMemReport(void) {
 	print("Xft Memory Usage:\n");
 	print("\t   Which       Alloc           Free\n");
 	print("\t           count   bytes   count   bytes\n");
-	for (int i = 0; i < XFT_MEM_NUM; i++)
+	FOR (i, XFT_MEM_NUM) {
 		print("\t%8.8s%8d%8d%8d%8d\n",
 		      XftInUse[i].name,
 		      XftInUse[i].alloc_count, XftInUse[i].alloc_mem,
 		      XftInUse[i].free_count, XftInUse[i].free_mem);
+	}
 	print("\t%8.8s%8d%8d%8d%8d\n",
 	      "Total",
 	      XftAllocCount, XftAllocMem,

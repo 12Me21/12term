@@ -192,13 +192,15 @@ static void _scaled_fill_xrender_bitmap(
 					src = src_buf + (src_y * src_pitch);
 					for (int sample_x = -sampling_width; sample_x < sampling_width + 1; ++sample_x) {
 						int src_x = limit(vector.x + sample_x, 0, source->width - 1);
-						for (int i=0; i<4; ++i)
+						FOR (i, 4) {
 							bgra[i] += src[src_x*4+i];
+						}
 					}
 				}
 				
-				for (int i=0; i<4; ++i)
+				FOR (i, 4) {
 					dst_line[4*x+i] = bgra[i]/sample_count;
+				}
 				break;
 			}
 			}
@@ -255,9 +257,8 @@ static void _fill_xrender_bitmap(
 			}
 			// copy mono to mono
 		} else {
-			int bytes = (width+7)/8;
 			FOR (y, height) {
-				memcpy(dstLine, srcLine, bytes);
+				memcpy(dstLine, srcLine, (width+7)/8);
 				srcLine += src_pitch;
 				dstLine += pitch;
 			}
@@ -640,7 +641,7 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 void XftFontUnloadGlyphs(XftFont* font, const FT_UInt* glyphs, int nglyph) {
 	Glyph	glyphBuf[nglyph];
 	int nused = 0;
-	for (int i=0; i<nglyph; i++) {
+	FOR (i, nglyph) {
 		XftGlyph* xftg = font->glyphs[glyphs[i]];
 		if (!xftg)
 			continue;
