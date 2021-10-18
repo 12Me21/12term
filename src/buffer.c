@@ -81,7 +81,6 @@ static void incwrap(int* x, int range) {
 }
 
 // idea: scroll lock support
-// todo: add a limit to the number of pushed lines, and then turn this into a ring buffer.
 static void push_history(int y) {
 	if (y<0 || y>=T.height)
 		return;
@@ -92,7 +91,8 @@ static void push_history(int y) {
 		history.length++;
 	}
 	// move row into history
-	history.rows[history.head] = T.buffers[0].rows[y];
+	Row* new = T.buffers[0].rows[y];
+	history.rows[history.head] = new;
 	T.buffers[0].rows[y] = NULL; // set to null so it doesn't get freed
 	// move head forward to next slot
 	incwrap(&history.head, history.size);
