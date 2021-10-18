@@ -220,123 +220,84 @@ static void _fill_xrender_bitmap(
 	FT_Bitmap* target, // target bitmap descriptor. Note that its 'buffer' pointer must point to memory allocated by the caller
 	FT_GlyphSlot slot, // the glyph slot containing the source bitmap
 	FT_Render_Mode mode, // the requested final rendering mode
-	int bgr // boolean, set if BGR or VBGR pixel ordering is needed
+	const int bgr // boolean, set if BGR or VBGR pixel ordering is needed
 ) {
-	FT_Bitmap* ftbit = &slot->bitmap;
-	int src_pitch = ftbit->pitch;
+	const FT_Bitmap* ftbit = &slot->bitmap;
+	const int src_pitch = ftbit->pitch;
 	unsigned char*	srcLine = ftbit->buffer;
 	if (src_pitch < 0)
 		srcLine -= src_pitch*(ftbit->rows-1);
 	
-	int width = target->width;
-	int height = target->rows;
-	int pitch = target->pitch;
+	const int width = target->width;
+	const int height = target->rows;
+	const int pitch = target->pitch;
 	unsigned char*	dstLine = target->buffer;
-	int subpixel = (mode==FT_RENDER_MODE_LCD || mode==FT_RENDER_MODE_LCD_V );
-	switch (ftbit->pixel_mode) {
-	case FT_PIXEL_MODE_MONO:
-		// convert mono to ARGB32 values
-		if (subpixel) { 
-			FOR (y, height) {
+	const int subpixel = (mode==FT_RENDER_MODE_LCD || mode==FT_RENDER_MODE_LCD_V );
+	FOR (y, height) {
+		unsigned int* dst = (unsigned int*)dstLine;
+		switch (ftbit->pixel_mode) {
+		case FT_PIXEL_MODE_MONO:
+			// convert mono to ARGB32 values
+			if (subpixel) { 
 				FOR (x, width) {
 					if (srcLine[x/8] & (0x80 >> x%8))
-						((unsigned int*)dstLine)[x] = 0xffffffffU;
+						dst[x] = 0xffffffffU;
 				}
-				srcLine += src_pitch;
-				dstLine += pitch;
-			}
-			// convert mono to 8-bit gray
-		} else if (mode == FT_RENDER_MODE_NORMAL) {
-			FOR (y, height) {
+				// convert mono to 8-bit gray
+			} else if (mode == FT_RENDER_MODE_NORMAL) {
 				FOR (x, width) {
 					if (srcLine[x/8] & (0x80 >> x%8))
 						dstLine[x] = 0xff;
 				}
-				srcLine += src_pitch;
-				dstLine += pitch;
-			}
-			// copy mono to mono
-		} else {
-			FOR (y, height) {
+				// copy mono to mono
+			} else {
 				memcpy(dstLine, srcLine, (width+7)/8);
-				srcLine += src_pitch;
-				dstLine += pitch;
 			}
-		}
-		break;
-	case FT_PIXEL_MODE_GRAY:
-		// convert gray to ARGB32 values
-		if (subpixel) {
-			FOR (y, height) {
-				unsigned int* dst = (unsigned int*)dstLine;
+			break;
+		case FT_PIXEL_MODE_GRAY:
+			// convert gray to ARGB32 values
+			if (subpixel) {
 				FOR (x, width) {
 					dst[x] = pack(srcLine[x], srcLine[x], srcLine[x], srcLine[x]);
 				}
-				srcLine += src_pitch;
-				dstLine += pitch;
-			}
-		// copy gray into gray
-		} else {
-			FOR (y, height) {
+				// copy gray into gray
+			} else {
 				memcpy(dstLine, srcLine, width);
-				srcLine += src_pitch;
-				dstLine += pitch;
 			}
-		}
-		break;
-	case FT_PIXEL_MODE_BGRA: 
-		// Preserve BGRA format
-		FOR (y, height) {
+			break;
+		case FT_PIXEL_MODE_BGRA: 
+			// Preserve BGRA format
 			memcpy(dstLine, srcLine, width*4);
-			srcLine += src_pitch;
-			dstLine += pitch;
-		}
-		break;
-	case FT_PIXEL_MODE_LCD:
-		// convert horizontal RGB into ARGB32
-		if (!bgr) {
-			FOR (y, height) {
-				unsigned int* dst = (unsigned int*)dstLine;
+			break;
+		case FT_PIXEL_MODE_LCD:
+			// convert horizontal RGB into ARGB32
+			if (!bgr) {
 				FOR (x, width) {
 					dst[x] = pack(srcLine[x*3+2], srcLine[x*3+1], srcLine[x*3], srcLine[x*3+1]); // is this supposed to be 3?
 				}
-				srcLine += src_pitch;
-				dstLine += pitch;
-			}
-		// convert horizontal BGR into ARGB32
-		} else {
-			FOR (y, height) {
-				unsigned int* dst = (unsigned int*)dstLine;
+				// convert horizontal BGR into ARGB32
+			} else {
 				FOR (x, width) {
 					dst[x] = pack(srcLine[x*3], srcLine[x*3+1], srcLine[x*3+2], srcLine[x*3+1]);
 				}
-				srcLine += src_pitch;
-				dstLine += pitch;
 			}
-		}
-		break;
-	default:  /* FT_PIXEL_MODE_LCD_V */
-		// convert vertical RGB into ARGB32
-		if (!bgr) {
-			FOR (y, height) {
-				unsigned int* dst = (unsigned int*)dstLine;
+			break;
+		default:  /* FT_PIXEL_MODE_LCD_V */
+			// convert vertical RGB into ARGB32
+			if (!bgr) {
 				FOR (x, width) {
 					dst[x] = pack(srcLine[x+src_pitch*2], srcLine[x+src_pitch], srcLine[x], srcLine[x+src_pitch]); // repeated values here are not a typo, i checked carefully
 				}
-				srcLine += 3*src_pitch;
-				dstLine += pitch;
-			}
-		// vertical RGB to ARGB32
-		} else {
-			FOR (y, height) {
-				unsigned int* dst = (unsigned int*)dstLine;
+				// vertical RGB to ARGB32
+			} else {
 				FOR (x, width) {
 					dst[x] = pack(srcLine[x], srcLine[x+src_pitch], srcLine[x+src_pitch*2], srcLine[x+src_pitch]);
 				}
-				srcLine += 3*src_pitch;
-				dstLine += pitch;
 			}
+			srcLine += (3-1)*src_pitch;
 		}
+		srcLine += src_pitch;
+		dstLine += pitch;
 	}
 }
 
