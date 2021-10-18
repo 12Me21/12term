@@ -114,7 +114,7 @@ void draw_resize(int width, int height, bool charsize) {
 		rows[y].redraw = true;
 	}
 	
-	resize_row(&blank_row, T.width);
+	resize_row(&blank_row, T.width, 0); // 0 should be old width but whatever
 	FOR (x, T.width) {
 		blank_row->cells[x] = (Cell){.attrs={.background={.i=-2}}};
 	}

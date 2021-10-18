@@ -121,29 +121,31 @@ static void push_history(int y) {
 // change the number of cells in a Row
 // if *row is NULL, it will be allocated (like realloc)
 // the return value is the same thing assigned to *row
-Row* resize_row(Row** row, int size) {
+Row* resize_row(Row** row, int size, int old_size) {
 	*row = realloc(*row, sizeof(Row) + sizeof(Cell)*size);
+	if (size > old_size)
+		clear_row(*row, old_size, true);
 	(*row)->wrap = false;
 	(*row)->cont = false;
 	return *row;
 }
 
+// this sets T.width and T.height
+// please do NOT change those variables manually
 void term_resize(int width, int height) {
 	if (width != T.width) {
 		int old_width = T.width;
 		T.width = width;
 		// resize existing rows
 		// todo: option to re-wrap text?
-		for (int i=0; i<2; i++) {
-			for (int y=0; y<T.height; y++) {
-				resize_row(&T.buffers[i].rows[y], T.width);
-				if (T.width > old_width)
-					clear_row(T.buffers[i].rows[y], old_width, true);
+		for (int scr=0; scr <= 1; scr++) {
+			FOR (y, T.height) {
+				resize_row(&T.buffers[scr].rows[y], T.width, old_width);
 			}
 		}
 		// update tab stops
 		REALLOC(T.tabs, T.width+1);
-		for (int x=0; x<T.width; x++) {
+		FOR (x, T.width) {
 			T.tabs[x] = (x%8 == 0);
 		}
 		// update cursor position
@@ -151,19 +153,17 @@ void term_resize(int width, int height) {
 		// resize history rows
 		for (int i=1; i<=history.length; i++) {
 			Row** row = &history.rows[(history.head-i+history.size) % history.size];
-			resize_row(row, T.width);
-			if (T.width > old_width)
-				clear_row(*row, old_width, true);
+			resize_row(row, T.width, old_width);
 		}
 	}
 	
-	int diff = T.height-height;
+	int diff = height-T.height;
 	//// height decrease ////
-	if (height < T.height) {
+	if (height < T.height) { // diff < 0
+		// iterate from top to bottom
 		int y = 0;
 		// upper rows
-		for (; y<diff; y++) {
-			//print("dr: removing row %d\n", y);
+		for (; y < -diff; y++) {
 			// main buffer: put lines into history
 			push_history(y);
 			// alt buffer: free
@@ -171,51 +171,48 @@ void term_resize(int width, int height) {
 		}
 		// lower rows: shift upwards
 		for (; y<T.height; y++) {
-			//print("dr: moving row %d to %d\n", y, y-diff);
-			T.buffers[0].rows[y-diff] = T.buffers[0].rows[y];
-			T.buffers[1].rows[y-diff] = T.buffers[1].rows[y];
+			T.buffers[0].rows[y+diff] = T.buffers[0].rows[y];
+			T.buffers[1].rows[y+diff] = T.buffers[1].rows[y];
 		}
 		// realloc lists of lines
 		T.height = height;
 		REALLOC(T.buffers[1].rows, height);
 		REALLOC(T.buffers[0].rows, height);
 		// adjust cursor position
-		T.c.y = limit(T.c.y-diff, 0, T.height-1);
+		T.c.y = limit(T.c.y+diff, 0, T.height-1);
 		
-	} else if (height > T.height) { // height INCREASE
+	} else if (height > T.height) { // height INCREASE (diff > 0)
 		// realloc lists of lines
 		REALLOC(T.buffers[1].rows, height);
 		REALLOC(T.buffers[0].rows, height);
 		T.height = height;
+		// iterate from bottom to top
 		int y = T.height-1;
 		// lower rows: shift downwards
-		for (; y >= -diff; y--) {
-			T.buffers[0].rows[y] = T.buffers[0].rows[y+diff];
-			T.buffers[1].rows[y] = T.buffers[1].rows[y+diff];
+		for (; y >= diff; y--) {
+			T.buffers[0].rows[y] = T.buffers[0].rows[y-diff];
+			T.buffers[1].rows[y] = T.buffers[1].rows[y-diff];
 		}
-		// move cursor down (remember `diff` will be negative)
-		T.c.y -= diff;
 		/// upper rows:
 		for (; y>=0; y--) {
 			// main buffer: move rows out of history
 			Row* r = pop_history();
 			T.buffers[0].rows[y] = r;
-			resize_row(&T.buffers[0].rows[y], T.width);
-			// if row was not taken from history, we need to clear it
-			if (!r)
-				clear_row(T.buffers[0].rows[y], 0, true);
+			if (!r) // history empty; blank row
+				resize_row(&T.buffers[0].rows[y], T.width, 0);
+			
 			// alt buffer: insert blank row
 			T.buffers[1].rows[y] = NULL;
-			resize_row(&T.buffers[1].rows[y], T.width);
-			clear_row(T.buffers[1].rows[y], 0, true);
+			resize_row(&T.buffers[1].rows[y], T.width, 0);
 		}
+		// adjust cursor down
+		T.c.y += diff;
 	}
 	// todo: how do we handle the scrolling regions?
 	T.scroll_top = 0;
 	T.scroll_bottom = T.height;
 }
 
-// todo: actually use this
 void set_cursor_style(int n) {
 	if (n==0)
 		n = settings.cursorShape;
@@ -258,7 +255,7 @@ void clear_region(int x1, int y1, int x2, int y2) {
 	}
 }
 
-// todo: confirm which things are reset by this
+// todo: confirm which things are supposed to be reset by this
 void full_reset(void) {
 	for (int i=0; i<2; i++) {
 		T.current = &T.buffers[i];

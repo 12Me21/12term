@@ -52,3 +52,12 @@ For programs which rely on cursor position (shell prompts, text editors, 'graphi
 
 For this reason, most programs use the same `wcwidth` library function to look up character widths.
 However, some people have decided that it is more "correct" to include their own hardcoded table, which causes rendering to fail on any terminal which doesn't have the exact same version of this table.
+
+# Resizing
+
+When the window is resized, existing text is "anchored" at the lower left corner. ("southwest resize gravity")
+This behavior is taken from xterm, and I think it makes sense: your cursor is usually near the bottom of the screen (except after clearing it), and this preserves that.
+maybe I'll add an option for northwest gravity if anyone wants it
+
+Currently when changing the window's width, lines will be truncated, or it'll add empty space on the right side.
+I'll add support for re-wrapping eventually.

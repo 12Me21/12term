@@ -121,6 +121,6 @@ void set_scrollback(int pos);
 bool move_scrollback(int amount);
 void dirty_all(void);
 Row* get_row(int y);
-Row* resize_row(Row** row, int size);
+Row* resize_row(Row** row, int size, int old_size);
 
 extern Term T;
