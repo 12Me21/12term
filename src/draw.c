@@ -32,9 +32,10 @@ static Row* blank_row = NULL;
 
 // cursor
 static XftDraw cursor_draw = {0, 0};
-static int cursor_width;
-static int cursor_y;
+static int cursor_width; // in cells
+static int cursor_y; // cells
 
+// convert a Color (indexed or rgb) into XRenderColor (rgb)
 static XRenderColor make_color(Color c) {
 	RGBColor rgb;
 	if (c.truecolor)
@@ -93,7 +94,7 @@ static void draw_destroy(XftDraw draw) {
 static int drawn_width = -1, drawn_height = -1;
 void draw_resize(int width, int height, bool charsize) {
 	if (rows) {
-		for (int i=0; i<drawn_height; i++) {
+		FOR (i, drawn_height) {
 			FREE(rows[i].glyphs);
 			FREE(rows[i].cells);
 			draw_destroy(rows[i].draw);
@@ -102,10 +103,10 @@ void draw_resize(int width, int height, bool charsize) {
 	drawn_height = height;
 	drawn_width = width;
 	REALLOC(rows, height);
-	for (int y=0; y<T.height; y++) {
+	FOR (y, T.height) {
 		ALLOC(rows[y].glyphs, T.width);
 		ALLOC(rows[y].cells, T.width);
-		for (int x=0; x<T.width; x++) {
+		FOR (x, T.width) {
 			rows[y].glyphs[x] = (Glyph){0}; // mreh
 			rows[y].cells[x] = (Cell){0}; //ehnnnn
 		}
@@ -114,8 +115,9 @@ void draw_resize(int width, int height, bool charsize) {
 	}
 	
 	resize_row(&blank_row, T.width);
-	for (int x=0; x<T.width; x++)
+	FOR (x, T.width) {
 		blank_row->cells[x] = (Cell){.attrs={.background={.i=-2}}};
+	}
 	
 	// char size changing
 	if (charsize) {
@@ -197,7 +199,7 @@ static void rotate(int amount, int length, DrawRow start[length]) {
 	int a=0;
 	int b=0;
 	
-	for (int i=0; i<length; i++) {
+	FOR (i, length) {
 		b = (b+amount) % length;
 		if (b==a)
 			b = ++a;
@@ -265,14 +267,15 @@ static bool draw_row(int y, Row* row) {
 	Glyph* specs = rows[y].glyphs;
 	cells_to_glyphs(T.width, row->cells, specs, true);
 	
-	for (int i=0; i<T.width; i++) {
+	FOR (i, T.width) {
 		if (specs[i].font)
 			draw_glyph(rows[y].draw, W.border+i*W.cw, 0, specs[i], row->cells[i].attrs.color, row->cells[i].wide==1 ? 2 : 1);
 	}
 	
 	// draw strikethrough and underlines
-	for (int x=0; x<T.width; x++)
+	FOR (x, T.width) {
 		draw_char_overlays(rows[y].draw, W.border+x*W.cw, row->cells[x]);
+	}
 	
 	return true;
 }
@@ -287,7 +290,7 @@ static void draw_put(XftDraw draw, Px x, Px y, Px w, Px h, Px dx, Px dy) {
 	XCopyArea(W.d, draw.drawable, W.win, W.gc, x, y, w, h, dx, dy);
 }
 
-void copy_cursor_part(Px x, Px y, Px w, Px h, int cx, int cy) {
+static void copy_cursor_part(Px x, Px y, Px w, Px h, int cx, int cy) {
 	draw_put(cursor_draw, x, y, w, h, W.border+cx*W.cw+x, W.border+W.ch*cy+y);
 }
 
@@ -325,13 +328,15 @@ static void paint_row(int y) {
 void draw(bool repaint_all) {
 	time_log(NULL);
 	print("dirty rows: [");
+	// wait how does this work with scrolling?
+	// and yeah we don't need this every time
 	draw_cursor(T.c.x, T.c.y); // todo: do we need this every time?
 	if (cursor_y>=0 && cursor_y<T.height)
 		paint_row(cursor_y); // todo: not ideal ehh
 	if (repaint_all) {
 		// todo: erase the top/bottom borders here?
 	}
-	for (int y=0; y<T.height; y++) {
+	FOR (y, T.height) {
 		int ry = row_displayed_at(y);
 		Row* row = get_row(ry);
 		if (!row)
@@ -361,10 +366,7 @@ void dirty_cursor(void) {
 
 // call this when changing palette etc.
 void dirty_all(void) {
-	for (int y=0; y<T.height; y++)
+	FOR (y, T.height) {
 		rows[y].redraw = true;
+	}
 }
-
-// todo: display characters CENTERED within the cell rather than aligned to the left side.
-
-
