@@ -93,15 +93,13 @@ static int _compute_xrender_bitmap_size(
 		if (mode == FT_RENDER_MODE_LCD || mode == FT_RENDER_MODE_LCD_V) {
 			// each pixel is replicated into a 32-bit ARGB value
 			pitch = width * 4;
-			break;
+		} else {
+			pitch = round_up(width, 4);
 		}
-		pitch = round_up(width, 4);
 		break;
-		
 	case FT_PIXEL_MODE_BGRA:
 		pitch = width * 4;
 		break;
-		
 	case FT_PIXEL_MODE_LCD:
 		if (mode != FT_RENDER_MODE_LCD)
 			return -1;
@@ -109,7 +107,6 @@ static int _compute_xrender_bitmap_size(
 		width /= 3;
 		pitch = width * 4;
 		break;
-		
 	case FT_PIXEL_MODE_LCD_V:
 		if (mode != FT_RENDER_MODE_LCD_V)
 			return -1;
@@ -117,7 +114,6 @@ static int _compute_xrender_bitmap_size(
 		height /= 3;
 		pitch = width * 4;
 		break;
-		
 	default: /* unsupported source format */
 		return -1;
 	}
@@ -197,7 +193,6 @@ static void _scaled_fill_xrender_bitmap(
 						}
 					}
 				}
-				
 				FOR (i, 4) {
 					dst_line[4*x+i] = bgra[i]/sample_count;
 				}

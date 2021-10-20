@@ -55,7 +55,7 @@ typedef struct XftFont {
 	FcPattern* pattern;
 	
 	struct XftFont* next; // all fonts on display
-	XftFontInfo info;	// Data from pattern
+	struct XftFontInfo info; // Data from pattern
 	int ref;	// reference count
 	// Per-glyph information, indexed by glyph ID
 	// This array follows the font in memory
@@ -91,7 +91,6 @@ void XftGlyphExtents(XftFont* pub, const FT_UInt* glyphs, int nglyphs, XGlyphInf
 void XftTextExtents32(XftFont* pub, const FcChar32* string, int len, XGlyphInfo* extents);
 
 /* xftfreetype.c */
-XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi);
 XftFont* XftFontOpenPattern(FcPattern* pattern);
 void XftFontClose(XftFont* pub);
 

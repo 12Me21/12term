@@ -436,7 +436,7 @@ static void XftFontInfoEmpty(XftFontInfo* fi) {
 		release_file(fi->file);
 }
 
-XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
+static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	// No existing font, create another.
 	if (XftDebug() & XFT_DBG_CACHE)
 		printf("New font %s/%d size %dx%d\n",
