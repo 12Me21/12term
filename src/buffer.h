@@ -11,13 +11,13 @@ typedef struct RGBColor {
 
 // if .truecolor is true, .rgb is the color.
 // otherwise, .i is the palette index (-1 = default foreground, -2 = default background)
-typedef struct Color {
-	union {
+typedef union Color {
+	struct {
 		RGBColor rgb;
-		int16_t i;
+		bool truecolor;
 	};
-	bool truecolor;
-} __attribute__((packed)) Color;
+	int16_t i;
+} Color;
 // RRRRRRRR GGGGGGGG BBBBBBBB 1.......
 // iiiiiiii iiiiiiii ........ 0.......
 
