@@ -187,7 +187,7 @@ void load_settings(int* argc, char** argv) {
 	settings.xft.hinting = true;
 	get_boolean("Xft." FC_HINTING, &settings.xft.hinting);
 	settings.xft.hint_style = FC_HINT_FULL;
-	get_integer("Xft." FC_HINTING, &settings.xft.hint_style);
+	get_integer("Xft." FC_HINT_STYLE, &settings.xft.hint_style);
 	settings.xft.autohint = FC_AUTOHINT;
 	get_boolean("Xft." FC_AUTOHINT, &settings.xft.autohint);
 	if (!get_integer("Xft." FC_RGBA, &settings.xft.rgba)) {
