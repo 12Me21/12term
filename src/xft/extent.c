@@ -16,7 +16,7 @@
 //  this gives me a bunch of glyphs (i.e. font+glyph id) which are known to be loaded
 // these can then be rendered without checking
 
-void XftGlyphExtents(XftFont* font, const FT_UInt* glyphs, int nglyphs, XGlyphInfo* extents) {
+static void xft_glyph_extents(XftFont* font, const FT_UInt* glyphs, int nglyphs, XGlyphInfo* extents) {
 	FT_UInt missing[XFT_NMISSING];
 	
 	const FT_UInt* g = glyphs;
@@ -82,10 +82,10 @@ void XftGlyphExtents(XftFont* font, const FT_UInt* glyphs, int nglyphs, XGlyphIn
 		xft_font_manage_memory(font);
 }
 
-void XftTextExtents32(XftFont* font, const FcChar32* string, int len, XGlyphInfo* extents) {
+void xft_text_extents(XftFont* font, const Char* string, int len, XGlyphInfo* extents) {
 	FT_UInt glyphs[len];
 	FOR (i, len) {
 		glyphs[i] = XftCharIndex(font, string[i]);
 	}
-	XftGlyphExtents(font, glyphs, len, extents);
+	xft_glyph_extents(font, glyphs, len, extents);
 }

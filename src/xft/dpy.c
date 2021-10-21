@@ -2,7 +2,7 @@
 
 XftDisplayInfo info;
 
-void XftDisplayInfoInit(void) {
+void xft_init(void) {
 	if (XftDebug() & XFT_DBG_RENDER) {
 		print("XftDisplayInfoGet Default visual 0x%x ", (int)W.vis->visualid);
 		if (W.format) {

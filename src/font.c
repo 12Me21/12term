@@ -24,7 +24,7 @@ static Font fonts[4] = {0}; // normal, bold, italic, bold+italic
 void font_init(void) {
 	if (!FcInit())
 		die("fontconfig init failed");
-	XftDisplayInfoInit();
+	xft_init();
 	if (FT_Init_FreeType(&ft_library))
 		die("freetype init failed");
 }
@@ -70,7 +70,7 @@ static bool load_font(Font* f, FcPattern* pattern, bool bold, bool italic, bool 
 		for (int i=0; i<len; i++)
 			ascii_printable[i] = ' '+i;
 		XGlyphInfo extents;
-		XftTextExtents32(f->font, (FcChar32*)ascii_printable, len, &extents);
+		xft_text_extents(f->font, ascii_printable, len, &extents);
 		f->width = ceildiv(extents.xOff, len);
 		//}
 	
@@ -204,16 +204,9 @@ void cells_to_glyphs(int len, Cell cells[len], Glyph glyphs[len], bool cache) {
 			FT_UInt glyph = XftCharIndex(font, chr);
 			if (!glyph)
 				find_fallback_font(chr, style, &font, &glyph);
-			//int width = cells[i].wide ? W.cw*2 : W.cw;
-			//XGlyphInfo extents;
-			//XftGlyphExtents(W.d, font, &glyph, 1, &extents);
 			glyphs[i] = (Glyph){
 				.font = font,
 				.glyph = glyph,
-				//.x = -extents.x, // todo: set this so the glyph is centered
-				//				.x = 0,
-				//				.y = W.font_ascent,//_font->ascent, //(xfont->ascent+xfont->descent-W.ch)/2+W.ch-xfont->descent, // todo: adjust this to minimize vertical clipping in tall fallback fonts, perhaps?
-				// really the char cell height should probably be ascent+descent, but idk uhh
 				.chr = chr,
 				.style = style,
 			};

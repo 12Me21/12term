@@ -83,12 +83,11 @@ typedef struct XftGlyphFont {
 /* xftdpy.c */
 bool XftDefaultSet(FcPattern* defaults);
 void XftDefaultSubstitute(FcPattern* pattern);
-void XftDisplayInfoInit(void);
+void xft_init(void);
 
 /* xftextent.c */
 
-void XftGlyphExtents(XftFont* pub, const FT_UInt* glyphs, int nglyphs, XGlyphInfo* extents);
-void XftTextExtents32(XftFont* pub, const FcChar32* string, int len, XGlyphInfo* extents);
+void xft_text_extents(XftFont* pub, const Char* string, int len, XGlyphInfo* extents);
 
 /* xftfreetype.c */
 XftFont* XftFontOpenPattern(FcPattern* pattern);
