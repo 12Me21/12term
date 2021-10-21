@@ -260,7 +260,7 @@ static int arg01(void) {
 
 void process_csi_command_2(Char c) {
 	switch (P.csi_private) {
-	default: 
+	default:
 		dump(c);
 		break;
 	case 0:
