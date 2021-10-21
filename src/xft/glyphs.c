@@ -351,7 +351,8 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 		FT_GlyphSlot glyphslot = face->glyph;
 		
 		// Embolden if required
-		if (font->info.embolden) FT_GlyphSlot_Embolden(glyphslot);
+		if (font->info.embolden)
+			FT_GlyphSlot_Embolden(glyphslot);
 		
 		// Compute glyph metrics from FreeType information
 		int left, right, top, bottom;

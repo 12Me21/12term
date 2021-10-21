@@ -276,6 +276,61 @@ void XftUnlockFace(XftFont* font) {
 	unlock_file(font->info.file);
 }
 
+static FT_Int get_load_flags(const FcPattern* pattern, const XftFontInfo* fi) {
+	FT_Int flags = FT_LOAD_DEFAULT | FT_LOAD_COLOR;
+	
+	// disable bitmaps when anti-aliasing or transforming glyphs
+	FcBool bitmap = false;
+	FcPatternGetBool(pattern, FC_EMBEDDED_BITMAP, 0, &bitmap);
+	if ((!bitmap && fi->antialias) || fi->transform)
+		flags |= FT_LOAD_NO_BITMAP;
+	
+	FcBool hinting = true;
+	FcPatternGetBool(pattern, FC_HINTING, 0, &hinting);
+	int hint_style = FC_HINT_FULL;
+	FcPatternGetInteger(pattern, FC_HINT_STYLE, 0, &hint_style);
+	
+	// disable hinting if requested
+	if (!hinting || hint_style == FC_HINT_NONE)
+		flags |= FT_LOAD_NO_HINTING;
+	
+	// Figure out the load target, which modifies the hinting
+	// behavior of FreeType based on the intended use of the glyphs.
+	if (fi->antialias) {
+		if (FC_HINT_NONE < hint_style && hint_style < FC_HINT_FULL) {
+			flags |= FT_LOAD_TARGET_LIGHT;
+		} else {
+			// autohinter will snap stems to integer widths, when
+			// the LCD targets are used.
+			switch (fi->rgba) {
+			case FC_RGBA_RGB:
+			case FC_RGBA_BGR:
+				flags |= FT_LOAD_TARGET_LCD;
+				break;
+			case FC_RGBA_VRGB:
+			case FC_RGBA_VBGR:
+				flags |= FT_LOAD_TARGET_LCD_V;
+				break;
+			}
+		}
+	} else
+		flags |= FT_LOAD_TARGET_MONO;
+	
+	// force autohinting if requested
+	FcBool autohint = false;
+	FcPatternGetBool(pattern, FC_AUTOHINT, 0, &autohint);
+	if (autohint)
+		flags |= FT_LOAD_FORCE_AUTOHINT;
+	
+	// disable global advance width (for broken DynaLab TT CJK fonts)
+	FcBool global_advance = true;
+	FcPatternGetBool(pattern, FC_GLOBAL_ADVANCE, 0, &global_advance);
+	if (!global_advance)
+		flags |= FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH;
+	
+	return flags;
+}
+
 static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 	// Find the associated file
 	FcChar8* filename = NULL;
@@ -337,71 +392,10 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 	
 	fi->transform = (fi->matrix.xx != 0x10000 || fi->matrix.xy != 0 || fi->matrix.yx != 0 || fi->matrix.yy != 0x10000);
 	
-	// Compute glyph load flags
-	fi->load_flags = FT_LOAD_DEFAULT | FT_LOAD_COLOR;
-	
-	FcBool bitmap = false;
-	FcPatternGetBool(pattern, "embeddedbitmap", 0, &bitmap);
-	
-	// disable bitmaps when anti-aliasing or transforming glyphs
-	if ((!bitmap && fi->antialias) || fi->transform)
-		fi->load_flags |= FT_LOAD_NO_BITMAP;
-	
-	// disable hinting if requested
-	FcBool hinting = true;
-	FcPatternGetBool(pattern, FC_HINTING, 0, &hinting);
+	fi->load_flags = get_load_flags(pattern, fi);
 	
 	fi->embolden = false;
 	FcPatternGetBool(pattern, FC_EMBOLDEN, 0, &fi->embolden);
-	
-	int hint_style = FC_HINT_FULL;
-	FcPatternGetInteger(pattern, FC_HINT_STYLE, 0, &hint_style);
-	
-	if (!hinting || hint_style == FC_HINT_NONE)
-		fi->load_flags |= FT_LOAD_NO_HINTING;
-	
-	// Figure out the load target, which modifies the hinting
-	// behavior of FreeType based on the intended use of the glyphs.
-	if (fi->antialias) {
-		if (FC_HINT_NONE < hint_style && hint_style < FC_HINT_FULL) {
-			fi->load_flags |= FT_LOAD_TARGET_LIGHT;
-		} else {
-			// autohinter will snap stems to integer widths, when
-			// the LCD targets are used.
-			switch (fi->rgba) {
-			case FC_RGBA_RGB:
-			case FC_RGBA_BGR:
-				fi->load_flags |= FT_LOAD_TARGET_LCD;
-				break;
-			case FC_RGBA_VRGB:
-			case FC_RGBA_VBGR:
-				fi->load_flags |= FT_LOAD_TARGET_LCD_V;
-				break;
-			}
-		}
-	} else
-		fi->load_flags |= FT_LOAD_TARGET_MONO;
-	
-	/* set vertical layout if requested */
-	// I'm disabling this as i don't think it's needed.
-	//FcBool vertical_layout = false;
-	//FcPatternGetBool(pattern, FC_VERTICAL_LAYOUT, 0, &vertical_layout);
-	//if (vertical_layout)
-	//	fi->load_flags |= FT_LOAD_VERTICAL_LAYOUT;
-	
-	/* force autohinting if requested */
-	FcBool autohint = false;
-	FcPatternGetBool(pattern, FC_AUTOHINT, 0, &autohint);
-	
-	if (autohint)
-		fi->load_flags |= FT_LOAD_FORCE_AUTOHINT;
-	
-	/* disable global advance width (for broken DynaLab TT CJK fonts) */
-	FcBool global_advance = true;
-	FcPatternGetBool(pattern, FC_GLOBAL_ADVANCE, 0, &global_advance);
-	
-	if (!global_advance)
-		fi->load_flags |= FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH;
 	
 	// Get requested spacing value
 	fi->spacing = FC_PROPORTIONAL;

@@ -53,7 +53,7 @@ typedef struct XftFont {
 	FcPattern* pattern;
 	
 	struct XftFont* next; // all fonts on display
-	struct XftFontInfo info; // Data from pattern
+	struct XftFontInfo info; // Data from pattern (i feel like this could be in one struct?)
 	int ref;	// reference count
 	// Per-glyph information, indexed by glyph ID
 	// This array follows the font in memory
