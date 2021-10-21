@@ -39,7 +39,7 @@ typedef struct XftFontInfo {
 	int lcd_filter; // lcd filter
 	FT_Matrix matrix;	// glyph transformation matrix
 	FcBool transform;	// non-identify matrix?
-	FT_Int load_flags; // glyph load flags
+	FT_Int load_flags; // glyph load flags (passed to FT_Load_Glyph)
 	// Internal fields
 	int spacing;
 	FcBool minspace;

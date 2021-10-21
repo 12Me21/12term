@@ -429,6 +429,7 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 		if (font->info.spacing >= FC_MONO) {
 			if (transform) {
 				// do we need all this
+				// todo: maybe remove all the vertical layout code?
 				if (font->info.load_flags & FT_LOAD_VERTICAL_LAYOUT) {
 					vector.x = 0;
 					vector.y = -face->size->metrics.max_advance;
@@ -475,7 +476,7 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 				
 				FOR (y, height) {
 					if (font->info.antialias) {
-						static const utf8 den[] = {" .:;=+*#"};
+						const utf8* den = " .:;=+*#";
 						FOR (x, width) {
 							print("%c", den[line[x] >> 5]);
 						}
@@ -499,6 +500,7 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 		xftg->metrics.width  = local.width;
 		xftg->metrics.height = local.rows;
 		if (0&&transform) {
+			// this is broken
 			vector.x = - glyphslot->bitmap_left;
 			vector.y =   glyphslot->bitmap_top;
 			
