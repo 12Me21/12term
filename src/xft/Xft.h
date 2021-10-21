@@ -20,7 +20,7 @@ extern FT_Library	ft_library;
 // Glyphs are stored in this structure
 typedef struct XftGlyph {
 	XGlyphInfo metrics;
-	unsigned long glyph_memory;
+	size_t glyph_memory;
 	Picture picture;
 } XftGlyph;
 
@@ -68,8 +68,8 @@ typedef struct XftFont {
 	GlyphSet glyphset; // Render glyphset
 	XRenderPictFormat* format;	// Render format for glyphs
 	// Glyph memory management fields
-	unsigned long glyph_memory;
-	unsigned long max_glyph_memory;
+	size_t glyph_memory;
+	size_t max_glyph_memory;
 } XftFont;
 
 // ghhh

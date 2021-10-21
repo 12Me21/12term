@@ -10,7 +10,7 @@ typedef struct XftFtFile {
 	struct XftFtFile* next;
 	int ref; // number of font infos using this file
 	
-	char* filename;
+	utf8* filename;
 	int id; // font index within that file
 	
 	FT_F26Dot6 xsize;	// current xsize setting
@@ -33,7 +33,7 @@ static XftFtFile* xft_files = NULL;
 static int XftMaxFreeTypeFiles = 5;
 
 // create a new XftFtFile from a filename and an id
-static XftFtFile* get_file(const char* filename, int id) {
+static XftFtFile* get_file(const utf8* filename, int id) {
 	XftFtFile* f;
 	for (f = xft_files; f; f = f->next) {
 		if (!strcmp(f->filename, filename) && f->id == id) {
@@ -55,7 +55,7 @@ static XftFtFile* get_file(const char* filename, int id) {
 	
 	f->ref = 1;
 	
-	f->filename = (char*)&f[1];
+	f->filename = (utf8*)&f[1];
 	strcpy(f->filename, filename);
 	f->id = id;
 	
@@ -135,7 +135,7 @@ static FT_Face lock_file(XftFtFile* f) {
 	return f->face;
 }
 
-static void lock_error(const char* reason) {
+static void lock_error(const utf8* reason) {
 	fprintf(stderr, "Xft: locking error %s\n", reason);
 }
 
@@ -286,7 +286,7 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 	
 	FT_Face face;
 	if (filename)
-		fi->file = get_file((char*)filename, id);
+		fi->file = get_file((utf8*)filename, id);
 	else if (FcPatternGetFTFace(pattern, FC_FT_FACE, 0, &face) == FcResultMatch && face)
 		fi->file = make_face_file(face);
 	if (!fi->file)
@@ -304,7 +304,7 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 	
 	if (XftDebug() & XFT_DBG_OPEN)
 		printf("XftFontInfoFill: %s: %d (%g pixels)\n",
-		       (filename ? filename : (FcChar8*)"<none>"), id, dsize);
+		       (filename ? (utf8*)filename : "<none>"), id, dsize);
 	
 	fi->antialias = true;
 	// Get antialias value
@@ -591,8 +591,8 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	font->hash_value = hash_value;
 	font->rehash_value = rehash_value;
 	// X specific fields
-	font->glyphset = 0;
 	font->format = format;
+	font->glyphset = XRenderCreateGlyphSet(W.d, font->format);
 	// Glyph memory management fields
 	font->glyph_memory = 0;
 	font->max_glyph_memory = max_glyph_memory;

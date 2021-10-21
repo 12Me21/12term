@@ -44,7 +44,7 @@ void xft_init(void) {
 // Reduce memory usage in X server
 
 static void validate_memory(void) {
-	unsigned long glyph_memory = 0;
+	size_t glyph_memory = 0;
 	for (XftFont* font=info.fonts; font; font=font->next) {
 		glyph_memory += font->glyph_memory;
 	}
@@ -64,7 +64,7 @@ void xft_manage_memory(void) {
 	}
 	
 	while (info.glyph_memory > info.max_glyph_memory) {
-		unsigned long glyph_memory = rand() % info.glyph_memory;
+		size_t glyph_memory = rand() % info.glyph_memory;
 		XftFont* font = info.fonts;
 		while (font) {
 			if (font->glyph_memory > glyph_memory) {

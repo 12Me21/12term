@@ -9,7 +9,7 @@
 
 // Validate the memory info for a font
 static void font_validate_memory(XftFont* font) {
-	unsigned long glyph_memory = 0;
+	size_t glyph_memory = 0;
 	for (FT_UInt i=0; i<font->num_glyphs; i++) {
 		XftGlyph* xftg = font->glyphs[i];
 		if (xftg)
@@ -26,10 +26,10 @@ static int native_byte_order(void) {
 		return LSBFirst;
 	return MSBFirst;
 }
-static inline unsigned int pack(unsigned char a, unsigned char b, unsigned char c, unsigned char d) {
+static inline uint32_t pack(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
 	return a | b<<8 | c<<16 | d<<24;
 }
-static void swap_card32(CARD32* data, int u) {
+static void swap_card32(uint32_t* data, int u) {
 	while (u--) {
 		*data = pack(*data>>24 & 0xFF, *data>>16 & 0xFF, *data>>8 & 0xFF, *data & 0xFF);
 		data++;
@@ -139,7 +139,7 @@ static void _scaled_fill_xrender_bitmap(
 	FT_Bitmap* source, // the source bitmap descriptor
 	const FT_Matrix* matrix // the scaling matrix to apply
 ) {
-	unsigned char* src_buf = source->buffer;
+	uint8_t* src_buf = source->buffer;
 	int src_pitch = source->pitch;
 	if (src_pitch<0)
 		src_buf -= src_pitch*(source->rows-1);
@@ -157,7 +157,7 @@ static void _scaled_fill_xrender_bitmap(
 	int width = target->width;
 	int height = target->rows;
 	int pitch = target->pitch;
-	unsigned char* dst_line = target->buffer;
+	uint8_t* dst_line = target->buffer;
 	FOR (y, height) {
 		FOR (x, width) {
 			// compute target pixel location in source space
@@ -167,7 +167,7 @@ static void _scaled_fill_xrender_bitmap(
 			vector.x = limit(FT_RoundFix(vector.x)/0x10000, 0, source->width - 1);
 			vector.y = limit(FT_RoundFix(vector.y)/0x10000, 0, source->rows  - 1);
 			
-			unsigned char* src;
+			uint8_t* src;
 			switch (source->pixel_mode) {
 				// convert mono to 8-bit gray, scale using nearest pixel
 			case FT_PIXEL_MODE_MONO: 
@@ -219,18 +219,18 @@ static void _fill_xrender_bitmap(
 ) {
 	const FT_Bitmap* ftbit = &slot->bitmap;
 	const int src_pitch = ftbit->pitch;
-	unsigned char*	srcLine = ftbit->buffer;
+	uint8_t*	srcLine = ftbit->buffer;
 	if (src_pitch < 0)
 		srcLine -= src_pitch*(ftbit->rows-1);
 	
 	const int width = target->width;
 	const int height = target->rows;
 	const int pitch = target->pitch;
-	unsigned char*	dstLine = target->buffer;
+	uint8_t* dstLine = target->buffer;
 	const int subpixel = (mode==FT_RENDER_MODE_LCD || mode==FT_RENDER_MODE_LCD_V );
 	// the compiler should optimize this by moving the for loop inside the switch block
 	FOR (y, height) {
-		unsigned int* const dst = (unsigned int*)dstLine;
+		uint32_t* const dst = (uint32_t*)dstLine;
 		switch (ftbit->pixel_mode) {
 		case FT_PIXEL_MODE_MONO:
 			// convert mono to ARGB32 values
@@ -469,13 +469,13 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 			       left, right, top, bottom,
 			       width, height);
 			if (XftDebug() & XFT_DBG_GLYPHV) {
-				unsigned char* line = ftbit->buffer;
+				uint8_t* line = ftbit->buffer;
 				if (ftbit->pitch < 0)
 					line -= ftbit->pitch*(height-1);
 				
 				FOR (y, height) {
 					if (font->info.antialias) {
-						static const char den[] = {" .:;=+*#"};
+						static const utf8 den[] = {" .:;=+*#"};
 						FOR (x, width) {
 							print("%c", den[line[x] >> 5]);
 						}
@@ -517,7 +517,7 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 		//if (!need_bitmaps && size>info.max_glyph_memory/100)
 		//	continue;
 		
-		unsigned char bufBitmap[size]; // I hope there's enough stack space owo
+		uint8_t bufBitmap[size]; // I hope there's enough stack space owo
 		memset(bufBitmap, 0, size);
 		
 		local.buffer = bufBitmap;
@@ -538,27 +538,22 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 		
 		xftg->picture = 0;
 		xftg->glyph_memory = sizeof(XftGlyph) + size;
-		if (!font->glyphset)
-			font->glyphset = XRenderCreateGlyphSet(W.d, font->format);
 		if (mode == FT_RENDER_MODE_MONO) {
 			/* swap bits in each byte */
 			if (BitmapBitOrder(W.d) != MSBFirst) {
-				unsigned char* line = bufBitmap;
-				int i = size;
-					
-				while (i--) {
-					int c = *line;
+				FOR (i, size) {
+					int c = bufBitmap[i];
 					// fancy
 					c = (c<<1 & 0xAA) | (c>>1 & 0x55);
 					c = (c<<2 & 0xCC) | (c>>2 & 0x33);
 					c = (c<<4 & 0xF0) | (c>>4 & 0x0F);
-					*line++ = c;
+					bufBitmap[i] = c;
 				}
 			}
 		} else if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA || mode != FT_RENDER_MODE_NORMAL) {
 			/* invert ARGB <=> BGRA */
 			if (ImageByteOrder(W.d) != native_byte_order())
-				swap_card32((CARD32*)bufBitmap, size/4);
+				swap_card32((uint32_t*)bufBitmap, size/4);
 		}
 			
 		if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA) {
@@ -595,7 +590,7 @@ void XftFontUnloadGlyphs(XftFont* font, const FT_UInt* glyphs, int nglyph) {
 		if (xftg->glyph_memory) {
 			if (xftg->picture)
 				XRenderFreePicture(W.d, xftg->picture);
-			else if (font->glyphset) {
+			else {
 				glyphBuf[nused++] = (Glyph)glyphs[i];
 			}
 			font->glyph_memory -= xftg->glyph_memory;
@@ -605,7 +600,7 @@ void XftFontUnloadGlyphs(XftFont* font, const FT_UInt* glyphs, int nglyph) {
 		XftMemFree(XFT_MEM_GLYPH, sizeof(XftGlyph));
 		font->glyphs[glyphs[i]] = NULL;
 	}
-	if (font->glyphset && nused)
+	if (nused)
 		XRenderFreeGlyphs(W.d, font->glyphset, glyphBuf, nused);
 }
 
@@ -648,7 +643,7 @@ void xft_font_uncache_glyph(XftFont* font) {
 	if (!font->glyph_memory)
 		return;
 	
-	unsigned long glyph_memory;
+	size_t glyph_memory;
 	glyph_memory = rand() % font->glyph_memory;
 	
 	if (XftDebug() & XFT_DBG_CACHE)
@@ -658,7 +653,7 @@ void xft_font_uncache_glyph(XftFont* font) {
 		if (xftg) {
 			if (xftg->glyph_memory > glyph_memory) {
 				if (XftDebug() & XFT_DBG_CACHEV)
-					print("Uncaching glyph 0x%x size %ld\n", glyphindex, xftg->glyph_memory);
+					print("Uncaching glyph 0x%x size %zd\n", glyphindex, xftg->glyph_memory);
 				XftFontUnloadGlyphs(font, &glyphindex, 1);
 				break;
 			}
@@ -673,9 +668,8 @@ void xft_font_manage_memory(XftFont* font) {
 	if (font->max_glyph_memory) {
 		if (XftDebug() & XFT_DBG_CACHE) {
 			if (font->glyph_memory > font->max_glyph_memory)
-				print("Reduce memory for font 0x%lx from %ld to %ld\n",
-					font->glyphset ? font->glyphset : (unsigned long)font,
-					font->glyph_memory, font->max_glyph_memory);
+				print("Reduce memory for font 0x%ld from %zd to %zd\n",
+					font->glyphset, font->glyph_memory, font->max_glyph_memory);
 		}
 		while (font->glyph_memory > font->max_glyph_memory)
 			xft_font_uncache_glyph(font);

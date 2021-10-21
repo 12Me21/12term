@@ -24,8 +24,8 @@ typedef struct XftSolidColor {
 
 typedef struct XftDisplayInfo {
 	XftFont* fonts;
-	unsigned long glyph_memory;
-	unsigned long max_glyph_memory;
+	size_t glyph_memory;
+	size_t max_glyph_memory;
 	int num_unref_fonts;
 	int max_unref_fonts;
 	XftSolidColor colors[XFT_NUM_SOLID_COLOR];
