@@ -216,7 +216,8 @@ void term_resize(int width, int height) {
 void set_cursor_style(int n) {
 	if (n==0) {
 		n = settings.cursorShape;
-		if (n == 0)
+		// todo: maybe just ensure that settings.cursorShape is a valid value rather than fixing it here
+		if (!(n>0 && n<=8))
 			n = 2; // true default
 	}
 	
