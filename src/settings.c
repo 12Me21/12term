@@ -86,10 +86,21 @@ static bool get_number(char* name, double* out) {
 }
 
 static bool get_integer(char* name, int* out) {
-	double d;
-	if (get_number(name, &d)) {
-		*out = (int)d;
-		return true;
+	char* str;
+	if (get_string(name, &str)) {
+		
+		// this converts fontconfig constant strings into integers
+		// i.e. subpixel types like "rgb", "bgr" become 1, 2, etc.
+		// very important
+		if (FcNameConstant((FcChar8*)str, out))
+			return true;
+		
+		char* end;
+		int n = strtol(str, &end, 0);
+		if (str[0]!='\0' && *end=='\0') {
+			*out = n;
+			return true;
+		}
 	}
 	return false;
 }
@@ -190,7 +201,10 @@ void load_settings(int* argc, char** argv) {
 	get_integer("Xft." FC_HINT_STYLE, &settings.xft.hint_style);
 	settings.xft.autohint = FC_AUTOHINT;
 	get_boolean("Xft." FC_AUTOHINT, &settings.xft.autohint);
+	
 	if (!get_integer("Xft." FC_RGBA, &settings.xft.rgba)) {
+		// on my computer, xrenderquerysubpixelorder just returns 0
+		// i assume it's meant to be configured somewhere but idk
 		int render_order = XRenderQuerySubpixelOrder(W.d, W.scr);
 		int subpixel;
 		switch (render_order) {
@@ -204,6 +218,7 @@ void load_settings(int* argc, char** argv) {
 		}
 		settings.xft.rgba = subpixel;
 	}
+	
 	settings.xft.lcd_filter = FC_LCD_DEFAULT;
 	get_integer("Xft." FC_LCD_FILTER, &settings.xft.lcd_filter);
 	settings.xft.minspace = false;
