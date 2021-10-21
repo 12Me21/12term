@@ -15,7 +15,7 @@
 12term.saveLines: 2000
 
 ! font
-12term.faceName: cascadia code
+12term.faceName: monospace
 ! font size (in points)
 12term.faceSize: 12
 
@@ -23,7 +23,13 @@
 12term.foreground: rgb:FF/FF/FF
 12term.background: rgb:00/00/00
 12term.cursorColor: rgb:00/AA/00
-! cursor shape (unused currently)
+! cursor shape:
+! 1,2 - full block
+! 3,4 - underline
+! 5,6 - vertical bar
+! 7,8 - hollow box
+! odd numbers are blinking cursors, even numbers are nonblinking
+! but this terminal doesn't support cursor blink so they're treated as the same
 12term.cursorShape: 2
 
 ! default size
