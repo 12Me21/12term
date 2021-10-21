@@ -35,7 +35,7 @@ typedef struct Attrs {
 	Color color, background, underline_color;
 	uint16_t link; // hyperlink. 0 = none, 1…max = T.links.items[n-1]
 	
-	int8_t weight: 2; // 1 = bold, -1 = faint
+	int8_t weight: 2; // 0 = normal, 1 = bold, -1 = faint
 	bool italic: 1;
 	uint8_t underline: 3; // 0 = none, 1-5 = normal,double,wavy,dotted,dashed (todo: support more of these)
 	bool colored_underline: 1; // whether to use special underline color
