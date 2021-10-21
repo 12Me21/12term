@@ -397,22 +397,12 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 		// Clip charcell glyphs to the bounding box
 		// XXX transformed?
 		if (font->info.spacing >= FC_CHARCELL && !transform) {
-			if (font->info.load_flags & FT_LOAD_VERTICAL_LAYOUT) {
-				if (TRUNC(bottom) > font->max_advance_width) {
-					int adjust = bottom - (font->max_advance_width << 6);
-					if (adjust > top) adjust = top;
-					top -= adjust;
-					bottom -= adjust;
-					height = font->max_advance_width;
-				}
-			} else {
-				if (TRUNC(right) > font->max_advance_width) {
-					int adjust = right - (font->max_advance_width << 6);
-					if (adjust > left) adjust = left;
-					left -= adjust;
-					right -= adjust;
-					width = font->max_advance_width;
-				}
+			if (TRUNC(right) > font->max_advance_width) {
+				int adjust = right - (font->max_advance_width << 6);
+				if (adjust > left) adjust = left;
+				left -= adjust;
+				right -= adjust;
+				width = font->max_advance_width;
 			}
 		}
 		
@@ -428,26 +418,14 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 		
 		if (font->info.spacing >= FC_MONO) {
 			if (transform) {
-				// do we need all this
-				// todo: maybe remove all the vertical layout code?
-				if (font->info.load_flags & FT_LOAD_VERTICAL_LAYOUT) {
-					vector.x = 0;
-					vector.y = -face->size->metrics.max_advance;
-				} else {
-					vector.x = face->size->metrics.max_advance;
-					vector.y = 0;
-				}
-				FT_Vector_Transform (&vector, &font->info.matrix);
+				vector.x = face->size->metrics.max_advance;
+				vector.y = 0;
+				FT_Vector_Transform(&vector, &font->info.matrix);
 				xftg->metrics.xOff = vector.x >> 6;
 				xftg->metrics.yOff = -(vector.y >> 6);
 			} else {
-				if (font->info.load_flags & FT_LOAD_VERTICAL_LAYOUT) {
-					xftg->metrics.xOff = 0;
-					xftg->metrics.yOff = -font->max_advance_width;
-				} else {
-					xftg->metrics.xOff = font->max_advance_width;
-					xftg->metrics.yOff = 0;
-				}
+				xftg->metrics.xOff = font->max_advance_width;
+				xftg->metrics.yOff = 0;
 			}
 		} else {
 			xftg->metrics.xOff = TRUNC(ROUND(glyphslot->advance.x));

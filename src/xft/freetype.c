@@ -383,11 +383,11 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 		fi->load_flags |= FT_LOAD_TARGET_MONO;
 	
 	/* set vertical layout if requested */
-	FcBool vertical_layout = false;
-	FcPatternGetBool(pattern, FC_VERTICAL_LAYOUT, 0, &vertical_layout);
-	
-	if (vertical_layout)
-		fi->load_flags |= FT_LOAD_VERTICAL_LAYOUT;
+	// I'm disabling this as i don't think it's needed.
+	//FcBool vertical_layout = false;
+	//FcPatternGetBool(pattern, FC_VERTICAL_LAYOUT, 0, &vertical_layout);
+	//if (vertical_layout)
+	//	fi->load_flags |= FT_LOAD_VERTICAL_LAYOUT;
 	
 	/* force autohinting if requested */
 	FcBool autohint = false;
