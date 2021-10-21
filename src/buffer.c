@@ -214,8 +214,11 @@ void term_resize(int width, int height) {
 }
 
 void set_cursor_style(int n) {
-	if (n==0)
+	if (n==0) {
 		n = settings.cursorShape;
+		if (n == 0)
+			n = 2; // true default
+	}
 	
 	if (n>0 && n<=8) {
 		T.cursor_shape = (n-1)/2;
