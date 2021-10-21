@@ -24,7 +24,7 @@ typedef struct XftFtFile {
 
 // A hash table translates Unicode values into glyph indicies
 typedef struct XftUcsHash {
-	FcChar32 ucs4;
+	Char ucs4;
 	FT_UInt glyph;
 } XftUcsHash;
 
@@ -221,14 +221,12 @@ static void release_file(XftFtFile* f) {
 	free(f);
 }
 
-/*
- * Find a prime larger than the minimum reasonable hash size
- */
-static FcChar32 xft_sqrt(FcChar32 a) {
-	FcChar32 l = 2;
-	FcChar32 h = a/2;
+// Find a prime larger than the minimum reasonable hash size
+static Char xft_sqrt(Char a) {
+	Char l = 2;
+	Char h = a/2;
 	while ((h-l) > 1) {
-		FcChar32 m = (h+l) >> 1;
+		Char m = (h+l) >> 1;
 		if (m * m < a)
 			l = m;
 		else
@@ -237,9 +235,7 @@ static FcChar32 xft_sqrt(FcChar32 a) {
 	return h;
 }
 
-static bool is_prime(FcChar32 i) {
-	FcChar32	l, t;
-	
+static bool is_prime(Char i) {
 	if (i < 2)
 		return false;
 	if ((i&1) == 0) {
@@ -247,16 +243,16 @@ static bool is_prime(FcChar32 i) {
 			return true;
 		return false;
 	}
-	l = xft_sqrt(i) + 1;
-	for (t = 3; t <= l; t += 2)
+	Char l = xft_sqrt(i) + 1;
+	for (Char t = 3; t <= l; t += 2)
 		if (i % t == 0)
 			return false;
 	return true;
 }
 
-static FcChar32 hash_size(FcChar32 num_unicode) {
+static Char hash_size(Char num_unicode) {
 	// at least 31.25% extra space
-	FcChar32	hash = num_unicode + (num_unicode>>2) + (num_unicode>>4);
+	Char hash = num_unicode + num_unicode/4 + num_unicode/16;
 	
 	if ((hash&1) == 0)
 		hash++;
@@ -490,9 +486,9 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	if (!format)
 		goto bail2;
 	
-	FcChar32 num_unicode = 0;
-	FcChar32 hash_value = 0;
-	FcChar32 rehash_value = 0;
+	Char num_unicode = 0;
+	Char hash_value = 0;
+	Char rehash_value = 0;
 	if (charset) {
 		num_unicode = FcCharSetCount(charset);
 		hash_value = hash_size(num_unicode);
@@ -589,7 +585,7 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	// Unicode hash table information
 	font->hash_table = (XftUcsHash*)(font->glyphs+font->num_glyphs);
 	for (int i=0; i<hash_value; i++) {
-		font->hash_table[i].ucs4 = ((FcChar32) ~0);
+		font->hash_table[i].ucs4 = -1;
 		font->hash_table[i].glyph = 0;
 	}
 	font->hash_value = hash_value;
@@ -688,13 +684,13 @@ void XftFontClose(XftFont* font) {
 	font_manage_memory();
 }
 
-FT_UInt XftCharIndex(XftFont* font, FcChar32 ucs4) {
+FT_UInt XftCharIndex(XftFont* font, Char ucs4) {
 	if (!font->hash_value)
 		return 0;
-	FcChar32	ent = ucs4 % font->hash_value;
-	FcChar32	offset = 0;
+	Char ent = ucs4 % font->hash_value;
+	Char offset = 0;
 	while (font->hash_table[ent].ucs4 != ucs4) {
-		if (font->hash_table[ent].ucs4 == (FcChar32)~0) {
+		if (font->hash_table[ent].ucs4 == -1) {
 			if (!XftCharExists(font, ucs4))
 				return 0;
 			FT_Face face = XftLockFace(font);

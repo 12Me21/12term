@@ -27,8 +27,6 @@ typedef struct XftGlyph {
 // This structure holds the data extracted from a pattern
 // needed to create a unique font object.
 typedef struct XftFontInfo {
-	// Hash value (not include in hash value computation)
-	//FcChar32	hash;
 	struct XftFtFile* file; // face source
 	// Rendering options
 	FT_F26Dot6 xsize, ysize; // pixel size
@@ -100,8 +98,8 @@ void XftFontUnloadGlyphs(XftFont* pub, const FT_UInt* glyphs, int nglyph);
 #define XFT_NMISSING 256
 
 bool XftFontCheckGlyph(XftFont* pub, bool need_bitmaps, FT_UInt glyph, FT_UInt* missing, int* nmissing);
-bool XftCharExists(XftFont* pub, FcChar32 ucs4);
-FT_UInt XftCharIndex(XftFont* pub, FcChar32 ucs4);
+bool XftCharExists(XftFont* pub, Char ucs4);
+FT_UInt XftCharIndex(XftFont* pub, Char ucs4);
 
 /* xftrender.c */
 

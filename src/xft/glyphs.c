@@ -637,7 +637,7 @@ bool XftFontCheckGlyph(XftFont* font, bool need_bitmaps, FT_UInt glyph, FT_UInt*
 		return false;
 }
 
-bool XftCharExists(XftFont* font, FcChar32 ucs4) {
+bool XftCharExists(XftFont* font, Char ucs4) {
 	if (font->charset)
 		return FcCharSetHasChar(font->charset, ucs4);
 	return false;
