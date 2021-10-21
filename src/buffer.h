@@ -11,6 +11,15 @@ typedef struct RGBColor {
 
 // if .truecolor is true, .rgb is the color.
 // otherwise, .i is the palette index (-1 = default foreground, -2 = default background)
+// normally this would be written as:
+// struct {
+//  union {
+//   RGBColor rgb;
+//   int16_t i;
+//  };
+//  bool truecolor;
+// };
+// but: this would use 6 bytes instead of 4 due to padding and alignment
 typedef union Color {
 	struct {
 		RGBColor rgb;
