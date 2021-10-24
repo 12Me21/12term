@@ -28,7 +28,7 @@ void xft_init(void) {
 	info.glyph_memory = 0;
 	info.max_glyph_memory = (4 * 1024 * 1024);
 	if (XftDebug() & XFT_DBG_CACHE)
-		print("global max cache memory %ld\n", info.max_glyph_memory);
+		print("global max cache memory %zd\n", info.max_glyph_memory);
 	
 	info.num_unref_fonts = 0;
 	info.max_unref_fonts = XFT_DPY_MAX_UNREF_FONTS;//XftDefaultGetInteger(XFT_MAX_UNREF_FONTS, XFT_DPY_MAX_UNREF_FONTS);
@@ -49,7 +49,7 @@ static void validate_memory(void) {
 		glyph_memory += font->glyph_memory;
 	}
 	if (glyph_memory != info.glyph_memory)
-		print("Display glyph cache incorrect has %ld bytes, should have %ld\n", info.glyph_memory, glyph_memory);
+		print("Display glyph cache incorrect has %zd bytes, should have %zd\n", info.glyph_memory, glyph_memory);
 }
 
 void xft_manage_memory(void) {
@@ -58,7 +58,7 @@ void xft_manage_memory(void) {
 	
 	if (XftDebug() & XFT_DBG_CACHE) {
 		if (info.glyph_memory > info.max_glyph_memory)
-			print("Reduce global memory from %ld to %ld\n",
+			print("Reduce global memory from %zd to %zd\n",
 			      info.glyph_memory, info.max_glyph_memory);
 		validate_memory();
 	}

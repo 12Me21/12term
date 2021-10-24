@@ -159,7 +159,7 @@ static void run(void) {
 				(HANDLERS[ev.type])(&ev);
 		}
 		
-		Nanosec timeout = 10000L*1000*1000;
+		Nanosec timeout = (Nanosec)10000*1000*1000;
 		
 		if (redraw) {
 			struct timespec now;
@@ -331,6 +331,7 @@ int main(int argc, char* argv[argc+1]) {
 	set_title(NULL);
 	
 	// set icon
+	// todo: make this work on other screen depths!
 	if (XDefaultDepth(W.d, W.scr) == 24) {
 		Pixmap icon_pixmap = XCreatePixmap(W.d, W.win, ICON_SIZE, ICON_SIZE, 24);
 		XImage* icon_image = XCreateImage(W.d, W.vis, 24, ZPixmap, 0, (void*)ICON_DATA, ICON_SIZE, ICON_SIZE, 8, 0);

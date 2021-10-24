@@ -16,7 +16,7 @@ static void font_validate_memory(XftFont* font) {
 			glyph_memory += xftg->glyph_memory;
 	}
 	if (glyph_memory != font->glyph_memory)
-		print("Font glyph cache incorrect has %ld bytes, should have %ld\n", font->glyph_memory, glyph_memory);
+		print("Font glyph cache incorrect has %zd bytes, should have %zd\n", font->glyph_memory, glyph_memory);
 }
 
 // messy
@@ -556,7 +556,7 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 		if (XftDebug() & XFT_DBG_CACHE)
 			font_validate_memory(font);
 		if (XftDebug() & XFT_DBG_CACHEV)
-			print("Caching glyph 0x%x size %ld\n", glyphindex, xftg->glyph_memory);
+			print("Caching glyph 0x%x size %zd\n", glyphindex, xftg->glyph_memory);
 	}
 	XftUnlockFace(font);
 }

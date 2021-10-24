@@ -27,7 +27,7 @@ typedef int32_t Char;
 
 typedef int Px;
 
-typedef long long Nanosec;
+typedef int64_t Nanosec;
 
 // this should be unsigned char, but for practical reasons I use char (since most functions take char)
 typedef char utf8;
