@@ -248,9 +248,13 @@ int main(int argc, char* argv[argc+1]) {
 		die("Could not connect to X server\n");
 	W.scr = XDefaultScreen(W.d);
 	W.vis = XDefaultVisual(W.d, W.scr);
+	
+	print("screen depth: %d\n", XDefaultDepth(W.d, W.scr));
+	
 	// check if user has modern display (otherwise nnnnnnnn sorry i dont want to deal with this)
-	if (W.vis->class!=TrueColor)
-		die("Cannot handle non truecolor visual ...\n");
+	// wait do we really need this anymore idk
+	//if (W.vis->class!=TrueColor)
+	//	die("Cannot handle non truecolor visual ...\n");
 	{
 		int major, minor;
 		XRenderQueryVersion(W.d, &major, &minor);
@@ -266,6 +270,7 @@ int main(int argc, char* argv[argc+1]) {
 	// init db
 	XrmInitialize();
 	load_settings(&argc, argv);
+	print("subpixel : %d\n", settings.xft.rgba);
 	
 	init_atoms();
 	
@@ -326,17 +331,24 @@ int main(int argc, char* argv[argc+1]) {
 	set_title(NULL);
 	
 	// set icon
-	Pixmap icon_pixmap = XCreatePixmap(W.d, W.win, ICON_SIZE, ICON_SIZE, 24);
-	XImage* icon_image = XCreateImage(W.d, W.vis, 24, ZPixmap, 0, (void*)ICON_DATA, ICON_SIZE, ICON_SIZE, 8, 0);
-	icon_image->f.destroy_image = gosh_dang_destroy_image_function;
-	XPutImage(W.d, icon_pixmap, W.gc, icon_image, 0,0,0,0, icon_image->width, icon_image->height);
-	XDestroyImage(icon_image);
-	
-	XSetWMHints(W.d, W.win, &(XWMHints){
-		.flags = InputHint | IconPixmapHint,
-		.input = true, // which input focus model
-		.icon_pixmap = icon_pixmap,
-	});
+	if (XDefaultDepth(W.d, W.scr) == 24) {
+		Pixmap icon_pixmap = XCreatePixmap(W.d, W.win, ICON_SIZE, ICON_SIZE, 24);
+		XImage* icon_image = XCreateImage(W.d, W.vis, 24, ZPixmap, 0, (void*)ICON_DATA, ICON_SIZE, ICON_SIZE, 8, 0);
+		icon_image->f.destroy_image = gosh_dang_destroy_image_function;
+		XPutImage(W.d, icon_pixmap, W.gc, icon_image, 0,0,0,0, icon_image->width, icon_image->height);
+		XDestroyImage(icon_image);
+		
+		XSetWMHints(W.d, W.win, &(XWMHints){
+			.flags = InputHint | IconPixmapHint,
+			.input = true, // which input focus model
+			.icon_pixmap = icon_pixmap,
+		});
+	} else {
+		XSetWMHints(W.d, W.win, &(XWMHints){
+			.flags = InputHint,
+			.input = true,
+		});
+	}
 	
 	time_log("created window");
 	

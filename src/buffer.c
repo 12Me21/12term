@@ -228,7 +228,7 @@ void set_cursor_style(int n) {
 }
 
 void clear_region(int x1, int y1, int x2, int y2) {
-	print("clear region: [%d,%d]-(%d,%d)\n",x1,y1,x2,y2);
+	//print("clear region: [%d,%d]-(%d,%d)\n",x1,y1,x2,y2);
 	// todo: warn about this
 	if (x1<0)
 		x1 = 0;

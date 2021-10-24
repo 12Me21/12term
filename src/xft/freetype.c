@@ -252,6 +252,7 @@ static bool is_prime(Char i) {
 
 static Char hash_size(Char num_unicode) {
 	// at least 31.25% extra space
+	//return 1000;
 	Char hash = num_unicode + num_unicode/4 + num_unicode/16;
 	
 	if ((hash&1) == 0)
@@ -486,6 +487,7 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	if (charset) {
 		num_unicode = FcCharSetCount(charset);
 		hash_value = hash_size(num_unicode);
+		print("hash table size: %d\n", hash_value);
 		rehash_value = hash_value-2;
 	}
 	
@@ -493,8 +495,8 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	// accept either numbering scheme by making room in the table
 	int num_glyphs = face->num_glyphs + 1;
 	int alloc_size = sizeof(XftFont) +
-	                 num_glyphs * sizeof(XftGlyph*) +
-	                 hash_value * sizeof(XftUcsHash);
+	                 num_glyphs*sizeof(XftGlyph*) +
+	                 hash_value*sizeof(XftUcsHash);
 	
 	XftFont* font = XftMalloc(XFT_MEM_FONT, alloc_size);
 	if (!font)

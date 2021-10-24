@@ -36,6 +36,6 @@ typedef struct Settings {
 
 extern Settings settings;
 
-void load_settings(int* argc, char** argv);
+void load_settings(int* argc, utf8** argv);
 
 void pattern_default_substitute(FcPattern* pattern);

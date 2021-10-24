@@ -13,7 +13,7 @@
 #include "settings.h"
 #include "x.h"
 #include "xft/Xft.h"
-extern bool parse_x_color(const char* c, RGBColor* out);
+extern bool parse_x_color(const utf8* c, RGBColor* out);
 
 Settings settings = {
 	.palette = {
@@ -51,9 +51,9 @@ Settings settings = {
 
 XrmDatabase	db = NULL;
 
-static bool get_string(char* name, char** out) {
+static bool get_string(utf8* name, utf8** out) {
 	XrmValue ret;
-	char* type;
+	utf8* type;
 	if (db && XrmGetResource(db, name, "", &type, &ret)) { //I tried passing NULL for the class string but it didn't like that,
 		if (strcmp(type, "String"))
 			return false;
@@ -64,18 +64,18 @@ static bool get_string(char* name, char** out) {
 	return false;
 }
 
-static bool get_color(char* name, RGBColor* out) {
-	char* str;
+static bool get_color(utf8* name, RGBColor* out) {
+	utf8* str;
 	if (get_string(name, &str))
 		if (parse_x_color(str, out))
 			return true;
 	return false;
 }
 
-static bool get_number(char* name, double* out) {
-	char* str;
+static bool get_number(utf8* name, double* out) {
+	utf8* str;
 	if (get_string(name, &str)) {
-		char* end;
+		utf8* end;
 		double n = strtod(str, &end);
 		if (str[0]!='\0' && *end=='\0') {
 			*out = n;
@@ -85,8 +85,8 @@ static bool get_number(char* name, double* out) {
 	return false;
 }
 
-static bool get_integer(char* name, int* out) {
-	char* str;
+static bool get_integer(utf8* name, int* out) {
+	utf8* str;
 	if (get_string(name, &str)) {
 		
 		// this converts fontconfig constant strings into integers
@@ -95,7 +95,7 @@ static bool get_integer(char* name, int* out) {
 		if (FcNameConstant((FcChar8*)str, out))
 			return true;
 		
-		char* end;
+		utf8* end;
 		int n = strtol(str, &end, 0);
 		if (str[0]!='\0' && *end=='\0') {
 			*out = n;
@@ -105,10 +105,10 @@ static bool get_integer(char* name, int* out) {
 	return false;
 }
 
-static bool get_boolean(char* name, bool* out) {
-	char* str;
+static bool get_boolean(utf8* name, bool* out) {
+	utf8* str;
 	if (get_string(name, &str)) {
-		char c0 = str[0];
+		utf8 c0 = str[0];
 		if (isupper(c0))
 			c0 = tolower(c0);
 		if (c0 == 't' || c0 == 'y' || c0 == '1') {
@@ -120,7 +120,7 @@ static bool get_boolean(char* name, bool* out) {
 			return true;
 		}
 		if (c0 == 'o') {
-			char c1 = str[1];
+			utf8 c1 = str[1];
 			if (isupper(c1))
 				c1 = tolower(c1);
 			if (c1 == 'n') {
@@ -138,8 +138,8 @@ static bool get_boolean(char* name, bool* out) {
 
 #define FIELD(name) "12term." #name, &settings.name
 
-void load_settings(int* argc, char** argv) {
-	char* resource_manager = XResourceManagerString(W.d);//screen?
+void load_settings(int* argc, utf8** argv) {
+	utf8* resource_manager = XResourceManagerString(W.d);//screen?
 	if (resource_manager) {
 		if (db)
 			XrmDestroyDatabase(db);
@@ -160,7 +160,7 @@ void load_settings(int* argc, char** argv) {
 	get_string(FIELD(termName));
 	// first 16 palette colors
 	for (int i=0; i<16; i++) {
-		char buf[100];
+		utf8 buf[100];
 		sprintf(buf, "12term.color%d", i);
 		get_color(buf, &settings.palette[i]);
 	}
@@ -232,22 +232,22 @@ void load_settings(int* argc, char** argv) {
 	get_integer("Xft." XFT_MAX_GLYPH_MEMORY, &settings.xft.max_glyph_memory);
 }
 
-static bool pattern_missing(FcPattern* pattern, const char* name) {
+static bool pattern_missing(FcPattern* pattern, const utf8* name) {
 	FcValue v;
 	return FcPatternGet(pattern, name, 0, &v)==FcResultNoMatch;
 }
 
-static void pattern_default_bool(FcPattern* pattern, char* field, bool value) {
+static void pattern_default_bool(FcPattern* pattern, utf8* field, bool value) {
 	if (pattern_missing(pattern, field))
 		FcPatternAddBool(pattern, field, value);
 }
 
-static void pattern_default_integer(FcPattern* pattern, char* field, int value) {
+static void pattern_default_integer(FcPattern* pattern, utf8* field, int value) {
 	if (pattern_missing(pattern, field))
 		FcPatternAddInteger(pattern, field, value);
 }
 
-static void pattern_default_number(FcPattern* pattern, char* field, double value) {
+static void pattern_default_number(FcPattern* pattern, utf8* field, double value) {
 	if (pattern_missing(pattern, field))
 		FcPatternAddDouble(pattern, field, value);
 }
