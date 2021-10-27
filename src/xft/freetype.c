@@ -263,11 +263,14 @@ static Char hash_size(Char num_unicode) {
 }
 
 FT_Face XftLockFace(XftFont* font) {
+	//return font->info.file->face;
 	XftFontInfo* fi = &font->info;
-	FT_Face face = lock_file(fi->file);
+	FT_Face face = fi->file->face;//lock_file(fi->file);
 	// Make sure the face is usable at the requested size
+	// this is necessary if you have like
+	// multiple fonts using the same face but different matricies i
 	if (face && !set_face(fi->file, fi->xsize, fi->ysize, &fi->matrix)) {
-		unlock_file(fi->file);
+		//unlock_file(fi->file);
 		face = NULL;
 	}
 	return face;
