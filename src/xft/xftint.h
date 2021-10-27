@@ -65,8 +65,7 @@ int XftDebug(void);
 void xft_manage_memory(void);
 
 /* xftfreetype.c */
-FT_Face XftLockFace(XftFont* pub);
-void XftUnlockFace(XftFont* pub);
+FT_Face xft_lock_face(XftFont* pub);
 
 /* xftglyph.c */
 void xft_font_uncache_glyph(XftFont* public);

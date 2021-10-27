@@ -27,7 +27,7 @@ typedef struct XftGlyph {
 // This structure holds the data extracted from a pattern
 // needed to create a unique font object.
 typedef struct XftFontInfo {
-	struct XftFtFile* file; // face source
+	struct FontFile* file; // face source
 	// Rendering options
 	FT_F26Dot6 xsize, ysize; // pixel size
 	
@@ -61,8 +61,8 @@ typedef struct XftFont {
 	int num_glyphs; // size of glyphs/bitmaps arrays
 	// Hash table to get from Unicode value to glyph ID
 	// This array follows the glyphs in memory
-	struct XftUcsHash* hash_table;
-	int hash_value;
+	struct UcsHash* hash_table;
+	int hash_length;
 	int rehash_value;
 	// X specific fields
 	GlyphSet glyphset; // Render glyphset

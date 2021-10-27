@@ -233,6 +233,7 @@ static bool draw_row(int y, Row* row) {
 	// see if row matches what's drawn onscreen
 	// todo: we don't store the wrap flags in here.
 	// so if you're debugging and want them visible, you must remove this line too
+	// todo: i think this is not working reliably?
 	if (!memcmp(&row->cells, rows[y].cells, sizeof(Cell)*T.width))
 		return false;
 	memcpy(rows[y].cells, &row->cells, T.width*sizeof(Cell));

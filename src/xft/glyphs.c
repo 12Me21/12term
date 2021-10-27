@@ -289,7 +289,7 @@ static void _fill_xrender_bitmap(
 }
 
 void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, int nglyph) {
-	FT_Face face = XftLockFace(font);
+	FT_Face face = xft_lock_face(font);
 	if (!face)
 		return;
 	
@@ -558,7 +558,6 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 		if (XftDebug() & XFT_DBG_CACHEV)
 			print("Caching glyph 0x%x size %zd\n", glyphindex, xftg->glyph_memory);
 	}
-	XftUnlockFace(font);
 }
 
 void XftFontUnloadGlyphs(XftFont* font, const FT_UInt* glyphs, int nglyph) {

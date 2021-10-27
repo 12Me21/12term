@@ -6,8 +6,8 @@ FT_Library ft_library;
 // structure references that.  Note that many faces may in fact
 // live in the same font file; that is irrelevant to this structure
 // which is concerned only with the individual faces themselves
-typedef struct XftFtFile {
-	struct XftFtFile* next;
+typedef struct FontFile {
+	struct FontFile* next;
 	int ref; // number of font infos using this file
 	
 	utf8* filename;
@@ -17,34 +17,32 @@ typedef struct XftFtFile {
 	FT_F26Dot6 ysize;	// current ysize setting
 	FT_Matrix matrix;	// current matrix setting
 	
-	int lock; // lock count; can't unload unless 0
 	FT_Face face; // pointer to face; only valid when lock
-} XftFtFile;
-// todo: all this locking stuff is probably unncessesary now
+} FontFile;
 
-// A hash table translates Unicode values into glyph indicies
-typedef struct XftUcsHash {
+// A hash table translates Unicode values into glyph indexes
+typedef struct UcsHash {
 	Char ucs4;
 	FT_UInt glyph;
-} XftUcsHash;
+} UcsHash;
 
 // List of all open files (each face in a file is managed separately)
-static XftFtFile* xft_files = NULL;
-static int XftMaxFreeTypeFiles = 5;
+static FontFile* xft_files = NULL;
 
-// create a new XftFtFile from a filename and an id
-static XftFtFile* get_file(const utf8* filename, int id) {
-	XftFtFile* f;
-	for (f = xft_files; f; f = f->next) {
+// create a new FontFile from a filename and an id
+static FontFile* get_file(const utf8* filename, int id) {
+	FontFile* f;
+	// search all files for one with a matching name/id
+	for (f=xft_files; f; f=f->next) {
 		if (!strcmp(f->filename, filename) && f->id == id) {
 			++f->ref;
 			if (XftDebug() & XFT_DBG_REF)
-				printf("FontFile %s/%d matches existing (%d)\n",
-				       filename, id, f->ref);
-			return f;
+				printf("FontFile %s/%d matches existing (%d)\n", filename, id, f->ref);
+			goto found;
 		}
 	}
-	f = XftMalloc(XFT_MEM_FILE, sizeof(XftFtFile)+strlen(filename)+1);
+	// otherwise, create a new one
+	f = XftMalloc(XFT_MEM_FILE, sizeof(FontFile)+strlen(filename)+1);
 	if (!f)
 		return NULL;
 	
@@ -59,89 +57,30 @@ static XftFtFile* get_file(const utf8* filename, int id) {
 	strcpy(f->filename, filename);
 	f->id = id;
 	
-	f->lock = 0;
 	f->face = NULL;
 	f->xsize = 0;
 	f->ysize = 0;
 	f->matrix.xx = f->matrix.xy = f->matrix.yx = f->matrix.yy = 0;
+ found:
 	return f;
 }
 
-// create a new XftFtFile from an existing face
-static XftFtFile* make_face_file(FT_Face face) {
-	XftFtFile* f = XftMalloc(XFT_MEM_FILE, sizeof(XftFtFile));
+// create a new FontFile from an existing face
+static FontFile* make_face_file(FT_Face face) {
+	FontFile* f = XftMalloc(XFT_MEM_FILE, sizeof(FontFile));
 	if (!f)
 		return NULL;
-	
-	f->next = NULL;
-	
-	f->ref = 1;
-	
-	f->filename = NULL;
-	f->id = 0;
-	f->lock = 0;
-	f->face = face;
-	f->xsize = 0;
-	f->ysize = 0;
-	f->matrix.xx = f->matrix.xy = f->matrix.yx = f->matrix.yy = 0;
+	*f = (FontFile){
+		.next = NULL,
+		.ref = 1,
+		.filename = NULL,
+		.id = 0,
+		.face = face,
+		.xsize = 0,
+		.ysize = 0,
+		.matrix = {0,0,0,0},
+	};
 	return f;
-}
-
-static int num_files(void) {
-	int count = 0;
-	for (XftFtFile* f=xft_files; f; f=f->next)
-		if (f->face && !f->lock)
-			++count;
-	return count;
-}
-
-static XftFtFile* nth_file(int n) {
-	int count = 0;
-	XftFtFile* f = NULL;
-	for (f=xft_files; f; f=f->next)
-		if (f->face && !f->lock)
-			if (count++ == n)
-				return f;
-	return f;
-}
-
-static void uncache_files(void) {
-	int n;
-	while ((n = num_files()) > XftMaxFreeTypeFiles) {
-		XftFtFile* f = nth_file(rand() % n);
-		if (f) {
-			if (XftDebug() & XFT_DBG_REF)
-				printf("Discard file %s/%d from cache\n",
-				        f->filename, f->id);
-			FT_Done_Face(f->face);
-			f->face = NULL;
-		}
-	}
-}
-
-static FT_Face lock_file(XftFtFile* f) {
-	++f->lock;
-	if (!f->face) {
-		if (XftDebug() & XFT_DBG_REF)
-			printf("Loading file %s/%d\n", f->filename, f->id);
-		if (FT_New_Face(ft_library, f->filename, f->id, &f->face))
-			--f->lock;
-		
-		f->xsize = 0;
-		f->ysize = 0;
-		f->matrix.xx = f->matrix.xy = f->matrix.yx = f->matrix.yy = 0;
-		uncache_files();
-	}
-	return f->face;
-}
-
-static void lock_error(const utf8* reason) {
-	fprintf(stderr, "Xft: locking error %s\n", reason);
-}
-
-static void unlock_file(XftFtFile* f) {
-	if (--f->lock < 0)
-		lock_error("too many file unlocks");
 }
 
 static bool matrix_equal(FT_Matrix* a, FT_Matrix* b) {
@@ -154,7 +93,7 @@ static FT_F26Dot6 dist(FT_F26Dot6 a, FT_F26Dot6 b) {
 	return b-a;
 }
 
-static bool set_face(XftFtFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* matrix) {
+static bool set_face(FontFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* matrix) {
 	FT_Face face = f->face;
 	
 	if (f->xsize != xsize || f->ysize != ysize) {
@@ -202,13 +141,11 @@ static bool set_face(XftFtFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix
 	return true;
 }
 
-static void release_file(XftFtFile* f) {
+static void release_file(FontFile* f) {
 	if (--f->ref != 0)
 		return;
-	if (f->lock)
-		lock_error("Attempt to close locked file");
 	if (f->filename) {
-		for (XftFtFile** prev = &xft_files; *prev; prev = &(*prev)->next) {
+		for (FontFile** prev = &xft_files; *prev; prev = &(*prev)->next) {
 			if (*prev == f) {
 				*prev = f->next;
 				break;
@@ -217,7 +154,7 @@ static void release_file(XftFtFile* f) {
 		if (f->face)
 			FT_Done_Face(f->face);
 	}
-	XftMemFree(XFT_MEM_FILE, sizeof(XftFtFile) + (f->filename ? strlen(f->filename)+1 : 0));
+	XftMemFree(XFT_MEM_FILE, sizeof(FontFile) + (f->filename ? strlen(f->filename)+1 : 0));
 	free(f);
 }
 
@@ -262,22 +199,15 @@ static Char hash_size(Char num_unicode) {
 	return hash;
 }
 
-FT_Face XftLockFace(XftFont* font) {
-	//return font->info.file->face;
+FT_Face xft_lock_face(XftFont* font) {
 	XftFontInfo* fi = &font->info;
-	FT_Face face = fi->file->face;//lock_file(fi->file);
+	FT_Face face = fi->file->face;
 	// Make sure the face is usable at the requested size
 	// this is necessary if you have like
 	// multiple fonts using the same face but different matricies i
-	if (face && !set_face(fi->file, fi->xsize, fi->ysize, &fi->matrix)) {
-		//unlock_file(fi->file);
+	if (face && !set_face(fi->file, fi->xsize, fi->ysize, &fi->matrix))
 		face = NULL;
-	}
 	return face;
-}
-
-void XftUnlockFace(XftFont* font) {
-	unlock_file(font->info.file);
 }
 
 static FT_Int get_load_flags(const FcPattern* pattern, const XftFontInfo* fi) {
@@ -440,7 +370,19 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	if (FcPatternGetInteger(pattern, XFT_MAX_GLYPH_MEMORY, 0, &max_glyph_memory) != FcResultMatch)
 		max_glyph_memory = XFT_FONT_MAX_GLYPH_MEMORY;
 	
-	FT_Face face = lock_file(fi->file);
+	FontFile* f = fi->file;
+	
+	if (!f->face) {
+		if (XftDebug() & XFT_DBG_REF)
+			printf("Loading file %s/%d\n", f->filename, f->id);
+		FT_New_Face(ft_library, f->filename, f->id, &f->face);
+		
+		f->xsize = 0;
+		f->ysize = 0;
+		f->matrix.xx = f->matrix.xy = f->matrix.yx = f->matrix.yy = 0;
+	}
+	FT_Face face = f->face;
+	
 	if (!face)
 		goto bail0;
 	
@@ -485,13 +427,13 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 		goto bail2;
 	
 	Char num_unicode = 0;
-	Char hash_value = 0;
+	Char hash_length = 0;
 	Char rehash_value = 0;
 	if (charset) {
 		num_unicode = FcCharSetCount(charset);
-		hash_value = hash_size(num_unicode);
-		print("hash table size: %d\n", hash_value);
-		rehash_value = hash_value-2;
+		hash_length = hash_size(num_unicode);
+		print("hash table size: %d\n", hash_length);
+		rehash_value = hash_length-2;
 	}
 	
 	// Sometimes the glyphs are numbered 1..n, other times 0..n-1,
@@ -499,7 +441,7 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	int num_glyphs = face->num_glyphs + 1;
 	int alloc_size = sizeof(XftFont) +
 	                 num_glyphs*sizeof(XftGlyph*) +
-	                 hash_value*sizeof(XftUcsHash);
+	                 hash_length*sizeof(UcsHash);
 	
 	XftFont* font = XftMalloc(XFT_MEM_FONT, alloc_size);
 	if (!font)
@@ -582,12 +524,12 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	memset(font->glyphs, '\0', num_glyphs*sizeof(XftGlyph*));
 	font->num_glyphs = num_glyphs;
 	// Unicode hash table information
-	font->hash_table = (XftUcsHash*)(font->glyphs+font->num_glyphs);
-	for (int i=0; i<hash_value; i++) {
+	font->hash_table = (UcsHash*)(font->glyphs+font->num_glyphs);
+	for (int i=0; i<hash_length; i++) {
 		font->hash_table[i].ucs4 = -1;
 		font->hash_table[i].glyph = 0;
 	}
-	font->hash_value = hash_value;
+	font->hash_length = hash_length;
 	font->rehash_value = rehash_value;
 	// X specific fields
 	font->format = format;
@@ -596,14 +538,11 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	font->glyph_memory = 0;
 	font->max_glyph_memory = max_glyph_memory;
 	
-	unlock_file(fi->file);
-	
 	return font;
 	
  bail2:
 	FcCharSetDestroy(charset);
  bail1:
-	unlock_file(fi->file);
  bail0:
 	return NULL;
 }
@@ -639,7 +578,7 @@ static void XftFontDestroy(XftFont* font) {
 	/* Finally, free the font structure */
 	XftMemFree(XFT_MEM_FONT, sizeof(XftFont) +
 	           font->num_glyphs * sizeof(XftGlyph*) +
-	           font->hash_value * sizeof(XftUcsHash));
+	           font->hash_length * sizeof(UcsHash));
 	free(font);
 }
 // i think i've been incorrectly marking these as static
@@ -684,30 +623,34 @@ void XftFontClose(XftFont* font) {
 }
 
 FT_UInt XftCharIndex(XftFont* font, Char ucs4) {
-	if (!font->hash_value)
+	if (!font->hash_length)
 		return 0;
-	Char ent = ucs4 % font->hash_value;
+	Char ent = ucs4 % font->hash_length;
+	UcsHash* table = font->hash_table;
 	Char offset = 0;
-	while (font->hash_table[ent].ucs4 != ucs4) {
-		if (font->hash_table[ent].ucs4 == -1) {
+	while (table[ent].ucs4 != ucs4) {
+		// empty slot
+		if (table[ent].ucs4 == -1) {
 			if (!XftCharExists(font, ucs4))
 				return 0;
-			FT_Face face = XftLockFace(font);
+			FT_Face face = xft_lock_face(font);
 			if (!face)
 				return 0;
-			font->hash_table[ent].ucs4 = ucs4;
-			font->hash_table[ent].glyph = FcFreeTypeCharIndex(face, ucs4);
-			XftUnlockFace(font);
+			table[ent] = (UcsHash){
+				.ucs4 = ucs4,
+				.glyph = FcFreeTypeCharIndex(face, ucs4),
+			};
 			break;
 		}
+		// collision: choose new index
 		if (!offset) {
+			// calculate offset if we haven't already
 			offset = ucs4 % font->rehash_value;
 			if (!offset)
 				offset = 1;
 		}
 		ent += offset;
-		if (ent >= font->hash_value)
-			ent -= font->hash_value;
+		ent %= font->hash_length;
 	}
 	return font->hash_table[ent].glyph;
 }
