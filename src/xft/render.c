@@ -68,7 +68,8 @@ void XftGlyphRender1(int op, XRenderColor col, XftFont* font, Picture dst, float
 	
 	XftGlyph* glyph = font->glyphs[wire];
 	float half = glyph->metrics.xOff / 2.0f;
-	int bx = (int)(x - half + 0.5);
+	int bx = (int)(x - half + 10000) - 10000; // add 10000 so the number isn't negative when rounded
+	
 	if (glyph->picture) {
 		XRenderComposite(W.d, op, glyph->picture, None, dst, 0, 0, 0, 0,
 			bx + glyph->metrics.x, y - glyph->metrics.y, glyph->metrics.width, glyph->metrics.height);
