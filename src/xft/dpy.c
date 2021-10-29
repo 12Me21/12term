@@ -30,15 +30,7 @@ void xft_init(void) {
 	if (XftDebug() & XFT_DBG_CACHE)
 		print("global max cache memory %zd\n", info.max_glyph_memory);
 	
-	info.num_unref_fonts = 0;
-	info.max_unref_fonts = XFT_DPY_MAX_UNREF_FONTS;//XftDefaultGetInteger(XFT_MAX_UNREF_FONTS, XFT_DPY_MAX_UNREF_FONTS);
-	if (XftDebug() & XFT_DBG_CACHE)
-		print("global max unref fonts %d\n", info.max_unref_fonts);
-	
-	// bail1:
-	if (XftDebug() & XFT_DBG_RENDER) {
-		print("XftDisplayInfoGet failed to initialize, Xft unhappy :(\n");
-	}
+	//		print("XftDisplayInfoGet failed to initialize, Xft unhappy :(\n");
 }
 
 // Reduce memory usage in X server

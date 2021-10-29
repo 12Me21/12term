@@ -37,7 +37,7 @@ static FontFile* get_file(const utf8* filename, int id) {
 		if (!strcmp(f->filename, filename) && f->id == id) {
 			++f->ref;
 			if (XftDebug() & XFT_DBG_REF)
-				printf("FontFile %s/%d matches existing (%d)\n", filename, id, f->ref);
+				print("FontFile %s/%d matches existing (%d)\n", filename, id, f->ref);
 			goto found;
 		}
 	}
@@ -47,7 +47,7 @@ static FontFile* get_file(const utf8* filename, int id) {
 		return NULL;
 	
 	if (XftDebug() & XFT_DBG_REF)
-		printf("FontFile %s/%d matches new\n", filename, id);
+		print("FontFile %s/%d matches new\n", filename, id);
 	f->next = xft_files;
 	xft_files = f;
 	
@@ -98,7 +98,7 @@ static bool set_face(FontFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix*
 	
 	if (f->xsize != xsize || f->ysize != ysize) {
 		if (XftDebug() & XFT_DBG_GLYPH)
-			printf("Set face size to %dx%d (%dx%d)\n",
+			print("Set face size to %dx%d (%dx%d)\n",
 			       (int) (xsize >> 6), (int) (ysize >> 6), (int) xsize, (int) ysize);
 		// Bitmap only faces must match exactly, so find the closest
 		// one (height dominant search)
@@ -130,11 +130,11 @@ static bool set_face(FontFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix*
 	}
 	if (!matrix_equal(&f->matrix, matrix)) {
 		if (XftDebug() & XFT_DBG_GLYPH)
-			printf ("Set face matrix to (%g,%g,%g,%g)\n",
-			        (double)matrix->xx / 0x10000,
-			        (double)matrix->xy / 0x10000,
-			        (double)matrix->yx / 0x10000,
-			        (double)matrix->yy / 0x10000);
+			print("Set face matrix to (%g,%g,%g,%g)\n",
+			      (double)matrix->xx / 0x10000,
+			      (double)matrix->xy / 0x10000,
+			      (double)matrix->yx / 0x10000,
+			      (double)matrix->yy / 0x10000);
 		FT_Set_Transform(face, matrix, NULL);
 		f->matrix = *matrix;
 	}
@@ -292,8 +292,8 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 	fi->xsize = (FT_F26Dot6)(dsize * aspect * 64.0);
 	
 	if (XftDebug() & XFT_DBG_OPEN)
-		printf("XftFontInfoFill: %s: %d (%g pixels)\n",
-		       (filename ? (utf8*)filename : "<none>"), id, dsize);
+		print("XftFontInfoFill: %s: %d (%g pixels)\n",
+		      (filename ? (utf8*)filename : "<none>"), id, dsize);
 	
 	fi->antialias = true;
 	// Get antialias value
@@ -363,9 +363,9 @@ static void XftFontInfoEmpty(XftFontInfo* fi) {
 static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	// No existing font, create another.
 	if (XftDebug() & XFT_DBG_CACHE)
-		printf("New font %s/%d size %dx%d\n",
-		       fi->file->filename, fi->file->id,
-		       (int) fi->xsize >> 6, (int) fi->ysize >> 6);
+		print("New font %s/%d size %dx%d\n",
+		      fi->file->filename, fi->file->id,
+		      (int) fi->xsize >> 6, (int) fi->ysize >> 6);
 	int max_glyph_memory;
 	if (FcPatternGetInteger(pattern, XFT_MAX_GLYPH_MEMORY, 0, &max_glyph_memory) != FcResultMatch)
 		max_glyph_memory = XFT_FONT_MAX_GLYPH_MEMORY;
@@ -374,7 +374,7 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	
 	if (!f->face) {
 		if (XftDebug() & XFT_DBG_REF)
-			printf("Loading file %s/%d\n", f->filename, f->id);
+			print("Loading file %s/%d\n", f->filename, f->id);
 		FT_New_Face(ft_library, f->filename, f->id, &f->face);
 		
 		f->xsize = 0;
@@ -388,7 +388,7 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	
 	if (!set_face(fi->file, fi->xsize, fi->ysize, &fi->matrix))
 		goto bail1;
-
+	
 	// Get the set of Unicode codepoints covered by the font.
 	// If the incoming pattern doesn't provide this data, go
 	// off and compute it.  Yes, this is expensive, but it's
@@ -558,68 +558,44 @@ XftFont* XftFontOpenPattern(FcPattern* pattern) {
 }
 
 static void XftFontDestroy(XftFont* font) {
-	/* note reduction in memory use */
+	// note reduction in memory use
 	info.glyph_memory -= font->glyph_memory;
-	/* Clean up the info */
+	// Clean up the info
 	XftFontInfoEmpty(&font->info);
-	/* Free the glyphset */
+	// Free the glyphset
 	if (font->glyphset)
 		XRenderFreeGlyphSet(W.d, font->glyphset);
-	/* Free the glyphs */
+	// Free the glyphs
 	FOR (i, font->num_glyphs) {
 		XftGlyph* xftg = font->glyphs[i];
 		free(xftg);
 	}
 	
-	/* Free the pattern and the charset */
+	// Free the pattern and the charset
 	FcPatternDestroy(font->pattern);
 	FcCharSetDestroy(font->charset);
 	
-	/* Finally, free the font structure */
+	// Finally, free the font structure
 	XftMemFree(XFT_MEM_FONT, sizeof(XftFont) +
 	           font->num_glyphs * sizeof(XftGlyph*) +
 	           font->hash_length * sizeof(UcsHash));
 	free(font);
 }
-// i think i've been incorrectly marking these as static
-static XftFont* XftFontFindNthUnref(int n) {
-	XftFont* font;
-	for (font=info.fonts; font; font=font->next) {
-		if (!font->ref && !n--)
-			break;
-	}
-	return font;
-}
-
-// different from xft_font_manage_memory
-static void font_manage_memory(void) {
-	while (info.num_unref_fonts > info.max_unref_fonts) {
-		XftFont* font = XftFontFindNthUnref(rand() % info.num_unref_fonts);
-		if (XftDebug() & XFT_DBG_CACHE)
-			printf("freeing unreferenced font %s/%d size %dx%d\n",
-			       font->info.file->filename, font->info.file->id,
-			       (int)font->info.xsize >> 6, (int)font->info.ysize >> 6);
-		
-		XftFont** prev;
-		/* Unhook from display list */
-		for (prev = &info.fonts; *prev; prev = &(*prev)->next) {
-			if (*prev == font) {
-				*prev = font->next;
-				break;
-			}
-		}
-		/* Destroy the font */
-		XftFontDestroy(font);
-		--info.num_unref_fonts;
-	}
-}
 
 void XftFontClose(XftFont* font) {
-	if (--font->ref != 0)
+	font->ref--;
+	if (font->ref > 0)
 		return;
 	
-	++info.num_unref_fonts;
-	font_manage_memory();
+	// Unhook from display list
+	for (XftFont** prev = &info.fonts; *prev; prev = &(*prev)->next) {
+		if (*prev == font) {
+			*prev = font->next;
+			break;
+		}
+	}
+	// Destroy the font
+	XftFontDestroy(font);
 }
 
 FT_UInt XftCharIndex(XftFont* font, Char ucs4) {

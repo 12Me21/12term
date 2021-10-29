@@ -26,20 +26,12 @@ typedef struct XftDisplayInfo {
 	XftFont* fonts;
 	size_t glyph_memory;
 	size_t max_glyph_memory;
-	int num_unref_fonts;
-	int max_unref_fonts;
 	XftSolidColor colors[XFT_NUM_SOLID_COLOR];
 } XftDisplayInfo;
 
 // By default, use no more than 4 meg of server memory total, and no
 // more than 1 meg for any one font
 #define XFT_FONT_MAX_GLYPH_MEMORY (1024 * 1024)
-
-// By default, keep the last 16 unreferenced fonts around to
-// speed reopening them.  Note that the glyph caching code
-// will keep the global memory usage reasonably limited
-//  no
-#define XFT_DPY_MAX_UNREF_FONTS 0
 
 #define XFT_DBG_OPEN	1
 #define XFT_DBG_OPENV 2

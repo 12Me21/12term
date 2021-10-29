@@ -8,7 +8,7 @@ int XftDebug(void) {
 		initialized = 1;
 		utf8* e = getenv("XFT_DEBUG");
 		if (e) {
-			printf("XFT_DEBUG=%s\n", e);
+			print("XFT_DEBUG=%s\n", e);
 			debug = atoi (e);
 			if (debug <= 0)
 				debug = 1;
