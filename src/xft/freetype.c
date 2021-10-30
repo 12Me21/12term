@@ -93,6 +93,7 @@ static FT_F26Dot6 dist(FT_F26Dot6 a, FT_F26Dot6 b) {
 	return b-a;
 }
 
+// set the current size and matrix for a font
 static bool set_face(FontFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* matrix) {
 	FT_Face face = f->face;
 	
@@ -274,10 +275,13 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 	FcPatternGetInteger(pattern, FC_INDEX, 0, &id);
 	
 	FT_Face face;
-	if (filename)
+	if (filename) {
+		// I think this is the only one which is used?
 		fi->file = get_file((utf8*)filename, id);
-	else if (FcPatternGetFTFace(pattern, FC_FT_FACE, 0, &face) == FcResultMatch && face)
+	} else if (FcPatternGetFTFace(pattern, FC_FT_FACE, 0, &face) == FcResultMatch && face) {
 		fi->file = make_face_file(face);
+	}
+	
 	if (!fi->file)
 		goto bail0;
 	
@@ -295,8 +299,8 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 		print("XftFontInfoFill: %s: %d (%g pixels)\n",
 		      (filename ? (utf8*)filename : "<none>"), id, dsize);
 	
-	fi->antialias = true;
 	// Get antialias value
+	fi->antialias = true;
 	FcPatternGetBool(pattern, FC_ANTIALIAS, 0, &fi->antialias);
 	
 	// Get rgba value

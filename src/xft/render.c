@@ -1,4 +1,5 @@
 #include "xftint.h"
+#include "../buffer.h"
 
 // improve caching here
 Picture XftDrawSrcPicture(const XRenderColor color) {
