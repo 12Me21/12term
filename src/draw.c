@@ -36,7 +36,7 @@ static int cursor_width; // in cells
 static int cursor_y; // cells
 
 // convert a Color (indexed or rgb) into XRenderColor (rgb)
-static XRenderColor make_color(Color c) {
+XRenderColor make_color(Color c) {
 	RGBColor rgb;
 	if (c.truecolor)
 		rgb = c.rgb;
@@ -62,18 +62,6 @@ static XRenderColor make_color(Color c) {
 static void draw_rect(XftDraw draw, Color color, Px x, Px y, Px width, Px height) {
 	XRenderColor c = make_color(color);
 	XRenderFillRectangle(W.d, PictOpSrc, draw.pict, &c, x, y, width, height);
-}
-
-unsigned long alloc_color(Color c) {
-	XRenderColor x = make_color(c);
-	XColor xc = {
-		.red = x.red,
-		.green = x.green,
-		.blue = x.blue,
-		//.flags = ?
-	};
-	XAllocColor(W.d, W.cmap, &xc);
-	return xc.pixel;
 }
 
 static XftDraw draw_create(Px w, Px h) {

@@ -44,6 +44,18 @@ bool parse_x_color(const utf8* c, RGBColor* out) {
 	return false;
 }
 
+static unsigned long alloc_color(Color c) {
+	XRenderColor x = make_color(c);
+	XColor xc = {
+		.red = x.red,
+		.green = x.green,
+		.blue = x.blue,
+		//.flags = ?
+	};
+	XAllocColor(W.d, W.cmap, &xc);
+	return xc.pixel;
+}
+
 // so we need to clean up these size change functions
 // basically, there are a few cases:
 // 1: on init, we update both the window size and the char size
