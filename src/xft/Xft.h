@@ -92,12 +92,12 @@ XftFont* XftFontOpenPattern(FcPattern* pattern);
 void XftFontClose(XftFont* pub);
 
 /* xftglyphs.c */
-void XftFontLoadGlyphs(XftFont* pub, bool need_bitmaps, const FT_UInt* glyphs, int nglyph);
+void XftFontLoadGlyphs(XftFont* pub, const FT_UInt* glyphs, int nglyph);
 void XftFontUnloadGlyphs(XftFont* pub, const FT_UInt* glyphs, int nglyph);
 
 #define XFT_NMISSING 256
 
-bool XftFontCheckGlyph(XftFont* pub, bool need_bitmaps, FT_UInt glyph, FT_UInt* missing, int* nmissing);
+bool XftFontCheckGlyph(XftFont* pub, FT_UInt glyph, FT_UInt* missing, int* nmissing);
 bool XftCharExists(XftFont* pub, Char ucs4);
 FT_UInt XftCharIndex(XftFont* pub, Char ucs4);
 

@@ -288,7 +288,20 @@ static void _fill_xrender_bitmap(
 	}
 }
 
-void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, int nglyph) {
+static int dot6_to_int(FT_F26Dot6 x) {
+	return x>>6;
+}
+static int dot6_floor(FT_F26Dot6 x) {
+	return x & ~63;
+}
+static int dot6_round(FT_F26Dot6 x) {
+	return x+32 & ~63;
+}
+static int dot6_ceil(FT_F26Dot6 x) {
+	return x+63 & ~63;
+}
+
+void XftFontLoadGlyphs(XftFont* font, const FT_UInt* glyphs, int nglyph) {
 	FT_Face face = xft_lock_face(font);
 	if (!face)
 		return;
@@ -342,11 +355,6 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 			if (error)
 				continue;
 		}
-
-#define FLOOR(x)    ((x) & -64)
-#define CEIL(x)	    (((x)+63) & -64)
-#define TRUNC(x)    ((x) >> 6)
-#define ROUND(x)    (((x)+32) & -64)
 		
 		FT_GlyphSlot glyphslot = face->glyph;
 		
@@ -355,7 +363,7 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 			FT_GlyphSlot_Embolden(glyphslot);
 		
 		// Compute glyph metrics from FreeType information
-		int left, right, top, bottom;
+		FT_F26Dot6 left, right, top, bottom;
 		FT_Vector vector;
 		if (transform) {
 			// calculate the true width by transforming all four corners.
@@ -372,33 +380,32 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 						left = right = vector.x;
 						top = bottom = vector.y;
 					} else {
-						if (left > vector.x) left = vector.x;
-						if (right < vector.x) right = vector.x;
-						if (bottom > vector.y) bottom = vector.y;
 						if (top < vector.y) top = vector.y;
+						if (right < vector.x) right = vector.x;
+						if (left > vector.x) left = vector.x;
+						if (bottom > vector.y) bottom = vector.y;
 					}
 				}
 			}
-			left = FLOOR(left);
-			right = CEIL(right);
-			bottom = FLOOR(bottom);
-			top = CEIL(top);
+			top = dot6_ceil(top);
+			right = dot6_ceil(right);
+			left = dot6_floor(left);
+			bottom = dot6_floor(bottom);
 			// lots of rounding going on here... kinda sus
 		} else {
-			left = FLOOR(glyphslot->metrics.horiBearingX);
-			right = CEIL(glyphslot->metrics.horiBearingX + glyphslot->metrics.width);
-			
-			top = CEIL(glyphslot->metrics.horiBearingY);
-			bottom = FLOOR( glyphslot->metrics.horiBearingY - glyphslot->metrics.height );
+			top = dot6_ceil(glyphslot->metrics.horiBearingY);
+			right = dot6_ceil(glyphslot->metrics.horiBearingX + glyphslot->metrics.width);
+			left = dot6_floor(glyphslot->metrics.horiBearingX);
+			bottom = dot6_floor(glyphslot->metrics.horiBearingY - glyphslot->metrics.height);
 		}
 		
-		int width = TRUNC(right - left);
-		int height = TRUNC(top - bottom);
+		int width = dot6_to_int(right - left);
+		int height = dot6_to_int(top - bottom);
 		
 		// Clip charcell glyphs to the bounding box
 		// XXX transformed?
 		if (font->info.spacing >= FC_CHARCELL && !transform) {
-			if (TRUNC(right) > font->max_advance_width) {
+			if (dot6_to_int(right) > font->max_advance_width) {
 				int adjust = right - (font->max_advance_width << 6);
 				if (adjust > left) adjust = left;
 				left -= adjust;
@@ -429,8 +436,8 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 				xftg->metrics.yOff = 0;
 			}
 		} else {
-			xftg->metrics.xOff = TRUNC(ROUND(glyphslot->advance.x));
-			xftg->metrics.yOff = -TRUNC(ROUND(glyphslot->advance.y));
+			xftg->metrics.xOff = dot6_to_int(dot6_round(glyphslot->advance.x));
+			xftg->metrics.yOff = -dot6_to_int(dot6_round(glyphslot->advance.y));
 		}
 		
 		// compute the size of the final bitmap
@@ -441,7 +448,7 @@ void XftFontLoadGlyphs(XftFont* font, bool need_bitmaps, const FT_UInt* glyphs, 
 		
 		if (XftDebug() & XFT_DBG_GLYPH) {
 			print("glyph %d:\n", (int) glyphindex);
-			print(" xywh (%d %d %d %d), trans (%d %d %d %d) wh (%d %d)\n",
+			print(" xywh (%d %d %d %d), trans (%ld %ld %ld %ld) wh (%d %d)\n",
 			       (int) glyphslot->metrics.horiBearingX,
 			       (int) glyphslot->metrics.horiBearingY,
 			       (int) glyphslot->metrics.width,
@@ -584,15 +591,38 @@ void XftFontUnloadGlyphs(XftFont* font, const FT_UInt* glyphs, int nglyph) {
 		XRenderFreeGlyphs(W.d, font->glyphset, glyphBuf, nused);
 }
 
+void xft_load_glyphs(XftFont* font, FT_UInt* glyphs, int nglyph) {
+	FT_UInt missing[nglyph];
+	int nmissing = 0;
+	FOR (i, nglyph) {
+		FT_UInt glyph = glyphs[i];
+		if (glyph >= font->num_glyphs)
+			continue; // out of range
+		XftGlyph* xftg = font->glyphs[glyph];
+		if (xftg && xftg->glyph_memory)
+			continue; // already loaded glyph
+		// is there actually a case where xftg exists but xftg->glyph_memory is 0?
+		// it seems like that would only be the case if we didn't load the bitmap immediately.
+		if (!xftg) {
+			xftg = XftMalloc(XFT_MEM_GLYPH, sizeof(XftGlyph));
+			xftg->glyph_memory = 0;
+			font->glyphs[glyph] = xftg;
+		}
+		missing[nmissing++] = glyph;
+	}
+	if (nmissing)
+		XftFontLoadGlyphs(font, missing, nmissing);
+}
+
 // check if glyph exists
 // also outputs to the array `missing` at index `nmissing`
 // `missing` is expected to have a length of XFT_NMISSING
 // if this array is full, all items in `missing` are loaded immediately, and `nmissing` is set back to 0
-bool XftFontCheckGlyph(XftFont* font, bool need_bitmaps, FT_UInt glyph, FT_UInt* missing, int* nmissing) {
+bool XftFontCheckGlyph(XftFont* font, FT_UInt glyph, FT_UInt* missing, int* nmissing) {
 	if (glyph >= font->num_glyphs)
 		return false;
 	XftGlyph* xftg = font->glyphs[glyph];
-	if (!xftg || (need_bitmaps && !xftg->glyph_memory)) {
+	if (!xftg || !xftg->glyph_memory) {
 		if (!xftg) {
 			xftg = XftMalloc(XFT_MEM_GLYPH, sizeof(XftGlyph));
 			if (!xftg)
@@ -603,7 +633,7 @@ bool XftFontCheckGlyph(XftFont* font, bool need_bitmaps, FT_UInt glyph, FT_UInt*
 		int n = *nmissing;
 		missing[n++] = glyph;
 		if (n == XFT_NMISSING) { //if the results array is out of space we just load the glyphs here right away
-			XftFontLoadGlyphs(font, need_bitmaps, missing, n);
+			XftFontLoadGlyphs(font, missing, n);
 			n = 0;
 		}
 		*nmissing = n;

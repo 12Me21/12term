@@ -58,9 +58,9 @@ void XftGlyphRender1(int op, XRenderColor col, XftFont* font, Picture dst, float
 	// Load missing glyphs
 	FT_UInt missing[1];
 	int nmissing = 0;
-	FcBool glyphs_loaded = XftFontCheckGlyph(font, true, wire, missing, &nmissing);
+	FcBool glyphs_loaded = XftFontCheckGlyph(font, wire, missing, &nmissing);
 	if (nmissing)
-		XftFontLoadGlyphs(font, true, missing, nmissing);
+		XftFontLoadGlyphs(font, missing, nmissing);
 	
 	if (!font->glyphset)
 		goto bail1;

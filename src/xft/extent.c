@@ -24,10 +24,10 @@ static void xft_glyph_extents(XftFont* font, const FT_UInt* glyphs, int nglyphs,
 	int nmissing = 0;
 	bool glyphs_loaded = false;
 	while (n--)
-		if (XftFontCheckGlyph(font, false, *g++, missing, &nmissing))
+		if (XftFontCheckGlyph(font, *g++, missing, &nmissing))
 			glyphs_loaded = true;
 	if (nmissing)
-		XftFontLoadGlyphs(font, false, missing, nmissing);
+		XftFontLoadGlyphs(font, missing, nmissing);
 	g = glyphs;
 	n = nglyphs;
 	XftGlyph* xftg = NULL;

@@ -60,6 +60,7 @@ void xft_manage_memory(void);
 FT_Face xft_lock_face(XftFont* pub);
 
 /* xftglyph.c */
+void xft_load_glyphs(XftFont* font, FT_UInt* glyphs, int nglyph);
 void xft_font_uncache_glyph(XftFont* public);
 void xft_font_manage_memory(XftFont* public);
 
