@@ -591,7 +591,8 @@ void XftFontUnloadGlyphs(XftFont* font, const FT_UInt* glyphs, int nglyph) {
 		XRenderFreeGlyphs(W.d, font->glyphset, glyphBuf, nused);
 }
 
-void xft_load_glyphs(XftFont* font, FT_UInt* glyphs, int nglyph) {
+// return: true if any were loaded
+bool xft_load_glyphs(XftFont* font, const FT_UInt* glyphs, int nglyph) {
 	FT_UInt missing[nglyph];
 	int nmissing = 0;
 	FOR (i, nglyph) {
@@ -610,36 +611,11 @@ void xft_load_glyphs(XftFont* font, FT_UInt* glyphs, int nglyph) {
 		}
 		missing[nmissing++] = glyph;
 	}
-	if (nmissing)
+	if (nmissing) {
 		XftFontLoadGlyphs(font, missing, nmissing);
-}
-
-// check if glyph exists
-// also outputs to the array `missing` at index `nmissing`
-// `missing` is expected to have a length of XFT_NMISSING
-// if this array is full, all items in `missing` are loaded immediately, and `nmissing` is set back to 0
-bool XftFontCheckGlyph(XftFont* font, FT_UInt glyph, FT_UInt* missing, int* nmissing) {
-	if (glyph >= font->num_glyphs)
-		return false;
-	XftGlyph* xftg = font->glyphs[glyph];
-	if (!xftg || !xftg->glyph_memory) {
-		if (!xftg) {
-			xftg = XftMalloc(XFT_MEM_GLYPH, sizeof(XftGlyph));
-			if (!xftg)
-				return false;
-			xftg->glyph_memory = 0;
-			font->glyphs[glyph] = xftg;
-		}
-		int n = *nmissing;
-		missing[n++] = glyph;
-		if (n == XFT_NMISSING) { //if the results array is out of space we just load the glyphs here right away
-			XftFontLoadGlyphs(font, missing, n);
-			n = 0;
-		}
-		*nmissing = n;
 		return true;
-	} else
-		return false;
+	}
+	return false;
 }
 
 bool XftCharExists(XftFont* font, Char ucs4) {

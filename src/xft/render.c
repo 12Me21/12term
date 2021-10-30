@@ -56,11 +56,7 @@ Picture XftDrawSrcPicture(const XRenderColor color) {
 // g - glyph id
 void XftGlyphRender1(int op, XRenderColor col, XftFont* font, Picture dst, float x, int y, FT_UInt wire) {
 	// Load missing glyphs
-	FT_UInt missing[1];
-	int nmissing = 0;
-	FcBool glyphs_loaded = XftFontCheckGlyph(font, wire, missing, &nmissing);
-	if (nmissing)
-		XftFontLoadGlyphs(font, missing, nmissing);
+	FcBool glyphs_loaded = xft_load_glyphs(font, &wire, 1);
 	
 	if (!font->glyphset)
 		goto bail1;

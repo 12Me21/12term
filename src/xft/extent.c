@@ -17,19 +17,10 @@
 // these can then be rendered without checking
 
 static void xft_glyph_extents(XftFont* font, const FT_UInt* glyphs, int nglyphs, XGlyphInfo* extents) {
-	FT_UInt missing[XFT_NMISSING];
-	
 	const FT_UInt* g = glyphs;
 	int n = nglyphs;
-	int nmissing = 0;
-	bool glyphs_loaded = false;
-	while (n--)
-		if (XftFontCheckGlyph(font, *g++, missing, &nmissing))
-			glyphs_loaded = true;
-	if (nmissing)
-		XftFontLoadGlyphs(font, missing, nmissing);
-	g = glyphs;
-	n = nglyphs;
+	bool glyphs_loaded = xft_load_glyphs(font, glyphs, nglyphs);
+	
 	XftGlyph* xftg = NULL;
 	FT_UInt glyph;
 	while (n) {
