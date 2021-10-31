@@ -15,7 +15,7 @@ typedef struct {
 	Px width, height;
 	
 	XftFont* font;
-	FcFontSet* set;
+	FcFontSet* set; // set of matching fonts, used for loading fallback chars
 	FcPattern* pattern;
 } Font;
 
@@ -74,8 +74,9 @@ static bool load_font(Font* f, FcPattern* pattern, bool bold, bool italic, bool 
 		f->width = ceildiv(extents.xOff, len);
 		//}
 	
-	f->set = NULL;
+	FcResult fcres;
 	f->pattern = configured;
+	f->set = FcFontSort(NULL, f->pattern, true, NULL, &fcres);
 	//f->ascent = f->font->ascent;
 	//f->descent = f->font->descent;
 	f->height = f->font->ascent + f->font->descent;
@@ -144,10 +145,6 @@ static void find_fallback_font(Char chr, int style, XftFont** xfont, FT_UInt* gl
 		}
 	}
 	Font* font = &fonts[style];
-	// Nothing was found. Use fontconfig to find matching font.
-	FcResult fcres;
-	if (!font->set)
-		font->set = FcFontSort(NULL, font->pattern, true, NULL, &fcres);
 	
 	FcPattern* fcpattern = FcPatternDuplicate(font->pattern);
 	FcCharSet* fccharset = FcCharSetCreate();
@@ -158,8 +155,9 @@ static void find_fallback_font(Char chr, int style, XftFont** xfont, FT_UInt* gl
 		
 	FcConfigSubstitute(NULL, fcpattern, FcMatchPattern);
 	FcDefaultSubstitute(fcpattern);
-		
-	FcPattern* fontpattern = FcFontSetMatch(NULL, (FcFontSet*[]){font->set}, 1, fcpattern, &fcres);
+	
+	FcResult fcres;
+	FcPattern* fontpattern = FcFontSetMatch(NULL, &font->set, 1, fcpattern, &fcres);
 	
 	if (frclen >= LEN(frc))
 		die("too many fallback fonts aaaaaaa\n");
