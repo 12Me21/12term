@@ -92,7 +92,6 @@ XftFont* XftFontOpenPattern(FcPattern* pattern);
 void XftFontClose(XftFont* pub);
 
 /* xftglyphs.c */
-void XftFontLoadGlyphs(XftFont* pub, const FT_UInt* glyphs, int nglyph);
 void XftFontUnloadGlyphs(XftFont* pub, const FT_UInt* glyphs, int nglyph);
 
 bool XftFontCheckGlyph(XftFont* pub, FT_UInt glyph, FT_UInt* missing, int* nmissing);
