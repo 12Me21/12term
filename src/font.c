@@ -144,24 +144,25 @@ static void find_fallback_font(Char chr, int style, XftFont** xfont, FT_UInt* gl
 			return;
 		}
 	}
-	Font* font = &fonts[style];
-	
-	FcPattern* fcpattern = FcPatternDuplicate(font->pattern);
-	FcCharSet* fccharset = FcCharSetCreate();
-		
-	FcCharSetAddChar(fccharset, chr);
-	FcPatternAddCharSet(fcpattern, FC_CHARSET, fccharset);
-	FcPatternAddBool(fcpattern, FC_SCALABLE, true);
-		
-	FcConfigSubstitute(NULL, fcpattern, FcMatchPattern);
-	FcDefaultSubstitute(fcpattern);
-	
-	FcResult fcres;
-	FcPattern* fontpattern = FcFontSetMatch(NULL, &font->set, 1, fcpattern, &fcres);
-	
 	if (frclen >= LEN(frc))
 		die("too many fallback fonts aaaaaaa\n");
 	
+	// ok here we start looking for a font
+	Font* font = &fonts[style];
+	// create a charset with our char in it
+	FcCharSet* fccharset = FcCharSetCreate();
+	FcCharSetAddChar(fccharset, chr);
+	// duplicate the initial font pattern, with our charset added
+	FcPattern* fcpattern = FcPatternDuplicate(font->pattern);
+	FcPatternAddCharSet(fcpattern, FC_CHARSET, fccharset);
+	// set some more things on our pattern
+	FcPatternAddBool(fcpattern, FC_SCALABLE, true);
+	FcConfigSubstitute(NULL, fcpattern, FcMatchPattern);
+	FcDefaultSubstitute(fcpattern);
+	// now search the set using this pattern
+	FcResult fcres;
+	FcPattern* fontpattern = FcFontSetMatch(NULL, &font->set, 1, fcpattern, &fcres);
+	// now add our font to the cache
 	frc[frclen].font = XftFontOpenPattern(fontpattern);
 	if (!frc[frclen].font)
 		die("XftFontOpenPattern failed seeking fallback font: %s\n", strerror(errno));
