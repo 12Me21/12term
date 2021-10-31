@@ -39,8 +39,8 @@ static void xft_glyph_extents(XftFont* font, const FT_UInt* glyphs, int nglyphs,
 		int y = 0;
 		int overall_left = x - xftg->metrics.x;
 		int overall_top = y - xftg->metrics.y;
-		int overall_right = overall_left + (int) xftg->metrics.width;
-		int overall_bottom = overall_top + (int) xftg->metrics.height;
+		int overall_right = overall_left + xftg->metrics.width;
+		int overall_bottom = overall_top + xftg->metrics.height;
 		x += xftg->metrics.xOff;
 		y += xftg->metrics.yOff;
 		while (n--) {
@@ -48,8 +48,8 @@ static void xft_glyph_extents(XftFont* font, const FT_UInt* glyphs, int nglyphs,
 			if (glyph < font->num_glyphs && (xftg = font->glyphs[glyph])) {
 				int left = x - xftg->metrics.x;
 				int top = y - xftg->metrics.y;
-				int right = left + (int) xftg->metrics.width;
-				int bottom = top + (int) xftg->metrics.height;
+				int right = left + xftg->metrics.width;
+				int bottom = top + xftg->metrics.height;
 				if (left < overall_left)
 					overall_left = left;
 				if (top < overall_top)

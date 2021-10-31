@@ -625,6 +625,7 @@ bool XftCharExists(XftFont* font, Char ucs4) {
 }
 
 // Pick a random glyph from the font and remove it from the cache
+// edit: i dont think this is actually how this works
 void xft_font_uncache_glyph(XftFont* font) {
 	if (!font->glyph_memory)
 		return;
