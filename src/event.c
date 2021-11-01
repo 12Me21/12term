@@ -201,31 +201,6 @@ void xim_spot(int x, int y) {
 	XSetICValues(ime.xic, XNPreeditAttributes, ime.spotlist, NULL);
 }
 
-// this will be useful someday, perhaps
-int utf8_encode(Char c, char* out) {
-	if (c<0)
-		return 0;
-	int len=0;
-	if (c < 1<<7) {
-		out[len++] = c;
-	} else if (c < 1<<5+6) {
-		out[len++] = 192 | (c>>6 & (1<<5)-1);
-		last1:
-		out[len++] = 128 | (c & (1<<6)-1);
-	} else if (c < 1<<4+6*2) {
-		out[len++] = 224 | (c>>6*2 & (1<<4)-1);
-		last2:
-		out[len++] = 128 | (c>>6 & (1<<6)-1);
-		goto last1;
-	} else if (c < 1<<3+6*3) {
-		out[len++] = 240 | (c>>6*3 & (1<<3)-1);
-		goto last2;
-	} else { //too big
-		return 0;
-	}
-	return len;
-}
-
 static bool match_modifiers(KeyMap* want, int got) {
 	if (want->app_keypad && T.app_keypad != (want->app_keypad==1))
 		return false;
