@@ -46,11 +46,15 @@ void load_fonts(const utf8* fontstr, double fontsize) {
 		time_log("loaded font");
 	}
 	
-	W.font_baseline = 10; //fonts[0].font->ascent;
-	
-	// messy. remember to call update_charsize
-	W.cw = 9;//ceil(fonts[0].width);
-	W.ch = 18;//ceil(fonts[0].height);
+	// calculate char cell size
+	int width = 0;
+	int count = 0;
+	for (Char i=' '; i<='~'; i++) {
+		GlyphData* d = cache_lookup(i, 0);
+		width += d->metrics.xOff;
+		count++;
+	}
+	W.cw = (width+count/2) / count; // average width
 	
 	FcPatternDestroy(pattern);
 }

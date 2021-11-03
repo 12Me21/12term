@@ -32,6 +32,7 @@ typedef struct {
 static Font fonts[4] = {0};
 
 //load one font face
+// todo: more error checking here
 bool load_font(FcPattern* pattern, int style, bool bold, bool italic) {
 	Font* f = &fonts[style];
 	
@@ -49,39 +50,17 @@ bool load_font(FcPattern* pattern, int style, bool bold, bool italic) {
 	pattern_default_substitute(configured);
 	
 	FcResult result;
-	f->set = FcFontSort(NULL, configured, true, NULL, &result);
-	
 	FcPattern* match = FcFontMatch(NULL, configured, &result);
 	
 	f->font = XftFontOpenPattern(match);
 	
-	// calculate the average char width
-	// (this also serves to load all ascii glyphs immediately)
-	//if (get_width) {
-	/*	int len = 95;
-		Char ascii_printable[len];
-		for (int i=0; i<len; i++)
-			ascii_printable[i] = ' '+i;
-		XGlyphInfo extents;
-		xft_text_extents(f->font, ascii_printable, len, &extents);
-		f->width = ceildiv(extents.xOff, len);*/
-		//}
-	
-	// todo instead: 
-	// calculate the average metrics.xoff
-	
 	f->pattern = configured;
 	
-	ALLOC(f->fallback_fonts, f->set->nfont);
-	FOR (i, f->set->nfont)
-		f->fallback_fonts[i] = NULL;
-	
-	print("%d fonts in set\n", f->set->nfont);
-	//FcFontSetPrint(f->set);
-	//f->ascent = f->font->ascent;
-	//f->descent = f->font->descent;
-	//f->height = f->font->ascent + f->font->descent;
-	//f->width = f->height/2; //TEMP!!
+	// todo: make this less of a hack
+	if (!style) {
+		W.ch = f->font->ascent + f->font->descent;
+		W.font_baseline = f->font->ascent;
+	}
 	
 	return true;
 }
@@ -105,11 +84,19 @@ int fontset_search(FcFontSet* set, FcPattern* match) {
 
 XftFont* find_char_font(Char chr, int style) {
 	Font* f = &fonts[style];
+	if (!f->set) {
+		FcResult result;
+		f->set = FcFontSort(NULL, f->pattern, true, NULL, &result);
+		ALLOC(f->fallback_fonts, f->set->nfont);
+		FOR (i, f->set->nfont)
+			f->fallback_fonts[i] = NULL;
+	}
+	FcFontSet* set = f->set; //fonts[0].set;
 	// check the primary font
 	if (FcCharSetHasChar(f->font->charset, chr))
 		return f->font;
 	// check the alternate fonts (in order)
-	FOR (i, f->set->nfont) {
+	FOR (i, set->nfont) {
 		XftFont* xf = f->fallback_fonts[i];
 		if (!xf) // if one isn't loaded yet, we need to give up
 			break;
@@ -120,26 +107,36 @@ XftFont* find_char_font(Char chr, int style) {
 	// use fontconfig to find one
 	print("searching for char\n");
 	FcCharSet* charset = FcCharSetCreate();
-	FcPattern* pattern = FcPatternCreate();
+	FcPattern* pattern = FcPatternDuplicate(f->pattern);
 	FcCharSetAddChar(charset, chr);
 	FcPatternAddCharSet(pattern, FC_CHARSET, charset);
 	FcResult res;
-	FcPattern* match = FcFontSetMatch(NULL, &f->set, 1, pattern, &res);
+	FcPattern* match = FcFontSetMatch(NULL, &set, 1, pattern, &res);
+	
 	if (match) {
-		int i = fontset_search(f->set, match);
+		int i = fontset_search(set, match);
 		if (i>=0) {
 			print("match success. loading font %d\n", i);
 			FcConfigSubstitute(0, match, FcMatchPattern);
 			pattern_default_substitute(match);
-			return XftFontOpenPattern(match);
+			XftFont* xf = XftFontOpenPattern(match);
+			f->fallback_fonts[i] = xf;
+			return xf;
+		} else {
+			// this should never happen
+			print("loaded unknown fallback font?\n");
 		}
 	}
 	return NULL; // couln't find :(
 }
 
+// todo: make sure we actually fill in the cache
+// even if loading fails
+// so we don't try to load invalid glyphs every time
 GlyphData* cache_lookup(Char chr, uint8_t style) {
 	int i = chr % cache_length;
 	
+	int collisions = 0;
 	// loop while slot `i` doesn't match
 	while (chr != cache[i].key) {
 		// found empty slot
@@ -150,7 +147,10 @@ GlyphData* cache_lookup(Char chr, uint8_t style) {
 		// todo: choose better offset
 		i += 1;
 		i %= cache_length;
+		collisions++;
 	}
+	if (collisions)
+		print("cache collisions: %d\n", collisions);
 	
 	GlyphData* g = &cache[i].value[style];
 	if (!g->exists) {
