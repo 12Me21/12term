@@ -8,8 +8,7 @@
 #define Glyph _Glyph
 
 typedef struct Glyph {
-	FT_UInt glyph;
-	XftFont* font; //null if glyph is empty
+	GlyphData* glyph; //null if glyph is empty
 	// keys for caching
 	Char chr;
 	char style; // whether bold/italic etc.

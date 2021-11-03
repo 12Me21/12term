@@ -228,8 +228,6 @@ void load_settings(int* argc, utf8** argv) {
 	}
 	settings.xft.scale = 1;
 	get_number("Xft." FC_SCALE, &settings.xft.scale);
-	settings.xft.max_glyph_memory = 1024*1024;
-	get_integer("Xft." XFT_MAX_GLYPH_MEMORY, &settings.xft.max_glyph_memory);
 }
 
 static bool pattern_missing(FcPattern* pattern, const utf8* name) {
@@ -264,6 +262,5 @@ void pattern_default_substitute(FcPattern* pattern) {
 	pattern_default_bool(pattern, FC_MINSPACE, settings.xft.minspace);
 	pattern_default_number(pattern, FC_DPI, settings.xft.dpi);
 	pattern_default_number(pattern, FC_SCALE, settings.xft.scale);
-	pattern_default_integer(pattern, XFT_MAX_GLYPH_MEMORY, settings.xft.max_glyph_memory);
 	FcDefaultSubstitute(pattern);
 }

@@ -7,17 +7,7 @@
 
 #include FT_GLYPH_H
 
-// Validate the memory info for a font
-static void font_validate_memory(XftFont* font) {
-	size_t glyph_memory = 0;
-	for (FT_UInt i=0; i<font->num_glyphs; i++) {
-		XftGlyph* xftg = font->glyphs[i];
-		if (xftg)
-			glyph_memory += xftg->glyph_memory;
-	}
-	if (glyph_memory != font->glyph_memory)
-		print("Font glyph cache incorrect has %zd bytes, should have %zd\n", font->glyph_memory, glyph_memory);
-}
+int glyphset_next = 0;
 
 // messy
 static int native_byte_order(void) {
@@ -301,10 +291,10 @@ static int dot6_ceil(FT_F26Dot6 x) {
 	return x+63 & ~63;
 }
 
-void XftFontLoadGlyphs(XftFont* font, const FT_UInt* glyphs, int nglyph) {
+bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 	FT_Face face = xft_lock_face(font);
 	if (!face)
-		return;
+		return false;
 	
 	// determine render mode
 	FT_Render_Mode mode = FT_RENDER_MODE_MONO;
@@ -327,339 +317,224 @@ void XftFontLoadGlyphs(XftFont* font, const FT_UInt* glyphs, int nglyph) {
 	
 	bool transform = font->info.transform && mode != FT_RENDER_MODE_MONO;
 	
-	// for each glyph:
-	while (nglyph--) {
-		FT_UInt glyphindex = *glyphs++;
-		XftGlyph* xftg = font->glyphs[glyphindex];
-		if (!xftg)
-			continue;
+	// lookup glyph
+	FT_UInt glyphindex = FcFreeTypeCharIndex(face, chr);
+	
+	FT_Library_SetLcdFilter(ft_library, font->info.lcd_filter);
 		
-		if (XftDebug() & XFT_DBG_CACHE)
-			font_validate_memory(font);
-		// Check to see if this glyph has just been loaded,
-		// this happens when drawing the same glyph twice
-		// in a single string
-		if (xftg->glyph_memory)
-			continue;
+	FT_Error	error = FT_Load_Glyph(face, glyphindex, font->info.load_flags);
+	if (error) {
+		// If anti-aliasing or transforming glyphs and
+		// no outline version exists, fallback to the
+		// bitmap and let things look bad instead of
+		// missing the glyph
+		if (font->info.load_flags & FT_LOAD_NO_BITMAP)
+			error = FT_Load_Glyph(face, glyphindex, font->info.load_flags & ~FT_LOAD_NO_BITMAP);
+		if (error)
+			return false;
+	}
+	
+	FT_GlyphSlot glyphslot = face->glyph;
 		
-		FT_Library_SetLcdFilter(ft_library, font->info.lcd_filter);
-		
-		FT_Error	error = FT_Load_Glyph(face, glyphindex, font->info.load_flags);
-		if (error) {
-			// If anti-aliasing or transforming glyphs and
-			// no outline version exists, fallback to the
-			// bitmap and let things look bad instead of
-			// missing the glyph
-			if (font->info.load_flags & FT_LOAD_NO_BITMAP)
-				error = FT_Load_Glyph(face, glyphindex, font->info.load_flags & ~FT_LOAD_NO_BITMAP);
-			if (error)
-				continue;
-		}
-		
-		FT_GlyphSlot glyphslot = face->glyph;
-		
-		// Embolden if required
-		if (font->info.embolden)
-			FT_GlyphSlot_Embolden(glyphslot);
-		
-		// Compute glyph metrics from FreeType information
-		FT_F26Dot6 left, right, top, bottom;
-		FT_Vector vector;
-		if (transform) {
-			// calculate the true width by transforming all four corners.
-			left = right = top = bottom = 0;
-			FOR (xc, 2) {
-				FOR (yc, 2) {
-					vector.x = glyphslot->metrics.horiBearingX + xc * glyphslot->metrics.width;
-					vector.y = glyphslot->metrics.horiBearingY - yc * glyphslot->metrics.height;
-					FT_Vector_Transform(&vector, &font->info.matrix);
-					if (XftDebug() & XFT_DBG_GLYPH)
-						print("Trans %d %d: %d %d\n", (int) xc, (int) yc,
-						       (int) vector.x, (int) vector.y);
-					if (xc == 0 && yc == 0) {
-						left = right = vector.x;
-						top = bottom = vector.y;
-					} else {
-						if (top < vector.y) top = vector.y;
-						if (right < vector.x) right = vector.x;
-						if (left > vector.x) left = vector.x;
-						if (bottom > vector.y) bottom = vector.y;
-					}
-				}
-			}
-			top = dot6_ceil(top);
-			right = dot6_ceil(right);
-			left = dot6_floor(left);
-			bottom = dot6_floor(bottom);
-			// lots of rounding going on here... kinda sus
-		} else {
-			top = dot6_ceil(glyphslot->metrics.horiBearingY);
-			right = dot6_ceil(glyphslot->metrics.horiBearingX + glyphslot->metrics.width);
-			left = dot6_floor(glyphslot->metrics.horiBearingX);
-			bottom = dot6_floor(glyphslot->metrics.horiBearingY - glyphslot->metrics.height);
-		}
-		
-		int width = dot6_to_int(right - left);
-		int height = dot6_to_int(top - bottom);
-		
-		// Clip charcell glyphs to the bounding box
-		// XXX transformed?
-		if (font->info.spacing >= FC_CHARCELL && !transform) {
-			if (dot6_to_int(right) > font->max_advance_width) {
-				int adjust = right - (font->max_advance_width << 6);
-				if (adjust > left) adjust = left;
-				left -= adjust;
-				right -= adjust;
-				width = font->max_advance_width;
-			}
-		}
-		
-		bool glyph_transform = transform;
-		if (glyphslot->format != FT_GLYPH_FORMAT_BITMAP) {
-			error = FT_Render_Glyph(face->glyph, mode);
-			if (error)
-				continue;
-			glyph_transform = false;
-		}
-		
-		FT_Library_SetLcdFilter(ft_library, FT_LCD_FILTER_NONE);
-		
-		if (font->info.spacing >= FC_MONO) {
-			if (transform) {
-				vector.x = face->size->metrics.max_advance;
-				vector.y = 0;
+	// Embolden if required
+	if (font->info.embolden)
+		FT_GlyphSlot_Embolden(glyphslot);
+	
+	// Compute glyph metrics from FreeType information
+	FT_F26Dot6 left, right, top, bottom;
+	FT_Vector vector;
+	if (transform) {
+		// calculate the true width by transforming all four corners.
+		left = right = top = bottom = 0;
+		FOR (xc, 2) {
+			FOR (yc, 2) {
+				vector.x = glyphslot->metrics.horiBearingX + xc * glyphslot->metrics.width;
+				vector.y = glyphslot->metrics.horiBearingY - yc * glyphslot->metrics.height;
 				FT_Vector_Transform(&vector, &font->info.matrix);
-				xftg->metrics.xOff = vector.x >> 6;
-				xftg->metrics.yOff = -(vector.y >> 6);
-			} else {
-				xftg->metrics.xOff = font->max_advance_width;
-				xftg->metrics.yOff = 0;
-			}
-		} else {
-			xftg->metrics.xOff = dot6_to_int(dot6_round(glyphslot->advance.x));
-			xftg->metrics.yOff = -dot6_to_int(dot6_round(glyphslot->advance.y));
-		}
-		
-		// compute the size of the final bitmap
-		FT_Bitmap* ftbit = &glyphslot->bitmap;
-		
-		width = ftbit->width;
-		height = ftbit->rows;
-		
-		if (XftDebug() & XFT_DBG_GLYPH) {
-			print("glyph %d:\n", (int) glyphindex);
-			print(" xywh (%d %d %d %d), trans (%ld %ld %ld %ld) wh (%d %d)\n",
-			       (int) glyphslot->metrics.horiBearingX,
-			       (int) glyphslot->metrics.horiBearingY,
-			       (int) glyphslot->metrics.width,
-			       (int) glyphslot->metrics.height,
-			       left, right, top, bottom,
-			       width, height);
-			if (XftDebug() & XFT_DBG_GLYPHV) {
-				uint8_t* line = ftbit->buffer;
-				if (ftbit->pitch < 0)
-					line -= ftbit->pitch*(height-1);
-				
-				FOR (y, height) {
-					if (font->info.antialias) {
-						const utf8* den = " .:;=+*#";
-						FOR (x, width) {
-							print("%c", den[line[x] >> 5]);
-						}
-					} else {
-						FOR (x, width*8) {
-							print("%c", line[x/8] & (1<<x%8) ? '#' : ' ');
-						}
-					}
-					print("|\n");
-					line += ftbit->pitch;
+				if (XftDebug() & XFT_DBG_GLYPH)
+					print("Trans %d %d: %d %d\n", (int) xc, (int) yc,
+					      (int) vector.x, (int) vector.y);
+				if (xc == 0 && yc == 0) {
+					left = right = vector.x;
+					top = bottom = vector.y;
+				} else {
+					if (top < vector.y) top = vector.y;
+					if (right < vector.x) right = vector.x;
+					if (left > vector.x) left = vector.x;
+					if (bottom > vector.y) bottom = vector.y;
 				}
-				print("\n");
 			}
 		}
-		
-		FT_Bitmap local;
-		int size = _compute_xrender_bitmap_size(&local, glyphslot, mode, glyph_transform ? &font->info.matrix : NULL);
-		if (size < 0)
-			continue;
-		
-		xftg->metrics.width  = local.width;
-		xftg->metrics.height = local.rows;
-		if (0&&transform) {
-			// this is broken
-			vector.x = - glyphslot->bitmap_left;
-			vector.y =   glyphslot->bitmap_top;
-			
+		top = dot6_ceil(top);
+		right = dot6_ceil(right);
+		left = dot6_floor(left);
+		bottom = dot6_floor(bottom);
+		// lots of rounding going on here... kinda sus
+	} else {
+		top = dot6_ceil(glyphslot->metrics.horiBearingY);
+		right = dot6_ceil(glyphslot->metrics.horiBearingX + glyphslot->metrics.width);
+		left = dot6_floor(glyphslot->metrics.horiBearingX);
+		bottom = dot6_floor(glyphslot->metrics.horiBearingY - glyphslot->metrics.height);
+	}
+	
+	int width = dot6_to_int(right - left);
+	int height = dot6_to_int(top - bottom);
+	
+	// Clip charcell glyphs to the bounding box
+	// XXX transformed?
+	if (font->info.spacing >= FC_CHARCELL && !transform) {
+		if (dot6_to_int(right) > font->max_advance_width) {
+			int adjust = right - (font->max_advance_width << 6);
+			if (adjust > left) adjust = left;
+			left -= adjust;
+			right -= adjust;
+			width = font->max_advance_width;
+		}
+	}
+	
+	bool glyph_transform = transform;
+	if (glyphslot->format != FT_GLYPH_FORMAT_BITMAP) {
+		error = FT_Render_Glyph(face->glyph, mode);
+		if (error) {
+			// uh oh
+			return false;
+			//die("error rendering glyph\n");
+		}
+		glyph_transform = false;
+	}
+	
+	FT_Library_SetLcdFilter(ft_library, FT_LCD_FILTER_NONE);
+	
+	if (font->info.spacing >= FC_MONO) {
+		if (transform) {
+			vector.x = face->size->metrics.max_advance;
+			vector.y = 0;
 			FT_Vector_Transform(&vector, &font->info.matrix);
-			
-			xftg->metrics.x = vector.x;
-			xftg->metrics.y = vector.y;
+			out->metrics.xOff = vector.x >> 6;
+			out->metrics.yOff = -(vector.y >> 6);
 		} else {
-			xftg->metrics.x = - glyphslot->bitmap_left;
-			xftg->metrics.y =   glyphslot->bitmap_top;
+			out->metrics.xOff = font->max_advance_width;
+			out->metrics.yOff = 0;
 		}
-		
-		// If the glyph is relatively large (> 1% of server memory),
-		// don't send it until necessary.
-		// we always need bitmaps hehehe
-		//if (!need_bitmaps && size>info.max_glyph_memory/100)
-		//	continue;
-		
-		uint8_t bufBitmap[size]; // I hope there's enough stack space owo
-		memset(bufBitmap, 0, size);
-		
-		local.buffer = bufBitmap;
-		
-		if (mode == FT_RENDER_MODE_NORMAL && glyph_transform)
-			_scaled_fill_xrender_bitmap(&local, &glyphslot->bitmap, &font->info.matrix);
-		else
-			_fill_xrender_bitmap(&local, glyphslot, mode, font->info.rgba==FC_RGBA_BGR || font->info.rgba==FC_RGBA_VBGR);
-		
-		// Copy or convert into local buffer.
-		
-		// Use the glyph index as the wire encoding; it
-		// might be more efficient for some locales to map
-		// these by first usage to smaller values, but that
-		// would require persistently storing the map when
-		// glyphs were freed.
-		Glyph glyph = glyphindex;
-		
-		xftg->picture = 0;
-		xftg->glyph_memory = sizeof(XftGlyph) + size;
-		if (mode == FT_RENDER_MODE_MONO) {
-			/* swap bits in each byte */
-			if (BitmapBitOrder(W.d) != MSBFirst) {
-				FOR (i, size) {
-					int c = bufBitmap[i];
-					// fancy
-					c = (c<<1 & 0xAA) | (c>>1 & 0x55);
-					c = (c<<2 & 0xCC) | (c>>2 & 0x33);
-					c = (c<<4 & 0xF0) | (c>>4 & 0x0F);
-					bufBitmap[i] = c;
+	} else {
+		out->metrics.xOff = dot6_to_int(dot6_round(glyphslot->advance.x));
+		out->metrics.yOff = -dot6_to_int(dot6_round(glyphslot->advance.y));
+	}
+	
+	// compute the size of the final bitmap
+	FT_Bitmap* ftbit = &glyphslot->bitmap;
+	
+	width = ftbit->width;
+	height = ftbit->rows;
+	
+	if (XftDebug() & XFT_DBG_GLYPH) {
+		print("glyph %d:\n", (int) glyphindex);
+		print(" xywh (%d %d %d %d), trans (%ld %ld %ld %ld) wh (%d %d)\n",
+		      (int) glyphslot->metrics.horiBearingX,
+		      (int) glyphslot->metrics.horiBearingY,
+		      (int) glyphslot->metrics.width,
+		      (int) glyphslot->metrics.height,
+		      left, right, top, bottom,
+		      width, height);
+		if (XftDebug() & XFT_DBG_GLYPHV) {
+			uint8_t* line = ftbit->buffer;
+			if (ftbit->pitch < 0)
+				line -= ftbit->pitch*(height-1);
+				
+			FOR (y, height) {
+				if (font->info.antialias) {
+					const utf8* den = " .:;=+*#";
+					FOR (x, width) {
+						print("%c", den[line[x] >> 5]);
+					}
+				} else {
+					FOR (x, width*8) {
+						print("%c", line[x/8] & (1<<x%8) ? '#' : ' ');
+					}
 				}
+				print("|\n");
+				line += ftbit->pitch;
 			}
-		} else if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA || mode != FT_RENDER_MODE_NORMAL) {
-			/* invert ARGB <=> BGRA */
-			if (ImageByteOrder(W.d) != native_byte_order())
-				swap_card32((uint32_t*)bufBitmap, size/4);
+			print("\n");
 		}
+	}
+	
+	FT_Bitmap local;
+	int size = _compute_xrender_bitmap_size(&local, glyphslot, mode, glyph_transform ? &font->info.matrix : NULL);
+	if (size < 0)
+		return false;
+	
+	out->metrics.width  = local.width;
+	out->metrics.height = local.rows;
+	if (0&&transform) {
+		// this is broken
+		vector.x = - glyphslot->bitmap_left;
+		vector.y =   glyphslot->bitmap_top;
 			
-		if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA) {
-			// all of this is just to take data and turn it into a Picture
-			Pixmap pixmap = XCreatePixmap(W.d, DefaultRootWindow(W.d), local.width, local.rows, 32);
-			GC gc = XCreateGC(W.d, pixmap, 0, NULL);
-			XImage* image = XCreateImage(W.d, W.vis, 32, ZPixmap, 0, (char*)bufBitmap, local.width, local.rows, 32, 0);
-			XPutImage(W.d, pixmap, gc, image, 0, 0, 0, 0, local.width, local.rows);
-			xftg->picture = XRenderCreatePicture(W.d, pixmap, font->format, 0, NULL);
-			image->data = NULL; // this is probably safe...
-			XDestroyImage(image);
-			XFreeGC(W.d, gc);
-			XFreePixmap(W.d, pixmap);
-		} else
-			XRenderAddGlyphs(W.d, font->glyphset, &glyph, &xftg->metrics, 1, (char*)bufBitmap, size);
+		FT_Vector_Transform(&vector, &font->info.matrix);
+			
+		out->metrics.x = vector.x;
+		out->metrics.y = vector.y;
+	} else {
+		out->metrics.x = - glyphslot->bitmap_left;
+		out->metrics.y =   glyphslot->bitmap_top;
+	}
 		
-		font->glyph_memory += xftg->glyph_memory;
-		info.glyph_memory += xftg->glyph_memory;
-		if (XftDebug() & XFT_DBG_CACHE)
-			font_validate_memory(font);
-		if (XftDebug() & XFT_DBG_CACHEV)
-			print("Caching glyph 0x%x size %zd\n", glyphindex, xftg->glyph_memory);
-	}
-}
-
-void XftFontUnloadGlyphs(XftFont* font, const FT_UInt* glyphs, int nglyph) {
-	Glyph	glyphBuf[nglyph];
-	int nused = 0;
-	FOR (i, nglyph) {
-		XftGlyph* xftg = font->glyphs[glyphs[i]];
-		if (!xftg)
-			continue;
-		if (xftg->glyph_memory) {
-			if (xftg->picture)
-				XRenderFreePicture(W.d, xftg->picture);
-			else {
-				glyphBuf[nused++] = (Glyph)glyphs[i];
-			}
-			font->glyph_memory -= xftg->glyph_memory;
-			info.glyph_memory -= xftg->glyph_memory;
-		}
-		free(xftg);
-		XftMemFree(XFT_MEM_GLYPH, sizeof(XftGlyph));
-		font->glyphs[glyphs[i]] = NULL;
-	}
-	if (nused)
-		XRenderFreeGlyphs(W.d, font->glyphset, glyphBuf, nused);
-}
-
-// return: true if any were loaded
-bool xft_load_glyphs(XftFont* font, const FT_UInt* glyphs, int nglyph) {
-	FT_UInt missing[nglyph];
-	int nmissing = 0;
-	FOR (i, nglyph) {
-		FT_UInt glyph = glyphs[i];
-		if (glyph >= font->num_glyphs)
-			continue; // out of range
-		XftGlyph* xftg = font->glyphs[glyph];
-		if (xftg && xftg->glyph_memory)
-			continue; // already loaded glyph
-		// is there actually a case where xftg exists but xftg->glyph_memory is 0?
-		// it seems like that would only be the case if we didn't load the bitmap immediately.
-		if (!xftg) {
-			xftg = XftMalloc(XFT_MEM_GLYPH, sizeof(XftGlyph));
-			xftg->glyph_memory = 0;
-			font->glyphs[glyph] = xftg;
-		}
-		missing[nmissing++] = glyph;
-	}
-	if (nmissing) {
-		XftFontLoadGlyphs(font, missing, nmissing);
-		return true;
-	}
-	return false;
-}
-
-bool XftCharExists(XftFont* font, Char ucs4) {
-	if (font->charset)
-		return FcCharSetHasChar(font->charset, ucs4);
-	return false;
-}
-
-// Pick a random glyph from the font and remove it from the cache
-// edit: i dont think this is actually how this works
-void xft_font_uncache_glyph(XftFont* font) {
-	if (!font->glyph_memory)
-		return;
+	// If the glyph is relatively large (> 1% of server memory),
+	// don't send it until necessary.
+	// we always need bitmaps hehehe
+	//if (!need_bitmaps && size>info.max_glyph_memory/100)
+	//	continue;
+		
+	uint8_t bufBitmap[size]; // I hope there's enough stack space owo
+	memset(bufBitmap, 0, size);
+		
+	local.buffer = bufBitmap;
+		
+	if (mode == FT_RENDER_MODE_NORMAL && glyph_transform)
+		_scaled_fill_xrender_bitmap(&local, &glyphslot->bitmap, &font->info.matrix);
+	else
+		_fill_xrender_bitmap(&local, glyphslot, mode, font->info.rgba==FC_RGBA_BGR || font->info.rgba==FC_RGBA_VBGR);
+		
+	// Copy or convert into local buffer.
 	
-	size_t glyph_memory;
-	glyph_memory = rand() % font->glyph_memory;
-	
-	if (XftDebug() & XFT_DBG_CACHE)
-		font_validate_memory(font);
-	for (FT_UInt glyphindex=0; glyphindex<font->num_glyphs; glyphindex++) {
-		XftGlyph* xftg = font->glyphs[glyphindex];
-		if (xftg) {
-			if (xftg->glyph_memory > glyph_memory) {
-				if (XftDebug() & XFT_DBG_CACHEV)
-					print("Uncaching glyph 0x%x size %zd\n", glyphindex, xftg->glyph_memory);
-				XftFontUnloadGlyphs(font, &glyphindex, 1);
-				break;
+	out->picture = 0;
+	if (mode == FT_RENDER_MODE_MONO) {
+		/* swap bits in each byte */
+		if (BitmapBitOrder(W.d) != MSBFirst) {
+			FOR (i, size) {
+				int c = bufBitmap[i];
+				// fancy
+				c = (c<<1 & 0xAA) | (c>>1 & 0x55);
+				c = (c<<2 & 0xCC) | (c>>2 & 0x33);
+				c = (c<<4 & 0xF0) | (c>>4 & 0x0F);
+				bufBitmap[i] = c;
 			}
-			glyph_memory -= xftg->glyph_memory;
 		}
+	} else if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA || mode != FT_RENDER_MODE_NORMAL) {
+		/* invert ARGB <=> BGRA */
+		if (ImageByteOrder(W.d) != native_byte_order())
+			swap_card32((uint32_t*)bufBitmap, size/4);
 	}
-	if (XftDebug() & XFT_DBG_CACHE)
-		font_validate_memory(font);
-}
-
-void xft_font_manage_memory(XftFont* font) {
-	if (font->max_glyph_memory) {
-		if (XftDebug() & XFT_DBG_CACHE) {
-			if (font->glyph_memory > font->max_glyph_memory)
-				print("Reduce memory for font 0x%ld from %zd to %zd\n",
-					font->glyphset, font->glyph_memory, font->max_glyph_memory);
-		}
-		while (font->glyph_memory > font->max_glyph_memory)
-			xft_font_uncache_glyph(font);
+			
+	if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA) {
+		// all of this is just to take data and turn it into a Picture
+		Pixmap pixmap = XCreatePixmap(W.d, DefaultRootWindow(W.d), local.width, local.rows, 32);
+		GC gc = XCreateGC(W.d, pixmap, 0, NULL);
+		XImage* image = XCreateImage(W.d, W.vis, 32, ZPixmap, 0, (char*)bufBitmap, local.width, local.rows, 32, 0);
+		XPutImage(W.d, pixmap, gc, image, 0, 0, 0, 0, local.width, local.rows);
+		out->picture = XRenderCreatePicture(W.d, pixmap, font->format, 0, NULL);
+		image->data = NULL; // this is probably safe...
+		XDestroyImage(image);
+		XFreeGC(W.d, gc);
+		XFreePixmap(W.d, pixmap);
+	} else {
+		out->id = glyphset_next;
+		XRenderAddGlyphs(W.d, glyphset, (Glyph[]){glyphset_next}, &out->metrics, 1, (char*)bufBitmap, size);
+		glyphset_next++;
 	}
-	xft_manage_memory();
+	out->format = font->format;
+	
+	out->exists = true;
+	return true;
 }

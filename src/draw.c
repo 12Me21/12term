@@ -122,9 +122,9 @@ static int same_color(Color ca, Color cb) {
 
 // todo: allow drawing multiple at once for efficiency?
 static void draw_glyph(XftDraw draw, Px x, Px y, Glyph g, Color col, int w) {
-	if (!g.font)
+	if (!g.glyph)
 		return;
-	XftGlyphRender1(PictOpOver, make_color(col), g.font, draw.pict, x+(W.cw*w)/2.0, y+W.font_baseline, g.glyph);
+	render_glyph(PictOpOver, make_color(col), draw.pict, x+(W.cw*w)/2.0, y+W.font_baseline, g.glyph);
 }
 
 // todo: make these thicker depending on dpi/fontsize
@@ -257,7 +257,7 @@ static bool draw_row(int y, Row* row) {
 	cells_to_glyphs(T.width, row->cells, specs, true);
 	
 	FOR (i, T.width) {
-		if (specs[i].font)
+		if (specs[i].glyph)
 			draw_glyph(rows[y].draw, W.border+i*W.cw, 0, specs[i], row->cells[i].attrs.color, row->cells[i].wide==1 ? 2 : 1);
 	}
 	

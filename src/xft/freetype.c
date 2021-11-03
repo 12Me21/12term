@@ -42,7 +42,7 @@ static FontFile* get_file(const utf8* filename, int id) {
 		}
 	}
 	// otherwise, create a new one
-	f = XftMalloc(XFT_MEM_FILE, sizeof(FontFile)+strlen(filename)+1);
+	f = malloc(sizeof(FontFile)+strlen(filename)+1);
 	if (!f)
 		return NULL;
 	
@@ -67,7 +67,7 @@ static FontFile* get_file(const utf8* filename, int id) {
 
 // create a new FontFile from an existing face
 static FontFile* make_face_file(FT_Face face) {
-	FontFile* f = XftMalloc(XFT_MEM_FILE, sizeof(FontFile));
+	FontFile* f = malloc(sizeof(FontFile));
 	if (!f)
 		return NULL;
 	*f = (FontFile){
@@ -94,6 +94,7 @@ static FT_F26Dot6 dist(FT_F26Dot6 a, FT_F26Dot6 b) {
 }
 
 // set the current size and matrix for a font
+// todo: check how much lag this causes and whether we ever need to call this after loading a font?
 static bool set_face(FontFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* matrix) {
 	FT_Face face = f->face;
 	
@@ -155,49 +156,7 @@ static void release_file(FontFile* f) {
 		if (f->face)
 			FT_Done_Face(f->face);
 	}
-	XftMemFree(XFT_MEM_FILE, sizeof(FontFile) + (f->filename ? strlen(f->filename)+1 : 0));
 	free(f);
-}
-
-// Find a prime larger than the minimum reasonable hash size
-static Char xft_sqrt(Char a) {
-	Char l = 2;
-	Char h = a/2;
-	while ((h-l) > 1) {
-		Char m = (h+l) >> 1;
-		if (m * m < a)
-			l = m;
-		else
-			h = m;
-	}
-	return h;
-}
-
-static bool is_prime(Char i) {
-	if (i < 2)
-		return false;
-	if ((i&1) == 0) {
-		if (i == 2)
-			return true;
-		return false;
-	}
-	Char l = xft_sqrt(i) + 1;
-	for (Char t = 3; t <= l; t += 2)
-		if (i % t == 0)
-			return false;
-	return true;
-}
-
-static Char hash_size(Char num_unicode) {
-	// at least 31.25% extra space
-	//return 1000;
-	Char hash = num_unicode + num_unicode/4 + num_unicode/16;
-	
-	if ((hash&1) == 0)
-		hash++;
-	while (!is_prime(hash))
-		hash += 2;
-	return hash;
 }
 
 FT_Face xft_lock_face(XftFont* font) {
@@ -287,8 +246,10 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 	
 	// Compute pixel size
 	double dsize;
-	if (FcPatternGetDouble(pattern, FC_PIXEL_SIZE, 0, &dsize) != FcResultMatch)
+	if (FcPatternGetDouble(pattern, FC_PIXEL_SIZE, 0, &dsize) != FcResultMatch) {
+		print("no size\n");
 		goto bail1;
+	}
 	double aspect = 1.0;
 	FcPatternGetDouble(pattern, FC_ASPECT, 0, &aspect);
 	
@@ -370,9 +331,6 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 		print("New font %s/%d size %dx%d\n",
 		      fi->file->filename, fi->file->id,
 		      (int) fi->xsize >> 6, (int) fi->ysize >> 6);
-	int max_glyph_memory;
-	if (FcPatternGetInteger(pattern, XFT_MAX_GLYPH_MEMORY, 0, &max_glyph_memory) != FcResultMatch)
-		max_glyph_memory = XFT_FONT_MAX_GLYPH_MEMORY;
 	
 	FontFile* f = fi->file;
 	
@@ -427,27 +385,15 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 		}
 	} else
 		format = XRenderFindStandardFormat(W.d, PictStandardA1);
+	if (!glyphset)
+		glyphset = XRenderCreateGlyphSet(W.d, format);
+	
 	if (!format)
 		goto bail2;
 	
-	Char num_unicode = 0;
-	Char hash_length = 0;
-	Char rehash_value = 0;
-	if (charset) {
-		num_unicode = FcCharSetCount(charset);
-		hash_length = hash_size(num_unicode);
-		print("hash table size: %d\n", hash_length);
-		rehash_value = hash_length-2;
-	}
+	int alloc_size = sizeof(XftFont);
 	
-	// Sometimes the glyphs are numbered 1..n, other times 0..n-1,
-	// accept either numbering scheme by making room in the table
-	int num_glyphs = face->num_glyphs + 1;
-	int alloc_size = sizeof(XftFont) +
-	                 num_glyphs*sizeof(XftGlyph*) +
-	                 hash_length*sizeof(UcsHash);
-	
-	XftFont* font = XftMalloc(XFT_MEM_FONT, alloc_size);
+	XftFont* font = malloc(alloc_size);
 	if (!font)
 		goto bail2;
 	
@@ -523,24 +469,8 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	// bump XftFile reference count
 	font->info.file->ref++;
 	
-	// Per glyph information
-	font->glyphs = (XftGlyph**)&font[1];
-	memset(font->glyphs, '\0', num_glyphs*sizeof(XftGlyph*));
-	font->num_glyphs = num_glyphs;
-	// Unicode hash table information
-	font->hash_table = (UcsHash*)(font->glyphs+font->num_glyphs);
-	for (int i=0; i<hash_length; i++) {
-		font->hash_table[i].ucs4 = -1;
-		font->hash_table[i].glyph = 0;
-	}
-	font->hash_length = hash_length;
-	font->rehash_value = rehash_value;
 	// X specific fields
 	font->format = format;
-	font->glyphset = XRenderCreateGlyphSet(W.d, font->format);
-	// Glyph memory management fields
-	font->glyph_memory = 0;
-	font->max_glyph_memory = max_glyph_memory;
 	
 	return font;
 	
@@ -562,27 +492,13 @@ XftFont* XftFontOpenPattern(FcPattern* pattern) {
 }
 
 static void XftFontDestroy(XftFont* font) {
-	// note reduction in memory use
-	info.glyph_memory -= font->glyph_memory;
 	// Clean up the info
 	XftFontInfoEmpty(&font->info);
-	// Free the glyphset
-	if (font->glyphset)
-		XRenderFreeGlyphSet(W.d, font->glyphset);
-	// Free the glyphs
-	FOR (i, font->num_glyphs) {
-		XftGlyph* xftg = font->glyphs[i];
-		free(xftg);
-	}
-	
 	// Free the pattern and the charset
 	FcPatternDestroy(font->pattern);
 	FcCharSetDestroy(font->charset);
 	
 	// Finally, free the font structure
-	XftMemFree(XFT_MEM_FONT, sizeof(XftFont) +
-	           font->num_glyphs * sizeof(XftGlyph*) +
-	           font->hash_length * sizeof(UcsHash));
 	free(font);
 }
 
@@ -600,37 +516,4 @@ void XftFontClose(XftFont* font) {
 	}
 	// Destroy the font
 	XftFontDestroy(font);
-}
-
-FT_UInt XftCharIndex(XftFont* font, Char ucs4) {
-	if (!font->hash_length)
-		return 0;
-	Char ent = ucs4 % font->hash_length;
-	UcsHash* table = font->hash_table;
-	Char offset = 0;
-	while (table[ent].ucs4 != ucs4) {
-		// empty slot
-		if (table[ent].ucs4 == -1) {
-			if (!XftCharExists(font, ucs4))
-				return 0;
-			FT_Face face = xft_lock_face(font);
-			if (!face)
-				return 0;
-			table[ent] = (UcsHash){
-				.ucs4 = ucs4,
-				.glyph = FcFreeTypeCharIndex(face, ucs4),
-			};
-			break;
-		}
-		// collision: choose new index
-		if (!offset) {
-			// calculate offset if we haven't already
-			offset = ucs4 % font->rehash_value;
-			if (!offset)
-				offset = 1;
-		}
-		ent += offset;
-		ent %= font->hash_length;
-	}
-	return font->hash_table[ent].glyph;
 }

@@ -12,9 +12,6 @@
 
 #include "../common.h"
 
-#define XFT_MAX_GLYPH_MEMORY	"maxglyphmemory"
-#define XFT_MAX_UNREF_FONTS	"maxunreffonts"
-
 extern FT_Library	ft_library;
 
 // Glyphs are stored in this structure
@@ -55,21 +52,8 @@ typedef struct XftFont {
 	struct XftFont* next; // all fonts on display
 	struct XftFontInfo info; // Data from pattern (i feel like this could be in one struct?)
 	int ref;	// reference count
-	// Per-glyph information, indexed by glyph ID
-	// This array follows the font in memory
-	XftGlyph** glyphs;
-	int num_glyphs; // size of glyphs/bitmaps arrays
-	// Hash table to get from Unicode value to glyph ID
-	// This array follows the glyphs in memory
-	struct UcsHash* hash_table;
-	int hash_length;
-	int rehash_value;
 	// X specific fields
-	GlyphSet glyphset; // Render glyphset
-	XRenderPictFormat* format;	// Render format for glyphs
-	// Glyph memory management fields
-	size_t glyph_memory;
-	size_t max_glyph_memory;
+	XRenderPictFormat* format; // Render format for glyphs
 } XftFont;
 
 // ghhh
@@ -103,3 +87,19 @@ FT_UInt XftCharIndex(XftFont* pub, Char ucs4);
 // eee
 void XftGlyphRender1(int op, XRenderColor col, XftFont* font, Picture dst, float x, int y, FT_UInt g);
 Picture XftDrawSrcPicture(const XRenderColor color);
+
+
+// this contains all the info needed to render a glyph
+typedef struct GlyphData {
+	XGlyphInfo metrics;
+	XRenderPictFormat* format; // bad maybe
+	Picture picture; // for color glyphs
+	Glyph id; // index in glyphset
+	bool exists;
+} GlyphData;
+
+GlyphData* cache_lookup(Char chr, uint8_t style);
+
+bool load_font(FcPattern* pattern, int style, bool bold, bool italic);
+
+void render_glyph(int op, XRenderColor col, Picture dst, float x, int y, GlyphData* glyph);

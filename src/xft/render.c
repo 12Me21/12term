@@ -47,34 +47,30 @@ Picture XftDrawSrcPicture(const XRenderColor color) {
 //       centerline
 // (when drawing wide characters, the centerline will instead be on the boundary between the two cells.)
 
-// todo: move the loadGlyphs call out of here and put it like, right after the glyph lookup in font.c  sleepy 💤
-// op - composite operation
-// col - color (only used for normal monochrome glyphs)
-// pub - font
-// dst - destination picture
-// x,y - destination position (center, baseline)
-// g - glyph id
-void XftGlyphRender1(int op, XRenderColor col, XftFont* font, Picture dst, float x, int y, FT_UInt wire) {
-	// Load missing glyphs
-	FcBool glyphs_loaded = xft_load_glyphs(font, &wire, 1);
-	
-	if (!font->glyphset)
-		goto bail1;
-	if (wire>=font->num_glyphs || !font->glyphs[wire])
-		wire = 0;
-	
-	XftGlyph* glyph = font->glyphs[wire];
+void render_glyph(
+	int op, // composite operation
+	XRenderColor col, // color (only used for normal monochrome glyphs)
+	Picture dst, // destination picture
+	float x, // position (center)
+	int y, // position (baseline)
+	GlyphData* glyph // glyph
+) {
 	float half = glyph->metrics.xOff / 2.0f;
 	int bx = (int)(x - half + 10000) - 10000; // add 10000 so the number isn't negative when rounded
 	
 	if (glyph->picture) {
-		XRenderComposite(W.d, op, glyph->picture, None, dst, 0, 0, 0, 0,
-			bx + glyph->metrics.x, y - glyph->metrics.y, glyph->metrics.width, glyph->metrics.height);
+		XRenderComposite(
+			W.d, op, glyph->picture, None, dst,
+			0, 0, 0, 0,
+			bx + glyph->metrics.x, y - glyph->metrics.y,
+			glyph->metrics.width, glyph->metrics.height
+		);
 	} else {
 		Picture src = XftDrawSrcPicture(col);
-		XRenderCompositeString32(W.d, op, src, dst, font->format, font->glyphset, 0, 0, bx, y, (unsigned int[]){wire}, 1);
+		XRenderCompositeString32(
+			W.d, op, src, dst, glyph->format, glyphset,
+			0, 0, bx, y,
+			(unsigned int[]){glyph->id}, 1
+		);
 	}
- bail1:
-	if (glyphs_loaded)
-		xft_font_manage_memory(font);
 }

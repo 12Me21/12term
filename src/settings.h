@@ -18,7 +18,7 @@ typedef struct Settings {
 	utf8* hyperlinkCommand;
 	utf8* termName;
 	int saveLines;
-
+	
 	struct {
 		bool antialias;
 		bool embolden;
@@ -30,7 +30,6 @@ typedef struct Settings {
 		bool minspace;
 		double dpi;
 		double scale;
-		int max_glyph_memory;
 	} xft;
 } Settings;
 
