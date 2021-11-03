@@ -2,6 +2,9 @@
 
 FT_Library ft_library;
 
+// linked list of all loaded fonts
+static XftFont* fonts = NULL;
+
 // Many fonts can share the same underlying face data; this
 // structure references that.  Note that many faces may in fact
 // live in the same font file; that is irrelevant to this structure
@@ -451,8 +454,8 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	// Management fields
 	font->ref = 1;
 	
-	font->next = info.fonts;
-	info.fonts = font;
+	font->next = fonts;
+	fonts = font;
 	
 	// Copy the info over
 	font->info = *fi;
@@ -508,7 +511,7 @@ void XftFontClose(XftFont* font) {
 		return;
 	
 	// Unhook from display list
-	for (XftFont** prev = &info.fonts; *prev; prev = &(*prev)->next) {
+	for (XftFont** prev = &fonts; *prev; prev = &(*prev)->next) {
 		if (*prev == font) {
 			*prev = font->next;
 			break;

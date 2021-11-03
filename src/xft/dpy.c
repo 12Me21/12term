@@ -1,9 +1,5 @@
 #include "xftint.h"
 
-XftDisplayInfo info = {
-	.fonts = NULL
-};
-
 void xft_init(void) {
 	if (XftDebug() & XFT_DBG_RENDER) {
 		print("XftDisplayInfoGet Default visual 0x%x ", (int)W.vis->visualid);
@@ -21,10 +17,5 @@ void xft_init(void) {
 			print("No Render format for default visual\n");
 		print("XftDisplayInfoGet initialized");
 	}
-	FOR (i, XFT_NUM_SOLID_COLOR) {
-		info.colors[i].screen = -1;
-		info.colors[i].pict = 0;
-	}
-	
 	//		print("XftDisplayInfoGet failed to initialize, Xft unhappy :(\n");
 }

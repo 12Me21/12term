@@ -17,18 +17,7 @@
 extern GlyphSet glyphset;
 extern int glyphset_next;
 
-typedef struct XftSolidColor {
-	XRenderColor color;
-	int screen; //we keep this because i think it uses -1 for invalid
-	Picture pict;
-} XftSolidColor;
-
 #define XFT_NUM_SOLID_COLOR 16
-
-typedef struct XftDisplayInfo {
-	XftFont* fonts;
-	XftSolidColor colors[XFT_NUM_SOLID_COLOR];
-} XftDisplayInfo;
 
 #define XFT_DBG_OPEN	1
 #define XFT_DBG_OPENV 2
@@ -50,5 +39,3 @@ FT_Face xft_lock_face(XftFont* pub);
 /* xftglyph.c */
 bool xft_load_glyphs(XftFont* font, const FT_UInt* glyphs, int nglyph);
 bool load_glyph(XftFont* font, Char chr, GlyphData* out);
-
-extern XftDisplayInfo info;
