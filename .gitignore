@@ -2,3 +2,7 @@
 12term
 old
 icon.xpm.c
+.*
+\#*
+perf.data
+perf.data.old

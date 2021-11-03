@@ -49,18 +49,11 @@ bool load_font(FcPattern* pattern, int style, bool bold, bool italic) {
 	pattern_default_substitute(configured);
 	
 	FcResult result;
+	f->set = FcFontSort(NULL, configured, true, NULL, &result);
+	
 	FcPattern* match = FcFontMatch(NULL, configured, &result);
-	if (!match) {
-		FcPatternDestroy(configured);
-		return false;
-	}
 	
 	f->font = XftFontOpenPattern(match);
-	if (!f->font) {
-		FcPatternDestroy(configured);
-		FcPatternDestroy(match);
-		return false;
-	}
 	
 	// calculate the average char width
 	// (this also serves to load all ascii glyphs immediately)
@@ -74,9 +67,11 @@ bool load_font(FcPattern* pattern, int style, bool bold, bool italic) {
 		f->width = ceildiv(extents.xOff, len);*/
 		//}
 	
-	FcResult fcres;
+	// todo instead: 
+	// calculate the average metrics.xoff
+	
 	f->pattern = configured;
-	f->set = FcFontSort(NULL, f->pattern, true, NULL, &fcres);
+	
 	ALLOC(f->fallback_fonts, f->set->nfont);
 	FOR (i, f->set->nfont)
 		f->fallback_fonts[i] = NULL;
