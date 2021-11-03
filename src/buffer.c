@@ -150,6 +150,7 @@ void term_resize(int width, int height) {
 		}
 		// update cursor position
 		T.c.x = limit(T.c.x, 0, T.width); //note this is NOT width-1, since cursor is allowed to be in the right margin
+		T.saved_cursor.x = limit(T.saved_cursor.x, 0, T.width);
 		// resize history rows
 		for (int i=1; i<=history.length; i++) {
 			Row** row = &history.rows[(history.head-i+history.size) % history.size];
@@ -180,6 +181,7 @@ void term_resize(int width, int height) {
 		REALLOC(T.buffers[0].rows, height);
 		// adjust cursor position
 		T.c.y = limit(T.c.y+diff, 0, T.height-1);
+		T.saved_cursor.y = limit(T.saved_cursor.y+diff, 0, T.height-1);
 		
 	} else if (height > T.height) { // height INCREASE (diff > 0)
 		// realloc lists of lines
@@ -207,6 +209,7 @@ void term_resize(int width, int height) {
 		}
 		// adjust cursor down
 		T.c.y += diff;
+		T.saved_cursor.y += diff;
 	}
 	// todo: how do we handle the scrolling regions?
 	T.scroll_top = 0;
