@@ -42,11 +42,11 @@ typedef struct XftFont {
 	FcCharSet* charset;
 	FcPattern* pattern;
 	
-	struct XftFont* next; // all fonts on display
 	struct XftFontInfo info; // Data from pattern (i feel like this could be in one struct?)
-	int ref;	// reference count
 	// X specific fields
 	char format;
+	
+	struct XftFont* next; // linked list
 } XftFont;
 
 // ghhh
@@ -95,6 +95,7 @@ typedef struct GlyphData {
 
 GlyphData* cache_lookup(Char chr, uint8_t style);
 
-bool load_font(FcPattern* pattern, int style, bool bold, bool italic);
+void load_fonts(const utf8* fontstr, double fontsize);
+void fonts_free(void);
 
 void render_glyph(int op, XRenderColor col, Picture dst, float x, int y, GlyphData* glyph);

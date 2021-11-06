@@ -8,7 +8,26 @@
 #include "Xft.h"
 #include <X11/extensions/Xrender.h>
 
-GlyphSet glyphset; // use one global glyphset, why not?
+XftFormat xft_formats[PictStandardNUM] = {0};
+
+static void init_format(int type) {
+	XftFormat* f = &xft_formats[type];
+	if (!f->format) {
+		f->format = XRenderFindStandardFormat(W.d, type);
+	}
+	
+	if (f->glyphset) {
+		XRenderFreeGlyphSet(W.d, f->glyphset);
+	}
+	f->glyphset = XRenderCreateGlyphSet(W.d, f->format);
+	f->next_glyph = 0;
+}
+
+void init_formats(void) {
+	init_format(PictStandardARGB32);
+	init_format(PictStandardA8);
+	init_format(PictStandardA1);
+}
 
 typedef struct Bucket {
 	Char key;
@@ -33,7 +52,7 @@ static Font fonts[4] = {0};
 
 //load one font face
 // todo: more error checking here
-bool load_font(FcPattern* pattern, int style, bool bold, bool italic) {
+static bool load_font(FcPattern* pattern, int style, bool bold, bool italic) {
 	Font* f = &fonts[style];
 	
 	FcPattern* configured = FcPatternDuplicate(pattern);
@@ -63,6 +82,75 @@ bool load_font(FcPattern* pattern, int style, bool bold, bool italic) {
 	}
 	
 	return true;
+}
+
+void fonts_free(void) {
+	// empty the cache:
+	FOR (i, cache_length) {
+		if (cache[i].key) {
+			cache[i].key = 0;
+			FOR (j, 4) {
+				if (cache[i].value[j].type==2)
+					XRenderFreePicture(W.d, cache[i].value[j].picture);
+				cache[i].value[j].type = 0;
+			}
+		}
+	}
+	// free fonts
+	FOR (i, 4) {
+		Font* f = &fonts[i];
+		if (f->font) {
+			//FcPatternDestroy(f->pattern);
+			XftFontClose(f->font);
+			f->font = NULL;
+			if (f->set) {
+				FOR (i, f->set->nfont) {
+					if (f->fallback_fonts[i])
+						XftFontClose(f->fallback_fonts[i]);
+				}
+				FcFontSetDestroy(f->set);
+				f->set = NULL;
+			}
+		}
+	}
+}
+
+// This frees any existing fonts and loads new ones, based on `fontstr`.
+// it also sets `W.cw` and `W.ch`.
+void load_fonts(const utf8* fontstr, double fontsize) {
+	print("loading pattern: %s\n", fontstr);
+	
+	init_formats();
+	fonts_free();
+	
+	FcPattern* pattern = FcNameParse((const FcChar8*)fontstr);
+	
+	if (!pattern)
+		die("can't open font %s\n", fontstr);
+	
+	if (fontsize) {
+		FcPatternDel(pattern, FC_PIXEL_SIZE);
+		FcPatternDel(pattern, FC_SIZE);
+		FcPatternAddDouble(pattern, FC_SIZE, fontsize);
+	}
+	
+	for (int i=0; i<4; i++) {
+		if (!load_font(pattern, i, i&1, i&2))
+			die("failed to load font");
+		time_log("loaded font");
+	}
+	
+	// calculate char cell size
+	int width = 0;
+	int count = 0;
+	for (Char i=' '; i<='~'; i++) {
+		GlyphData* d = cache_lookup(i, 0);
+		width += d->metrics.xOff;
+		count++;
+	}
+	W.cw = (width+count/2) / count; // average width
+	
+	FcPatternDestroy(pattern);
 }
 
 int fontset_search(FcFontSet* set, FcPattern* match) {
@@ -164,11 +252,5 @@ GlyphData* cache_lookup(Char chr, uint8_t style) {
 	}
 	return g;
 }
-
-// idea for glyph finding
-// for each font in the font set returned by fcfontsort
-//  if the font is loaded, check for the glyph
-//  otherwise, call fcfontsetmatch, load that font, and add it to the list.
-// this SHOULD work assuming the charset match is accurate!!!
 
 // also: we might only need one fontset rather than one for each style.

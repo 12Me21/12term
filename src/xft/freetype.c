@@ -318,8 +318,10 @@ static bool font_info_fill(const FcPattern* pattern, XftFontInfo* fi) {
 }
 
 static void XftFontInfoEmpty(XftFontInfo* fi) {
-	if (fi->file)
+	if (fi->file) {
 		release_file(fi->file);
+		fi->file = NULL;
+	}
 }
 
 static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
@@ -436,9 +438,7 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	font->charset = charset;
 	font->pattern = pattern;
 	
-	// Management fields
-	font->ref = 1;
-	
+	// insert into global linked list
 	font->next = fonts;
 	fonts = font;
 	
@@ -487,10 +487,6 @@ static void XftFontDestroy(XftFont* font) {
 }
 
 void XftFontClose(XftFont* font) {
-	font->ref--;
-	if (font->ref > 0)
-		return;
-	
 	// Unhook from display list
 	for (XftFont** prev = &fonts; *prev; prev = &(*prev)->next) {
 		if (*prev == font) {

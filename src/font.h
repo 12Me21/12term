@@ -17,7 +17,5 @@ typedef struct Glyph {
 	int x;
 } Glyph;
 
-void load_fonts(const utf8* fontstr, double fontsize);
-void fonts_free(void);
 void cells_to_glyphs(int len, Cell cells[len], Glyph glyphs[len], bool cache);
 void font_init(void);
