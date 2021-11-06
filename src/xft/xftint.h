@@ -7,7 +7,6 @@
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
-#include <X11/Xmd.h>
 #include "Xft.h"
 #include <fontconfig/fontconfig.h>
 #include <fontconfig/fcfreetype.h>
@@ -37,5 +36,4 @@ int XftDebug(void);
 FT_Face xft_lock_face(XftFont* pub);
 
 /* xftglyph.c */
-bool xft_load_glyphs(XftFont* font, const FT_UInt* glyphs, int nglyph);
 bool load_glyph(XftFont* font, Char chr, GlyphData* out);

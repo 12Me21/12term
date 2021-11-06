@@ -2,9 +2,6 @@
 
 FT_Library ft_library;
 
-// linked list of all loaded fonts
-static XftFont* fonts = NULL;
-
 // Many fonts can share the same underlying face data; this
 // structure references that.  Note that many faces may in fact
 // live in the same font file; that is irrelevant to this structure
@@ -23,11 +20,8 @@ typedef struct FontFile {
 	FT_Face face; // pointer to face; only valid when lock
 } FontFile;
 
-// A hash table translates Unicode values into glyph indexes
-typedef struct UcsHash {
-	Char ucs4;
-	FT_UInt glyph;
-} UcsHash;
+// linked list of all loaded fonts
+static XftFont* fonts = NULL;
 
 // List of all open files (each face in a file is managed separately)
 static FontFile* xft_files = NULL;
@@ -228,7 +222,7 @@ static FT_Int get_load_flags(const FcPattern* pattern, const XftFontInfo* fi) {
 	return flags;
 }
 
-static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
+static bool font_info_fill(const FcPattern* pattern, XftFontInfo* fi) {
 	// Find the associated file
 	FcChar8* filename = NULL;
 	FcPatternGetString(pattern, FC_FILE, 0, &filename);
@@ -260,7 +254,7 @@ static bool XftFontInfoFill(const FcPattern* pattern, XftFontInfo* fi) {
 	fi->xsize = (FT_F26Dot6)(dsize * aspect * 64.0);
 	
 	if (XftDebug() & XFT_DBG_OPEN)
-		print("XftFontInfoFill: %s: %d (%g pixels)\n",
+		print("font_info_fill: %s: %d (%g pixels)\n",
 		      (filename ? (utf8*)filename : "<none>"), id, dsize);
 	
 	// Get antialias value
@@ -462,7 +456,7 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	
 	// reset the antialias field.  It can't
 	// be set correctly until the font is opened,
-	// which doesn't happen in XftFontInfoFill
+	// which doesn't happen in font_info_fill
 	font->info.antialias = antialias;
 	
 	// Set color value, which is only known once the
@@ -486,7 +480,7 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 
 XftFont* XftFontOpenPattern(FcPattern* pattern) {
 	XftFontInfo info;
-	if (!XftFontInfoFill(pattern, &info))
+	if (!font_info_fill(pattern, &info))
 		return NULL;
 	
 	XftFont* font = XftFontOpenInfo(pattern, &info);

@@ -195,7 +195,7 @@ static void _scaled_fill_xrender_bitmap(
 }
 
 /* 
-  this functions converts the glyph bitmap found in a FT_GlyphSlot
+  this function converts the glyph bitmap found in a FT_GlyphSlot
   into a different format (see _compute_xrender_bitmap_size)
  
   you should call this function after _compute_xrender_bitmap_size
