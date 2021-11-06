@@ -23,7 +23,7 @@ static void init_format(int type) {
 	f->next_glyph = 0;
 }
 
-void init_formats(void) {
+static void init_formats(void) {
 	init_format(PictStandardARGB32);
 	init_format(PictStandardA8);
 	init_format(PictStandardA1);

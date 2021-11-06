@@ -13,7 +13,6 @@
 void font_init(void) {
 	if (!FcInit())
 		die("fontconfig init failed");
-	xft_init();
 	if (FT_Init_FreeType(&ft_library))
 		die("freetype init failed");
 }
