@@ -14,13 +14,6 @@
 
 extern FT_Library	ft_library;
 
-// Glyphs are stored in this structure
-typedef struct XftGlyph {
-	XGlyphInfo metrics;
-	size_t glyph_memory;
-	Picture picture;
-} XftGlyph;
-
 // This structure holds the data extracted from a pattern
 // needed to create a unique font object.
 typedef struct XftFontInfo {
@@ -93,9 +86,11 @@ Picture XftDrawSrcPicture(const XRenderColor color);
 typedef struct GlyphData {
 	XGlyphInfo metrics;
 	XRenderPictFormat* format; // bad maybe
-	Picture picture; // for color glyphs
-	Glyph id; // index in glyphset
-	bool exists;
+	union {
+		Glyph id; // index in glyphset
+		Picture picture; // for color glyphs
+	};
+	char type; // 0 = doesn't exist, 1 = glyph, 2 = picture
 } GlyphData;
 
 GlyphData* cache_lookup(Char chr, uint8_t style);

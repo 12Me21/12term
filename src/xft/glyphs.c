@@ -528,13 +528,14 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 		XDestroyImage(image);
 		XFreeGC(W.d, gc);
 		XFreePixmap(W.d, pixmap);
+		out->type = 2;
 	} else {
 		out->id = glyphset_next;
 		XRenderAddGlyphs(W.d, glyphset, (Glyph[]){glyphset_next}, &out->metrics, 1, (char*)bufBitmap, size);
 		glyphset_next++;
+		out->type = 1;
 	}
 	out->format = font->format;
 	
-	out->exists = true;
 	return true;
 }

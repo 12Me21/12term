@@ -153,7 +153,7 @@ GlyphData* cache_lookup(Char chr, uint8_t style) {
 		print("cache collisions: %d\n", collisions);
 	
 	GlyphData* g = &cache[i].value[style];
-	if (!g->exists) {
+	if (!g->type) {
 		// 1: decide which font to use
 		XftFont* font = find_char_font(chr, style);
 		if (!font)
