@@ -348,6 +348,9 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	if (!set_face(fi->file, fi->xsize, fi->ysize, &fi->matrix))
 		goto bail1;
 	
+	XftFont* font;
+	ALLOC(font, 1);
+	
 	// Get the set of Unicode codepoints covered by the font.
 	// If the incoming pattern doesn't provide this data, go
 	// off and compute it.  Yes, this is expensive, but it's
@@ -363,36 +366,24 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 		antialias = false;
 	
 	bool color = FT_HAS_COLOR(face);
-	XRenderPictFormat* format;
 	// Find the appropriate picture format
 	// we should probably cache the format list
 	if (color)
-		format = XRenderFindStandardFormat(W.d, PictStandardARGB32);
+		font->format = PictStandardARGB32;
 	else if (antialias) {
 		switch (fi->rgba) {
 		case FC_RGBA_RGB:
 		case FC_RGBA_BGR:
 		case FC_RGBA_VRGB:
 		case FC_RGBA_VBGR:
-			format = XRenderFindStandardFormat(W.d, PictStandardARGB32);
+			font->format = PictStandardARGB32;
 			break;
 		default:
-			format = XRenderFindStandardFormat(W.d, PictStandardA8);
+			font->format = PictStandardA8;
 			break;
 		}
 	} else
-		format = XRenderFindStandardFormat(W.d, PictStandardA1);
-	if (!glyphset)
-		glyphset = XRenderCreateGlyphSet(W.d, format);
-	
-	if (!format)
-		goto bail2;
-	
-	int alloc_size = sizeof(XftFont);
-	
-	XftFont* font = malloc(alloc_size);
-	if (!font)
-		goto bail2;
+		font->format = PictStandardA1;
 	
 	int ascent, descent, height;
 	// Public fields
@@ -466,12 +457,8 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	// bump XftFile reference count
 	font->info.file->ref++;
 	
-	// X specific fields
-	font->format = format;
-	
 	return font;
 	
- bail2:
 	FcCharSetDestroy(charset);
  bail1:
  bail0:

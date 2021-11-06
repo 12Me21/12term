@@ -58,17 +58,18 @@ void render_glyph(
 	float half = glyph->metrics.xOff / 2.0f;
 	int bx = (int)(x - half + 10000) - 10000; // add 10000 so the number isn't negative when rounded
 	//print("xoff: %d. width: %d. x: %d\n", glyph->metrics.xOff, glyph->metrics.width, glyph->metrics.x);
-	if (glyph->type==1) {
+	if (glyph->type==2) {
 		XRenderComposite(
 			W.d, op, glyph->picture, None, dst,
 			0, 0, 0, 0,
 			bx - glyph->metrics.x, y - glyph->metrics.y,
 			glyph->metrics.width, glyph->metrics.height
 		);
-	} else if (glyph->type==2) {
+	} else if (glyph->type==1) {
 		Picture src = XftDrawSrcPicture(col);
+		XftFormat* format = &xft_formats[glyph->format];
 		XRenderCompositeString32(
-			W.d, op, src, dst, glyph->format, glyphset,
+			W.d, op, src, dst, format->format, format->glyphset,
 			0, 0, bx, y,
 			(unsigned int[]){glyph->id}, 1
 		);

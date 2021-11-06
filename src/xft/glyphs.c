@@ -7,8 +7,6 @@
 
 #include FT_GLYPH_H
 
-int glyphset_next = 0;
-
 // messy
 static int native_byte_order(void) {
 	int whichbyte = 1;
@@ -516,23 +514,25 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 		if (ImageByteOrder(W.d) != native_byte_order())
 			swap_card32((uint32_t*)bufBitmap, size/4);
 	}
-			
+	
+	XftFormat* format = &xft_formats[font->format];
+	
 	if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA) {
 		// all of this is just to take data and turn it into a Picture
 		Pixmap pixmap = XCreatePixmap(W.d, DefaultRootWindow(W.d), local.width, local.rows, 32);
 		GC gc = XCreateGC(W.d, pixmap, 0, NULL);
 		XImage* image = XCreateImage(W.d, W.vis, 32, ZPixmap, 0, (char*)bufBitmap, local.width, local.rows, 32, 0);
 		XPutImage(W.d, pixmap, gc, image, 0, 0, 0, 0, local.width, local.rows);
-		out->picture = XRenderCreatePicture(W.d, pixmap, font->format, 0, NULL);
+		out->picture = XRenderCreatePicture(W.d, pixmap, format->format, 0, NULL);
 		image->data = NULL; // this is probably safe...
 		XDestroyImage(image);
 		XFreeGC(W.d, gc);
 		XFreePixmap(W.d, pixmap);
 		out->type = 2;
 	} else {
-		out->id = glyphset_next;
-		XRenderAddGlyphs(W.d, glyphset, (Glyph[]){glyphset_next}, &out->metrics, 1, (char*)bufBitmap, size);
-		glyphset_next++;
+		int id = format->next_glyph++;
+		out->id = id;
+		XRenderAddGlyphs(W.d, format->glyphset, (Glyph[]){id}, &out->metrics, 1, (char*)bufBitmap, size);
 		out->type = 1;
 	}
 	out->format = font->format;

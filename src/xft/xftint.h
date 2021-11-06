@@ -13,8 +13,13 @@
 
 #include "../x.h"
 
-extern GlyphSet glyphset;
-extern int glyphset_next;
+typedef struct XftFormat {
+	XRenderPictFormat* format;
+	GlyphSet glyphset;
+	int next_glyph;
+} XftFormat;
+
+extern XftFormat xft_formats[PictStandardNUM];
 
 #define XFT_NUM_SOLID_COLOR 16
 
