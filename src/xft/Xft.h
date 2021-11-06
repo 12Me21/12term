@@ -85,7 +85,14 @@ Picture XftDrawSrcPicture(const XRenderColor color);
 // this contains all the info needed to render a glyph
 typedef struct GlyphData {
 	XGlyphInfo metrics;
-	XRenderPictFormat* format; // bad maybe
+	XRenderPictFormat* format;
+	// todo: there are only a few formats that we actually ever use
+	// we call XRenderFindStandardFormat with one of:
+	// PictStandardARGB32 - for color glyphs
+	// PictStandardA8 - for normal fonts/glyphs
+	// PictStandardA1 - for bitmap fonts
+	// so instead of a pointer we could just store one of these types in a char
+	
 	union {
 		Glyph id; // index in glyphset
 		Picture picture; // for color glyphs
