@@ -317,13 +317,6 @@ static bool font_info_fill(const FcPattern* pattern, XftFontInfo* fi) {
 	return false;
 }
 
-static void XftFontInfoEmpty(XftFontInfo* fi) {
-	if (fi->file) {
-		release_file(fi->file);
-		fi->file = NULL;
-	}
-}
-
 static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	// No existing font, create another.
 	if (XftDebug() & XFT_DBG_CACHE)
@@ -471,13 +464,10 @@ XftFont* XftFontOpenPattern(FcPattern* pattern) {
 		return NULL;
 	
 	XftFont* font = XftFontOpenInfo(pattern, &info);
-	XftFontInfoEmpty(&info);
 	return font;
 }
 
 static void XftFontDestroy(XftFont* font) {
-	// Clean up the info
-	XftFontInfoEmpty(&font->info);
 	// Free the pattern and the charset
 	FcPatternDestroy(font->pattern);
 	FcCharSetDestroy(font->charset);

@@ -254,3 +254,18 @@ GlyphData* cache_lookup(Char chr, uint8_t style) {
 }
 
 // also: we might only need one fontset rather than one for each style.
+
+
+// todo: 
+// so there's a control seq which allows changing the current font
+// really we shouldn't free ALL fonts because the fallback fonts will likely remain the same
+// but this raises a bigger issue:
+// should the fallback list be stored separately from the main font?
+
+// ideally the fallback list is derived from the main font, but
+// that means that the "main font" in practice is actually a pattern like "cascadia code, twemoji, deja vu"
+
+// but this sucks because it means you need to pass this full list when changing the font
+
+// so idk..
+// maybe append the fallbacks somehow (NOT by just appending strings though)
