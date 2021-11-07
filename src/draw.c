@@ -124,7 +124,7 @@ static int same_color(Color ca, Color cb) {
 static void draw_glyph(XftDraw draw, Px x, Px y, Glyph g, Color col, int w) {
 	if (!g.glyph)
 		return;
-	render_glyph(PictOpOver, make_color(col), draw.pict, x+(W.cw*w)/2.0, y+W.font_baseline, g.glyph);
+	render_glyph(make_color(col), draw.pict, x+(W.cw*w)/2.0, y+W.font_baseline, g.glyph);
 }
 
 // todo: make these thicker depending on dpi/fontsize

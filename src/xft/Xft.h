@@ -98,4 +98,4 @@ GlyphData* cache_lookup(Char chr, uint8_t style);
 void load_fonts(const utf8* fontstr, double fontsize);
 void fonts_free(void);
 
-void render_glyph(int op, XRenderColor col, Picture dst, float x, int y, GlyphData* glyph);
+void render_glyph(XRenderColor col, Picture dst, float x, int y, GlyphData* glyph);

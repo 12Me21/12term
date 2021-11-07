@@ -48,7 +48,6 @@ Picture XftDrawSrcPicture(const XRenderColor color) {
 // (when drawing wide characters, the centerline will instead be on the boundary between the two cells.)
 
 void render_glyph(
-	int op, // composite operation
 	XRenderColor col, // color (only used for normal monochrome glyphs)
 	Picture dst, // destination picture
 	float x, // position (center)
@@ -60,7 +59,7 @@ void render_glyph(
 	//print("xoff: %d. width: %d. x: %d\n", glyph->metrics.xOff, glyph->metrics.width, glyph->metrics.x);
 	if (glyph->type==2) {
 		XRenderComposite(
-			W.d, op, glyph->picture, None, dst,
+			W.d, PictOpOver, glyph->picture, None, dst,
 			0, 0, 0, 0,
 			bx - glyph->metrics.x, y - glyph->metrics.y,
 			glyph->metrics.width, glyph->metrics.height
@@ -69,7 +68,7 @@ void render_glyph(
 		Picture src = XftDrawSrcPicture(col);
 		XftFormat* format = &xft_formats[glyph->format];
 		XRenderCompositeString32(
-			W.d, op, src, dst, format->format, format->glyphset,
+			W.d, PictOpOver, src, dst, format->format, format->glyphset,
 			0, 0, bx, y,
 			(unsigned int[]){glyph->id}, 1
 		);
