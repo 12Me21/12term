@@ -1,15 +1,8 @@
 #pragma once
 
-#include <stdbool.h>
-
-#include <ft2build.h>
-#include FT_FREETYPE_H
-
 #include <X11/extensions/Xrender.h>
 
 #include "../common.h"
-
-extern FT_Library	ft_library;
 
 // this contains all the info needed to render a glyph
 typedef struct GlyphData {
@@ -28,3 +21,5 @@ void load_fonts(const utf8* fontstr, double fontsize);
 void fonts_free(void);
 
 void render_glyph(XRenderColor col, Picture dst, float x, int y, GlyphData* glyph);
+
+void font_init(void);

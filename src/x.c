@@ -1,7 +1,7 @@
 // this file deals with general interfacing with X and contains the main function and main loop
 
 #define _POSIX_C_SOURCE 200112L
-#include <math.h>
+#include <string.h>
 #include <unistd.h>
 #include <locale.h>
 #include <errno.h>
@@ -26,6 +26,8 @@
 #include "event.h"
 #include "settings.h"
 #include "icon.h"
+
+#include "xft/Xft.h"
 //#include "lua.h"
 
 Xw W = {0};

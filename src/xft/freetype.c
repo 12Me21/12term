@@ -2,6 +2,13 @@
 
 FT_Library ft_library;
 
+void font_init(void) {
+	if (!FcInit())
+		die("fontconfig init failed");
+	if (FT_Init_FreeType(&ft_library))
+		die("freetype init failed");
+}
+
 // Many fonts can share the same underlying face data; this
 // structure references that.  Note that many faces may in fact
 // live in the same font file; that is irrelevant to this structure

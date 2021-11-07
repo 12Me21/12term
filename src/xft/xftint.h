@@ -13,6 +13,8 @@
 
 #include "../x.h"
 
+extern FT_Library	ft_library;
+
 // This structure holds the data extracted from a pattern
 // needed to create a unique font object.
 typedef struct XftFontInfo {

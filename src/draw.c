@@ -1,5 +1,7 @@
 // Drawing graphics
 
+#include <string.h>
+
 #include <X11/Xlib.h>
 #include "xft/Xft.h"
 
