@@ -56,22 +56,30 @@ void render_glyph(
 ) {
 	float half = glyph->metrics.xOff / 2.0f;
 	int bx = (int)(x - half + 10000) - 10000; // add 10000 so the number isn't negative when rounded
-	//print("xoff: %d. width: %d. x: %d\n", glyph->metrics.xOff, glyph->metrics.width, glyph->metrics.x);
-	if (glyph->type==2) {
-		XRenderComposite(
-			W.d, PictOpOver, glyph->picture, None, dst,
-			0, 0, 0, 0,
-			bx - glyph->metrics.x, y - glyph->metrics.y,
-			glyph->metrics.width, glyph->metrics.height
-		);
-	} else if (glyph->type==1) {
+	
+	// regular glyph
+	if (glyph->type==1) {
 		Picture src = XftDrawSrcPicture(col);
 		XftFormat* format = &xft_formats[glyph->format];
 		XRenderCompositeString32(
-			W.d, PictOpOver, src, dst, format->format, format->glyphset,
-			0, 0, bx, y,
-			(unsigned int[]){glyph->id}, 1
+			W.d, PictOpOver,
+			src, dst, // color, dest
+			format->format, // format (is this correct?)
+			format->glyphset,
+			0, 0, // source pos
+			bx, y, // dest pos
+			(unsigned int[]){glyph->id}, 1 // list of glyphs
 		);
+	// color image glyph (i.e. emoji)
+	} else if (glyph->type==2) {
+		XRenderComposite(
+			W.d, PictOpOver,
+			glyph->picture, None, dst, // source, mask, dest
+			0, 0, 0, 0, // source/mask pos
+			bx-glyph->metrics.x, y-glyph->metrics.y, // dest pos
+			glyph->metrics.width, glyph->metrics.height // size
+		);
+	// invalid
 	} else {
 		print("tried to render unloaded glyph?\n");
 	}
