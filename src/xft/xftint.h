@@ -13,6 +13,41 @@
 
 #include "../x.h"
 
+// This structure holds the data extracted from a pattern
+// needed to create a unique font object.
+typedef struct XftFontInfo {
+	struct FontFile* file; // face source
+	// Rendering options
+	FT_F26Dot6 xsize, ysize; // pixel size
+	
+	// these need to be FcBool because some functions output using pointers to these
+	FcBool antialias;	// doing antialiasing
+	FcBool embolden; // force emboldening
+	FcBool color; // contains color glyphs
+	int rgba; // subpixel order
+	int lcd_filter; // lcd filter
+	FT_Matrix matrix;	// glyph transformation matrix
+	FcBool transform;	// non-identify matrix?
+	FT_Int load_flags; // glyph load flags (passed to FT_Load_Glyph)
+	// Internal fields
+	int spacing;
+	FcBool minspace;
+	int char_width;
+} XftFontInfo;
+
+typedef struct XftFont {
+	int ascent, descent, height;
+	int max_advance_width;
+	FcCharSet* charset;
+	FcPattern* pattern;
+	
+	struct XftFontInfo info; // Data from pattern (i feel like this could be in one struct?)
+	// X specific fields
+	char format;
+	
+	struct XftFont* next; // linked list
+} XftFont;
+
 typedef struct XftFormat {
 	XRenderPictFormat* format;
 	GlyphSet glyphset;
@@ -39,6 +74,8 @@ int XftDebug(void);
 
 /* xftfreetype.c */
 FT_Face xft_lock_face(XftFont* pub);
+void XftFontClose(XftFont* pub);
+XftFont* XftFontOpenPattern(FcPattern* pattern);
 
 /* xftglyph.c */
 bool load_glyph(XftFont* font, Char chr, GlyphData* out);
