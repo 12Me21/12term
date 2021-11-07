@@ -8,10 +8,20 @@
 #include "common.h"
 #include "x.h"
 #include "buffer.h"
-#include "font.h"
 #include "draw.h"
 #include "draw2.h"
 #include "event.h"
+
+#define Glyph Glyph_
+typedef struct Glyph {
+	struct GlyphData* glyph; //null if glyph is empty
+	// keys for caching
+	Char chr;
+	char style; // whether bold/italic etc.
+	// when turning cells into glyphs, if the prev 2 values match the new cell's, the cached glyph is used
+	// todo: we need to store which cell the glyph is in, so we can handle combining chars
+	int x;
+} Glyph;
 
 typedef struct XftDraw {
 	Drawable drawable;
@@ -79,6 +89,25 @@ static void draw_destroy(XftDraw draw) {
 	XRenderFreePicture(W.d, draw.pict);
 }
 // todo: add _replace back? this only gets used on resize so is it worth it, idk?
+
+static int cell_fontstyle(const Cell* c) {
+	return (c->attrs.weight==1) | (c->attrs.italic)<<1;
+}
+
+static void cells_to_glyphs(int len, Cell cells[len], Glyph glyphs[len], bool cache) {
+	FOR (i, len) {
+		Char chr = cells[i].chr;
+		// skip blank cells
+		if (cells[i].wide==-1 || chr==0 || chr==' ') {
+			glyphs[i].chr = chr;
+			glyphs[i].glyph = NULL;
+			continue;
+		}
+		int style = cell_fontstyle(&cells[i]);
+		if (!cache || glyphs[i].chr!=chr || glyphs[i].style!=style)
+			glyphs[i].glyph = cache_lookup(chr, style);
+	}
+}
 
 // these are only used to track the old size in this function
 static int drawn_width = -1, drawn_height = -1;

@@ -5,7 +5,7 @@ all: $(output) terminfo
 
 # all the .c files
 srcdir = src
-srcs = x tty debug buffer ctlseqs keymap csi draw font event settings icon clipboard #lua
+srcs = x tty debug buffer ctlseqs keymap csi draw event settings icon clipboard #lua
 srcs += xft/dbg xft/freetype xft/glyphs xft/render xft/cache
 srcs := $(srcs:=.c) #append .c to names
 
