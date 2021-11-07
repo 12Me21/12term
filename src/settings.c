@@ -12,8 +12,20 @@
 #include "buffer.h"
 #include "settings.h"
 #include "x.h"
-#include "xft/Xft.h"
-extern bool parse_x_color(const utf8* c, RGBColor* out);
+
+// hhhh
+bool parse_x_color(const utf8* c, RGBColor* out) {
+	XColor ret;
+	if (XParseColor(W.d, W.cmap, c, &ret)) {
+		*out = (RGBColor){
+			ret.red*255/65535,
+			ret.green*255/65535,
+			ret.blue*255/65535,
+		};
+		return true;
+	}
+	return false;
+}
 
 Settings settings = {
 	.palette = {

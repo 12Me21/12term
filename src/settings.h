@@ -38,3 +38,6 @@ extern Settings settings;
 void load_settings(int* argc, utf8** argv);
 
 void pattern_default_substitute(FcPattern* pattern);
+
+// should this be in here?
+bool parse_x_color(const utf8* c, RGBColor* out);

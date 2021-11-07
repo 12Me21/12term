@@ -30,20 +30,6 @@
 
 Xw W = {0};
 
-// hhhh
-bool parse_x_color(const utf8* c, RGBColor* out) {
-	XColor ret;
-	if (XParseColor(W.d, W.cmap, c, &ret)) {
-		*out = (RGBColor){
-			ret.red*255/65535,
-			ret.green*255/65535,
-			ret.blue*255/65535,
-		};
-		return true;
-	}
-	return false;
-}
-
 static unsigned long alloc_color(Color c) {
 	XRenderColor x = make_color(c);
 	XColor xc = {

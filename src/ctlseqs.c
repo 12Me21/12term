@@ -13,7 +13,6 @@
 #include "settings.h"
 // messy
 extern void own_clipboard(utf8* which, utf8* string);
-extern bool parse_x_color(const utf8* c, RGBColor* out);
 extern void set_title(utf8* c);
 extern void change_font(const utf8* name);
 
