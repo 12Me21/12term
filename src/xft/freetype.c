@@ -2,12 +2,8 @@
 
 FT_Library ft_library;
 
-void font_init(void) {
-	if (!FcInit())
-		die("fontconfig init failed");
-	if (FT_Init_FreeType(&ft_library))
-		die("freetype init failed");
-}
+// linked list of all loaded fonts
+static XftFont* fonts = NULL;
 
 // Many fonts can share the same underlying face data; this
 // structure references that.  Note that many faces may in fact
@@ -27,11 +23,15 @@ typedef struct FontFile {
 	FT_Face face; // pointer to face; only valid when lock
 } FontFile;
 
-// linked list of all loaded fonts
-static XftFont* fonts = NULL;
-
 // List of all open files (each face in a file is managed separately)
 static FontFile* xft_files = NULL;
+
+void font_init(void) {
+	if (!FcInit())
+		die("fontconfig init failed");
+	if (FT_Init_FreeType(&ft_library))
+		die("freetype init failed");
+}
 
 // create a new FontFile from a filename and an id
 static FontFile* get_file(const utf8* filename, int id) {
@@ -98,7 +98,6 @@ static FT_F26Dot6 dist(FT_F26Dot6 a, FT_F26Dot6 b) {
 }
 
 // set the current size and matrix for a font
-// todo: check how much lag this causes and whether we ever need to call this after loading a font?
 static bool set_face(FontFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* matrix) {
 	FT_Face face = f->face;
 	
@@ -160,8 +159,6 @@ FT_Face xft_lock_face(XftFont* font) {
 	XftFontInfo* fi = &font->info;
 	FT_Face face = fi->file->face;
 	// Make sure the face is usable at the requested size
-	// this is necessary if you have like
-	// multiple fonts using the same face but different matricies i
 	if (face && !set_face(fi->file, fi->xsize, fi->ysize, &fi->matrix))
 		face = NULL;
 	return face;
@@ -271,19 +268,14 @@ static bool font_info_fill(const FcPattern* pattern, XftFontInfo* fi) {
 	
 	// Get matrix and transform values
 	FcMatrix* font_matrix;
-	switch (FcPatternGetMatrix(pattern, FC_MATRIX, 0, &font_matrix)) {
-	case FcResultNoMatch:
-		fi->matrix.xx = fi->matrix.yy = 0x10000;
-		fi->matrix.xy = fi->matrix.yx = 0;
-		break;
-	case FcResultMatch:
+	if (FcPatternGetMatrix(pattern, FC_MATRIX, 0, &font_matrix) == FcResultMatch) {
 		fi->matrix.xx = 0x10000L * font_matrix->xx;
 		fi->matrix.yy = 0x10000L * font_matrix->yy;
 		fi->matrix.xy = 0x10000L * font_matrix->xy;
 		fi->matrix.yx = 0x10000L * font_matrix->yx;
-		break;
-	default:
-		goto bail1;
+	} else {
+		fi->matrix.xx = fi->matrix.yy = 0x10000;
+		fi->matrix.xy = fi->matrix.yx = 0;
 	}
 	
 	fi->transform = (fi->matrix.xx != 0x10000 || fi->matrix.xy != 0 || fi->matrix.yx != 0 || fi->matrix.yy != 0x10000);

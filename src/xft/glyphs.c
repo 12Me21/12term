@@ -45,7 +45,7 @@ before calling _fill_xrender_bitmap
 it also returns -1 in case of error (e.g. incompatible arguments,
 like trying to convert a gray bitmap into a monochrome one)
 */
-static int _compute_xrender_bitmap_size(
+static int compute_xrender_bitmap_size(
 	FT_Bitmap* target, // target bitmap descriptor. The function will set its 'width', 'rows' and 'pitch' fields, and only these
 	FT_GlyphSlot slot, // the glyph slot containing the source bitmap. this function assumes that slot->format == FT_GLYPH_FORMAT_BITMAP
 	FT_Render_Mode mode, // the requested final rendering mode. supported values are MONO, NORMAL (i.e. gray), LCD and LCD_V
@@ -117,12 +117,12 @@ static int _compute_xrender_bitmap_size(
 /*
 this function converts the glyph bitmap found in a FT_GlyphSlot
 into a different format while scaling by applying the given matrix
-(see _compute_xrender_bitmap_size)
+(see compute_xrender_bitmap_size)
 
-you should call this function after _compute_xrender_bitmap_size
+you should call this function after compute_xrender_bitmap_size
 */
 //  vcectors ...
-static void _scaled_fill_xrender_bitmap(
+static void scaled_fill_xrender_bitmap(
 	FT_Bitmap* target, // target bitmap descriptor. Note that its 'buffer' pointer must point to memory allocated by the caller
 	FT_Bitmap* source, // the source bitmap descriptor
 	const FT_Matrix* matrix // the scaling matrix to apply
@@ -194,12 +194,12 @@ static void _scaled_fill_xrender_bitmap(
 
 /* 
   this function converts the glyph bitmap found in a FT_GlyphSlot
-  into a different format (see _compute_xrender_bitmap_size)
+  into a different format (see compute_xrender_bitmap_size)
  
-  you should call this function after _compute_xrender_bitmap_size
+  you should call this function after compute_xrender_bitmap_size
 */
 // gosh how much of this is really necessary though?
-static void _fill_xrender_bitmap(
+static void fill_xrender_bitmap(
 	FT_Bitmap* target, // target bitmap descriptor. Note that its 'buffer' pointer must point to memory allocated by the caller
 	FT_GlyphSlot slot, // the glyph slot containing the source bitmap
 	FT_Render_Mode mode, // the requested final rendering mode
@@ -279,14 +279,8 @@ static void _fill_xrender_bitmap(
 static int dot6_to_int(FT_F26Dot6 x) {
 	return x>>6;
 }
-static int dot6_floor(FT_F26Dot6 x) {
-	return x & ~63;
-}
 static int dot6_round(FT_F26Dot6 x) {
 	return x+32 & ~63;
-}
-static int dot6_ceil(FT_F26Dot6 x) {
-	return x+63 & ~63;
 }
 
 bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
@@ -319,7 +313,7 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 	FT_UInt glyphindex = FcFreeTypeCharIndex(face, chr);
 	
 	FT_Library_SetLcdFilter(ft_library, font->info.lcd_filter);
-		
+	
 	FT_Error	error = FT_Load_Glyph(face, glyphindex, font->info.load_flags);
 	if (error) {
 		// If anti-aliasing or transforming glyphs and
@@ -338,75 +332,19 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 	if (font->info.embolden)
 		FT_GlyphSlot_Embolden(glyphslot);
 	
-	// Compute glyph metrics from FreeType information
-	FT_F26Dot6 left, right, top, bottom;
-	FT_Glyph_Metrics* metrics = &glyphslot->metrics;
-	if (transform) {
-		// calculate the true width by transforming all four corners.
-		FOR (xc, 2) {
-			FOR (yc, 2) {
-				FT_Vector vector = {
-					.x = metrics->horiBearingX + xc * metrics->width,
-					.y = metrics->horiBearingY - yc * metrics->height,
-				};
-				FT_Vector_Transform(&vector, &font->info.matrix);
-				if (XftDebug() & XFT_DBG_GLYPH)
-					print("Trans %d %d: %d %d\n", (int) xc, (int) yc,
-					      (int) vector.x, (int) vector.y);
-				if (xc == 0 && yc == 0) {
-					left = right = vector.x;
-					top = bottom = vector.y;
-				} else {
-					if (left > vector.x) left = vector.x;
-					if (top < vector.y) top = vector.y;
-					if (right < vector.x) right = vector.x;
-					if (bottom > vector.y) bottom = vector.y;
-				}
-			}
-		}
-		// lots of rounding going on here... kinda sus
-	} else {
-		left = metrics->horiBearingX;
-		top = metrics->horiBearingY;
-		right = metrics->horiBearingX + metrics->width;
-		bottom = metrics->horiBearingY - metrics->height;
-	}
-	left = dot6_floor(left);
-	top = dot6_ceil(top);
-	bottom = dot6_floor(bottom);
-	right = dot6_ceil(right);
-	
-	//int width = dot6_to_int(right - left);
-	//int height = dot6_to_int(top - bottom);
-	
-	// Clip charcell glyphs to the bounding box
-	// XXX transformed?
-	if (font->info.spacing >= FC_CHARCELL && !transform) {
-		if (dot6_to_int(right) > font->max_advance_width) {
-			int adjust = right - (font->max_advance_width << 6);
-			if (adjust > left) adjust = left;
-			left -= adjust;
-			right -= adjust;
-			//width = font->max_advance_width;
-		}
-	}
-	
-	// ok I'm confused.
-	// when is this width value ever used?
-	
 	bool glyph_transform = transform;
 	if (glyphslot->format != FT_GLYPH_FORMAT_BITMAP) {
 		error = FT_Render_Glyph(face->glyph, mode);
 		if (error) {
 			// uh oh
 			return false;
-			//die("error rendering glyph\n");
 		}
 		glyph_transform = false;
 	}
 	
 	FT_Library_SetLcdFilter(ft_library, FT_LCD_FILTER_NONE);
 	
+	int x_off, y_off;
 	if (font->info.spacing >= FC_MONO) {
 		if (transform) {
 			FT_Vector vector = {
@@ -414,57 +352,21 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 				.y = 0,
 			};
 			FT_Vector_Transform(&vector, &font->info.matrix);
-			out->metrics.xOff = vector.x >> 6;
-			out->metrics.yOff = -(vector.y >> 6);
+			x_off = vector.x >> 6;
+			y_off = -(vector.y >> 6);
 		} else {
-			out->metrics.xOff = font->max_advance_width;
-			out->metrics.yOff = 0;
+			x_off = font->max_advance_width;
+			y_off = 0;
 		}
 	} else {
-		out->metrics.xOff = dot6_to_int(dot6_round(glyphslot->advance.x));
-		out->metrics.yOff = -dot6_to_int(dot6_round(glyphslot->advance.y));
+		x_off = dot6_to_int(dot6_round(glyphslot->advance.x));
+		y_off = -dot6_to_int(dot6_round(glyphslot->advance.y));
 	}
-	
-	// compute the size of the final bitmap
-	FT_Bitmap* ftbit = &glyphslot->bitmap;
-	
-	int width = ftbit->width;
-	int height = ftbit->rows;
-	
-	if (XftDebug() & XFT_DBG_GLYPH) {
-		print("glyph %d:\n", (int) glyphindex);
-		print(" xywh (%d %d %d %d), trans (%ld %ld %ld %ld) wh (%d %d)\n",
-		      (int) metrics->horiBearingX,
-		      (int) metrics->horiBearingY,
-		      (int) metrics->width,
-		      (int) metrics->height,
-		      left, right, top, bottom,
-		      width, height);
-		if (XftDebug() & XFT_DBG_GLYPHV) {
-			uint8_t* line = ftbit->buffer;
-			if (ftbit->pitch < 0)
-				line -= ftbit->pitch*(height-1);
-				
-			FOR (y, height) {
-				if (font->info.antialias) {
-					const utf8* den = " .:;=+*#";
-					FOR (x, width) {
-						print("%c", den[line[x] >> 5]);
-					}
-				} else {
-					FOR (x, width*8) {
-						print("%c", line[x/8] & (1<<x%8) ? '#' : ' ');
-					}
-				}
-				print("|\n");
-				line += ftbit->pitch;
-			}
-			print("\n");
-		}
-	}
+	out->metrics.xOff = x_off;
+	out->metrics.yOff = y_off;
 	
 	FT_Bitmap local;
-	int size = _compute_xrender_bitmap_size(&local, glyphslot, mode, glyph_transform ? &font->info.matrix : NULL);
+	int size = compute_xrender_bitmap_size(&local, glyphslot, mode, glyph_transform ? &font->info.matrix : NULL);
 	if (size < 0)
 		return false;
 	
@@ -492,9 +394,9 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 	local.buffer = bufBitmap;
 		
 	if (mode == FT_RENDER_MODE_NORMAL && glyph_transform)
-		_scaled_fill_xrender_bitmap(&local, &glyphslot->bitmap, &font->info.matrix);
+		scaled_fill_xrender_bitmap(&local, &glyphslot->bitmap, &font->info.matrix);
 	else
-		_fill_xrender_bitmap(&local, glyphslot, mode, font->info.rgba==FC_RGBA_BGR || font->info.rgba==FC_RGBA_VBGR);
+		fill_xrender_bitmap(&local, glyphslot, mode, font->info.rgba==FC_RGBA_BGR || font->info.rgba==FC_RGBA_VBGR);
 		
 	// Copy or convert into local buffer.
 	
