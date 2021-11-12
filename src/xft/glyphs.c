@@ -143,7 +143,7 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 	local.buffer = bufBitmap;
 		
 	if (mode == FT_RENDER_MODE_NORMAL && glyph_transform)
-		scaled_fill_xrender_bitmap(&local, &glyphslot->bitmap, mode, false, &font->info.matrix);
+		fill_xrender_bitmap(&local, &glyphslot->bitmap, mode, false, &font->info.matrix);
 	else
 		fill_xrender_bitmap(&local, &glyphslot->bitmap, mode, font->info.rgba==FC_RGBA_BGR || font->info.rgba==FC_RGBA_VBGR, NULL);
 		
