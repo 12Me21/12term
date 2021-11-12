@@ -86,6 +86,6 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out);
 
 int compute_xrender_bitmap_size(FT_Bitmap* target, const FT_Bitmap* ftbit, FT_Render_Mode mode, const FT_Matrix* matrix);
 
-void scaled_fill_xrender_bitmap(FT_Bitmap* target, const FT_Bitmap* source, const FT_Matrix* matrix);
+void scaled_fill_xrender_bitmap(FT_Bitmap* target, const FT_Bitmap* ftbit, FT_Render_Mode mode, bool bgr, const FT_Matrix* matrix);
 
-void fill_xrender_bitmap(FT_Bitmap* target, const FT_Bitmap* ftbit, FT_Render_Mode mode, bool bgr);
+void fill_xrender_bitmap(FT_Bitmap* target, const FT_Bitmap* ftbit, FT_Render_Mode mode, bool bgr, const FT_Matrix* matrix);

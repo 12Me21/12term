@@ -109,6 +109,8 @@ you should call this function after compute_xrender_bitmap_size
 void scaled_fill_xrender_bitmap(
 	FT_Bitmap* target, // target bitmap descriptor. Note that its 'buffer' pointer must point to memory allocated by the caller
 	const FT_Bitmap* source, // the source bitmap descriptor
+	FT_Render_Mode mode, // unused
+	bool bgr, // unused
 	const FT_Matrix* matrix // the scaling matrix to apply
 ) {
 	uint8_t* src_buf = source->buffer;
@@ -187,7 +189,8 @@ void fill_xrender_bitmap(
 	FT_Bitmap* target, // target bitmap descriptor. Note that its 'buffer' pointer must point to memory allocated by the caller
 	const FT_Bitmap* ftbit, // source bitmap
 	FT_Render_Mode mode, // the requested final rendering mode
-	bool bgr // boolean, set if BGR or VBGR pixel ordering is needed
+	bool bgr, // boolean, set if BGR or VBGR pixel ordering is needed
+	const FT_Matrix* matrix // unused
 ) {
 	const int src_pitch = ftbit->pitch;
 	uint8_t*	srcLine = ftbit->buffer;
