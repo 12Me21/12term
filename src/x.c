@@ -21,7 +21,6 @@
 #include "tty.h"
 #include "draw.h"
 #include "x.h"
-#include "font.h"
 #include "buffer.h"
 #include "event.h"
 #include "settings.h"
@@ -96,7 +95,9 @@ __attribute__((noreturn)) void sleep_forever(bool hangup) {
 	
 	draw_free();
 	
-	//FcFini();
+	close_all();
+	
+	FcFini();
 	
 	XCloseDisplay(W.d);
 	

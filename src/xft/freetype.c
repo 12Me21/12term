@@ -148,17 +148,10 @@ static bool set_face(FontFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix*
 }
 
 static void release_file(FontFile* f) {
-	if (--f->ref != 0)
-		return;
 	if (f->filename) {
-		for (FontFile** prev = &xft_files; *prev; prev = &(*prev)->next) {
-			if (*prev == f) {
-				*prev = f->next;
-				break;
-			}
-		}
-		if (f->face)
+		if (f->face) {
 			FT_Done_Face(f->face);
+		}
 	}
 	free(f);
 }
@@ -483,14 +476,15 @@ static void XftFontDestroy(XftFont* font) {
 	free(font);
 }
 
-void XftFontClose(XftFont* font) {
-	// Unhook from display list
-	for (XftFont** prev = &fonts; *prev; prev = &(*prev)->next) {
-		if (*prev == font) {
-			*prev = font->next;
-			break;
-		}
+void close_all(void) {
+	while (xft_files) {
+		FontFile* next = xft_files->next;
+		release_file(xft_files);
+		xft_files = next;
 	}
-	// Destroy the font
-	XftFontDestroy(font);
+	while (fonts) {
+		XftFont* next = fonts->next;
+		XftFontDestroy(fonts);
+		fonts = next;
+	}
 }

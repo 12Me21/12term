@@ -1,32 +1,6 @@
 #include "xftint.h"
-#include "../buffer.h"
-
-// color cache
-static struct {
-	XRenderColor color;
-	Picture pict;
-} colors[XFT_NUM_SOLID_COLOR] = {0};
 
 // todo: improve caching here
-Picture XftDrawSrcPicture(const XRenderColor color) {
-	// See if there's one already available
-	FOR (i, XFT_NUM_SOLID_COLOR) {
-		if (colors[i].pict && !memcmp(&color, &colors[i].color, sizeof(XRenderColor)))
-			return colors[i].pict;
-	}
-	// Pick one to replace at random
-	int i = (unsigned int)rand() % XFT_NUM_SOLID_COLOR;
-	
-	// Free any existing entry
-	if (colors[i].pict)
-		XRenderFreePicture(W.d, colors[i].pict);
-	// Create picture
-	// is it worth caching this anymore?
-	colors[i].pict = XRenderCreateSolidFill(W.d, &color);
-	colors[i].color = color;
-
-	return colors[i].pict;
-}
 
 // this function uses the intersection of the baseline and the center line as the origin
 // ⎛note that the ascent and descent may vary depending on the font.       ⎞
@@ -59,7 +33,7 @@ void render_glyph(
 	
 	// regular glyph
 	if (glyph->type==1) {
-		Picture src = XftDrawSrcPicture(col);
+		Picture src = XRenderCreateSolidFill(W.d, &col);
 		XftFormat* format = &xft_formats[glyph->format];
 		XRenderCompositeString32(
 			W.d, PictOpOver,
@@ -70,6 +44,7 @@ void render_glyph(
 			bx, y, // dest pos
 			(unsigned int[]){glyph->id}, 1 // list of glyphs
 		);
+		XRenderFreePicture(W.d, src);
 	// color image glyph (i.e. emoji)
 	} else if (glyph->type==2) {
 		XRenderComposite(

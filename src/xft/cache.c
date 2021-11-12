@@ -100,16 +100,12 @@ void fonts_free(void) {
 	FOR (i, 4) {
 		Font* f = &fonts[i];
 		if (f->font) {
-			//FcPatternDestroy(f->pattern);
-			XftFontClose(f->font);
+			FcPatternDestroy(f->pattern);
 			f->font = NULL;
 			if (f->set) {
-				FOR (i, f->set->nfont) {
-					if (f->fallback_fonts[i])
-						XftFontClose(f->fallback_fonts[i]);
-				}
 				FcFontSetDestroy(f->set);
 				f->set = NULL;
+				free(f->fallback_fonts);
 			}
 		}
 	}
@@ -200,13 +196,16 @@ XftFont* find_char_font(Char chr, int style) {
 	FcPatternAddCharSet(pattern, FC_CHARSET, charset);
 	FcResult res;
 	FcPattern* match = FcFontSetMatch(NULL, &set, 1, pattern, &res);
+	FcPatternDestroy(pattern);
+	FcCharSetDestroy(charset);
 	
 	if (match) {
 		int i = fontset_search(set, match);
 		if (i>=0) {
 			print("match success. loading font %d\n", i);
-			FcConfigSubstitute(0, match, FcMatchPattern);
-			pattern_default_substitute(match);
+			//pattern_default_substitute(match);
+			//FcConfigSubstitute(NULL, match, FcMatchFont); // changed this from FcMatchPattern to FcMatchFont and that helped with some memory leaks????
+			//pattern_default_substitute(match);
 			XftFont* xf = XftFontOpenPattern(match);
 			f->fallback_fonts[i] = xf;
 			return xf;

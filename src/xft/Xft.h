@@ -23,3 +23,5 @@ void fonts_free(void);
 void render_glyph(XRenderColor col, Picture dst, float x, int y, GlyphData* glyph);
 
 void font_init(void);
+
+void close_all(void);

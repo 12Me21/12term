@@ -340,14 +340,15 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 	
 	// Compute glyph metrics from FreeType information
 	FT_F26Dot6 left, right, top, bottom;
-	FT_Vector vector;
+	FT_Glyph_Metrics* metrics = &glyphslot->metrics;
 	if (transform) {
 		// calculate the true width by transforming all four corners.
-		left = right = top = bottom = 0;
 		FOR (xc, 2) {
 			FOR (yc, 2) {
-				vector.x = glyphslot->metrics.horiBearingX + xc * glyphslot->metrics.width;
-				vector.y = glyphslot->metrics.horiBearingY - yc * glyphslot->metrics.height;
+				FT_Vector vector = {
+					.x = metrics->horiBearingX + xc * metrics->width,
+					.y = metrics->horiBearingY - yc * metrics->height,
+				};
 				FT_Vector_Transform(&vector, &font->info.matrix);
 				if (XftDebug() & XFT_DBG_GLYPH)
 					print("Trans %d %d: %d %d\n", (int) xc, (int) yc,
@@ -356,27 +357,27 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 					left = right = vector.x;
 					top = bottom = vector.y;
 				} else {
+					if (left > vector.x) left = vector.x;
 					if (top < vector.y) top = vector.y;
 					if (right < vector.x) right = vector.x;
-					if (left > vector.x) left = vector.x;
 					if (bottom > vector.y) bottom = vector.y;
 				}
 			}
 		}
-		top = dot6_ceil(top);
-		right = dot6_ceil(right);
-		left = dot6_floor(left);
-		bottom = dot6_floor(bottom);
 		// lots of rounding going on here... kinda sus
 	} else {
-		top = dot6_ceil(glyphslot->metrics.horiBearingY);
-		right = dot6_ceil(glyphslot->metrics.horiBearingX + glyphslot->metrics.width);
-		left = dot6_floor(glyphslot->metrics.horiBearingX);
-		bottom = dot6_floor(glyphslot->metrics.horiBearingY - glyphslot->metrics.height);
+		left = metrics->horiBearingX;
+		top = metrics->horiBearingY;
+		right = metrics->horiBearingX + metrics->width;
+		bottom = metrics->horiBearingY - metrics->height;
 	}
+	left = dot6_floor(left);
+	top = dot6_ceil(top);
+	bottom = dot6_floor(bottom);
+	right = dot6_ceil(right);
 	
-	int width = dot6_to_int(right - left);
-	int height = dot6_to_int(top - bottom);
+	//int width = dot6_to_int(right - left);
+	//int height = dot6_to_int(top - bottom);
 	
 	// Clip charcell glyphs to the bounding box
 	// XXX transformed?
@@ -386,9 +387,12 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 			if (adjust > left) adjust = left;
 			left -= adjust;
 			right -= adjust;
-			width = font->max_advance_width;
+			//width = font->max_advance_width;
 		}
 	}
+	
+	// ok I'm confused.
+	// when is this width value ever used?
 	
 	bool glyph_transform = transform;
 	if (glyphslot->format != FT_GLYPH_FORMAT_BITMAP) {
@@ -405,8 +409,10 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 	
 	if (font->info.spacing >= FC_MONO) {
 		if (transform) {
-			vector.x = face->size->metrics.max_advance;
-			vector.y = 0;
+			FT_Vector vector = {
+				.x = face->size->metrics.max_advance,
+				.y = 0,
+			};
 			FT_Vector_Transform(&vector, &font->info.matrix);
 			out->metrics.xOff = vector.x >> 6;
 			out->metrics.yOff = -(vector.y >> 6);
@@ -422,16 +428,16 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 	// compute the size of the final bitmap
 	FT_Bitmap* ftbit = &glyphslot->bitmap;
 	
-	width = ftbit->width;
-	height = ftbit->rows;
+	int width = ftbit->width;
+	int height = ftbit->rows;
 	
 	if (XftDebug() & XFT_DBG_GLYPH) {
 		print("glyph %d:\n", (int) glyphindex);
 		print(" xywh (%d %d %d %d), trans (%ld %ld %ld %ld) wh (%d %d)\n",
-		      (int) glyphslot->metrics.horiBearingX,
-		      (int) glyphslot->metrics.horiBearingY,
-		      (int) glyphslot->metrics.width,
-		      (int) glyphslot->metrics.height,
+		      (int) metrics->horiBearingX,
+		      (int) metrics->horiBearingY,
+		      (int) metrics->width,
+		      (int) metrics->height,
 		      left, right, top, bottom,
 		      width, height);
 		if (XftDebug() & XFT_DBG_GLYPHV) {
@@ -466,24 +472,20 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 	out->metrics.height = local.rows;
 	if (0&&transform) {
 		// this is broken
+		/*
+		  FT_Vector vector;
 		vector.x = - glyphslot->bitmap_left;
 		vector.y =   glyphslot->bitmap_top;
 			
 		FT_Vector_Transform(&vector, &font->info.matrix);
 			
 		out->metrics.x = vector.x;
-		out->metrics.y = vector.y;
+		out->metrics.y = vector.y;*/
 	} else {
 		out->metrics.x = - glyphslot->bitmap_left;
 		out->metrics.y =   glyphslot->bitmap_top;
 	}
-		
-	// If the glyph is relatively large (> 1% of server memory),
-	// don't send it until necessary.
-	// we always need bitmaps hehehe
-	//if (!need_bitmaps && size>info.max_glyph_memory/100)
-	//	continue;
-		
+	
 	uint8_t bufBitmap[size]; // I hope there's enough stack space owo
 	memset(bufBitmap, 0, size);
 		
