@@ -113,7 +113,9 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 	out->metrics.yOff = y_off;
 	
 	FT_Bitmap local;
-	int size = compute_xrender_bitmap_size(&local, glyphslot, mode, glyph_transform ? &font->info.matrix : NULL);
+	if (glyphslot->format != FT_GLYPH_FORMAT_BITMAP)
+		return false;
+	int size = compute_xrender_bitmap_size(&local, &glyphslot->bitmap, mode, glyph_transform ? &font->info.matrix : NULL);
 	if (size < 0)
 		return false;
 	
@@ -143,7 +145,7 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 	if (mode == FT_RENDER_MODE_NORMAL && glyph_transform)
 		scaled_fill_xrender_bitmap(&local, &glyphslot->bitmap, &font->info.matrix);
 	else
-		fill_xrender_bitmap(&local, glyphslot, mode, font->info.rgba==FC_RGBA_BGR || font->info.rgba==FC_RGBA_VBGR);
+		fill_xrender_bitmap(&local, &glyphslot->bitmap, mode, font->info.rgba==FC_RGBA_BGR || font->info.rgba==FC_RGBA_VBGR);
 		
 	// Copy or convert into local buffer.
 	out->picture = 0;

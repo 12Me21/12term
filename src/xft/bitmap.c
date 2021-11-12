@@ -19,7 +19,7 @@ static int round_up(int n, int to) {
 }
 
 /* 
-we sometimes need to convert the glyph bitmap in a FT_GlyphSlot
+we sometimes need to convert the glyph bitmap
 into a different format. For example, we want to convert a
 FT_PIXEL_MODE_LCD or FT_PIXEL_MODE_LCD_V bitmap into a 32-bit
 ARGB or ABGR bitmap.
@@ -35,15 +35,11 @@ like trying to convert a gray bitmap into a monochrome one)
 */
 int compute_xrender_bitmap_size(
 	FT_Bitmap* target, // target bitmap descriptor. The function will set its 'width', 'rows' and 'pitch' fields, and only these
-	FT_GlyphSlot slot, // the glyph slot containing the source bitmap. this function assumes that slot->format == FT_GLYPH_FORMAT_BITMAP
+	const FT_Bitmap* ftbit, // source bitmap.
 	FT_Render_Mode mode, // the requested final rendering mode. supported values are MONO, NORMAL (i.e. gray), LCD and LCD_V
-	FT_Matrix* matrix
+	const FT_Matrix* matrix
 ) {
-	if (slot->format != FT_GLYPH_FORMAT_BITMAP)
-		return -1;
-	
 	// compute the size of the final bitmap
-	FT_Bitmap* ftbit = &slot->bitmap;
 	int width = ftbit->width;
 	int height = ftbit->rows;
 	
@@ -103,7 +99,7 @@ int compute_xrender_bitmap_size(
 }
 
 /*
-this function converts the glyph bitmap found in a FT_GlyphSlot
+this function converts the glyph bitmap
 into a different format while scaling by applying the given matrix
 (see compute_xrender_bitmap_size)
 
@@ -112,7 +108,7 @@ you should call this function after compute_xrender_bitmap_size
 //  vcectors ...
 void scaled_fill_xrender_bitmap(
 	FT_Bitmap* target, // target bitmap descriptor. Note that its 'buffer' pointer must point to memory allocated by the caller
-	FT_Bitmap* source, // the source bitmap descriptor
+	const FT_Bitmap* source, // the source bitmap descriptor
 	const FT_Matrix* matrix // the scaling matrix to apply
 ) {
 	uint8_t* src_buf = source->buffer;
@@ -181,7 +177,7 @@ void scaled_fill_xrender_bitmap(
 }
 
 /* 
-  this function converts the glyph bitmap found in a FT_GlyphSlot
+  this function converts the glyph bitmap
   into a different format (see compute_xrender_bitmap_size)
  
   you should call this function after compute_xrender_bitmap_size
@@ -189,11 +185,10 @@ void scaled_fill_xrender_bitmap(
 // gosh how much of this is really necessary though?
 void fill_xrender_bitmap(
 	FT_Bitmap* target, // target bitmap descriptor. Note that its 'buffer' pointer must point to memory allocated by the caller
-	FT_GlyphSlot slot, // the glyph slot containing the source bitmap
+	const FT_Bitmap* ftbit, // source bitmap
 	FT_Render_Mode mode, // the requested final rendering mode
 	bool bgr // boolean, set if BGR or VBGR pixel ordering is needed
 ) {
-	const FT_Bitmap* ftbit = &slot->bitmap;
 	const int src_pitch = ftbit->pitch;
 	uint8_t*	srcLine = ftbit->buffer;
 	if (src_pitch < 0)
