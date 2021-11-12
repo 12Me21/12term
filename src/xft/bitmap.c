@@ -111,26 +111,25 @@ void fill_xrender_bitmap(
 	bool bgr, // boolean, set if BGR or VBGR pixel ordering is needed
 	const FT_Matrix* matrix // the scaling matrix to apply
 ) {
-	if (matrix) {
-		uint8_t* src_buf = source->buffer;
-		int src_pitch = source->pitch;
-		if (src_pitch<0)
-			src_buf -= src_pitch*(source->rows-1);
+	const int width = target->width;
+	const int height = target->rows;
+	uint8_t* dst_line = target->buffer;
+	const int pitch = target->pitch;
+	int src_pitch = source->pitch;
+	uint8_t*	src_line = source->buffer;
+	if (src_pitch<0)
+		src_line -= src_pitch*(source->rows-1);
 	
+	if (matrix) {
 		FT_Matrix inverse = *matrix;
 		FT_Matrix_Invert(&inverse);
-	
+		
 		// compute how many source pixels a target pixel spans
 		FT_Vector vector = {.x=1, .y=1};
 		FT_Vector_Transform(&vector, &inverse);
 		int sampling_width = vector.x / 2;
 		int sampling_height = vector.y / 2;
 		int sample_count = (2*sampling_width + 1) * (2*sampling_height + 1);
-	
-		int width = target->width;
-		int height = target->rows;
-		int pitch = target->pitch;
-		uint8_t* dst_line = target->buffer;
 		FOR (y, height) {
 			FOR (x, width) {
 				// compute target pixel location in source space
@@ -144,13 +143,13 @@ void fill_xrender_bitmap(
 				switch (source->pixel_mode) {
 					// convert mono to 8-bit gray, scale using nearest pixel
 				case FT_PIXEL_MODE_MONO: 
-					src = src_buf + (vector.y*src_pitch);
+					src = src_line + (vector.y*src_pitch);
 					if (src[vector.x>>3] & (0x80 >> (vector.x & 7)) )
 						dst_line[x] = 0xFF;
 					break;
 					// scale using nearest pixel
 				case FT_PIXEL_MODE_GRAY: 
-					src = src_buf + (vector.y * src_pitch);
+					src = src_line + (vector.y * src_pitch);
 					dst_line[x] = src[vector.x];
 					break;
 					// scale by averaging all relevant source pixels, keep BGRA format
@@ -158,7 +157,7 @@ void fill_xrender_bitmap(
 					int bgra[4] = {0};
 					for (int sample_y = -sampling_height; sample_y < sampling_height + 1; ++sample_y) {
 						int src_y = limit(vector.y + sample_y, 0, source->rows - 1);
-						src = src_buf + (src_y * src_pitch);
+						src = src_line + (src_y * src_pitch);
 						for (int sample_x = -sampling_width; sample_x < sampling_width + 1; ++sample_x) {
 							int src_x = limit(vector.x + sample_x, 0, source->width - 1);
 							FOR (i, 4) {
@@ -176,73 +175,64 @@ void fill_xrender_bitmap(
 			dst_line+=pitch;
 		}
 	} else {
-		const int src_pitch = source->pitch;
-		uint8_t*	srcLine = source->buffer;
-		if (src_pitch < 0)
-			srcLine -= src_pitch*(source->rows-1);
-	
-		const int width = target->width;
-		const int height = target->rows;
-		const int pitch = target->pitch;
-		uint8_t* dstLine = target->buffer;
-		const int subpixel = (mode==FT_RENDER_MODE_LCD || mode==FT_RENDER_MODE_LCD_V );
+		const bool subpixel = (mode==FT_RENDER_MODE_LCD || mode==FT_RENDER_MODE_LCD_V);
 		// the compiler should optimize this by moving the for loop inside the switch block
 		FOR (y, height) {
-			uint32_t* const dst = (uint32_t*)dstLine;
+			uint32_t* const dst = (uint32_t*)dst_line;
 			switch (source->pixel_mode) {
 			case FT_PIXEL_MODE_MONO:
 				// convert mono to ARGB32 values
 				if (subpixel) { 
 					FOR (x, width) {
-						if (srcLine[x/8] & (0x80 >> x%8))
+						if (src_line[x/8] & (0x80 >> x%8))
 							dst[x] = 0xffffffffU;
 					}
 					// convert mono to 8-bit gray
 				} else if (mode == FT_RENDER_MODE_NORMAL) {
 					FOR (x, width) {
-						if (srcLine[x/8] & (0x80 >> x%8))
-							dstLine[x] = 0xff;
+						if (src_line[x/8] & (0x80 >> x%8))
+							dst_line[x] = 0xff;
 					}
 					// copy mono to mono
 				} else {
-					memcpy(dstLine, srcLine, (width+7)/8);
+					memcpy(dst_line, src_line, (width+7)/8);
 				}
 				break;
 			case FT_PIXEL_MODE_GRAY:
 				// convert gray to ARGB32 values
 				if (subpixel) {
 					FOR (x, width) {
-						dst[x] = pack(srcLine[x], srcLine[x], srcLine[x], srcLine[x]);
+						dst[x] = pack(src_line[x], src_line[x], src_line[x], src_line[x]);
 					}
 					// copy gray into gray
 				} else {
-					memcpy(dstLine, srcLine, width);
+					memcpy(dst_line, src_line, width);
 				}
 				break;
 			case FT_PIXEL_MODE_BGRA: 
 				// Preserve BGRA format
-				memcpy(dstLine, srcLine, width*4);
+				memcpy(dst_line, src_line, width*4);
 				break;
 			case FT_PIXEL_MODE_LCD:
 				FOR (x, width) {
 					// convert horizontal RGB into ARGB32
 					if (!bgr)
-						dst[x] = pack(srcLine[x*3+2], srcLine[x*3+1], srcLine[x*3], srcLine[x*3+1]); // is this supposed to be 3?
+						dst[x] = pack(src_line[x*3+2], src_line[x*3+1], src_line[x*3], src_line[x*3+1]); // is this supposed to be 3?
 					else
-						dst[x] = pack(srcLine[x*3], srcLine[x*3+1], srcLine[x*3+2], srcLine[x*3+1]);
+						dst[x] = pack(src_line[x*3], src_line[x*3+1], src_line[x*3+2], src_line[x*3+1]);
 				}
 				break;
 			case FT_PIXEL_MODE_LCD_V:
 				FOR (x, width) {
 					if (!bgr)
-						dst[x] = pack(srcLine[x+src_pitch*2], srcLine[x+src_pitch], srcLine[x], srcLine[x+src_pitch]); // repeated values here are not a typo, i checked carefully
+						dst[x] = pack(src_line[x+src_pitch*2], src_line[x+src_pitch], src_line[x], src_line[x+src_pitch]); // repeated values here are not a typo, i checked carefully
 					else
-						dst[x] = pack(srcLine[x], srcLine[x+src_pitch], srcLine[x+src_pitch*2], srcLine[x+src_pitch]);
+						dst[x] = pack(src_line[x], src_line[x+src_pitch], src_line[x+src_pitch*2], src_line[x+src_pitch]);
 				}
-				srcLine += (3-1)*src_pitch; // adjust for vertical pixels
+				src_line += (3-1)*src_pitch; // adjust for vertical pixels
 			}
-			srcLine += src_pitch;
-			dstLine += pitch;
+			src_line += src_pitch;
+			dst_line += pitch;
 		}
 	}
 }
