@@ -223,7 +223,6 @@ static bool font_info_fill(const FcPattern* pattern, XftFontInfo* fi) {
 	// Find the associated file
 	FcChar8* filename = NULL;
 	FcPatternGetString(pattern, FC_FILE, 0, &filename);
-	
 	int id = 0;
 	FcPatternGetInteger(pattern, FC_INDEX, 0, &id);
 	
