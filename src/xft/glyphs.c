@@ -133,8 +133,8 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 		out->metrics.x = vector.x;
 		out->metrics.y = vector.y;*/
 	} else {
-		out->metrics.x = - glyphslot->bitmap_left;
-		out->metrics.y =   glyphslot->bitmap_top;
+		out->metrics.x = -glyphslot->bitmap_left;
+		out->metrics.y =  glyphslot->bitmap_top;
 	}
 	
 	uint8_t bufBitmap[size]; // I hope there's enough stack space owo

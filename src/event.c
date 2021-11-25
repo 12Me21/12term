@@ -1,6 +1,7 @@
 // x event handler functions and related
 
 #include <X11/Xlib.h>
+#include <X11/Xcursor/Xcursor.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -59,8 +60,13 @@ static bool cell_at(Px x, Px y, int* ox, int* oy) {
 // returns true if the event was eaten
 int ox=-1, oy=-1, oldbutton = 3;
 static bool mouse_event(XEvent* ev) {
+	//#undef Cursor
+	//	Cursor c = XcursorLibraryLoadCursor(W.d, "box_spiral");
+	//	XDefineCursor(W.d, W.win, c);
+	
 	if (!T.mouse_mode)
 		return false;
+	
 	int type = ev->xbutton.type;
 	bool click = type==ButtonPress || type==ButtonRelease;
 	int button = ev->xbutton.button;

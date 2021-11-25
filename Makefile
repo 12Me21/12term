@@ -17,7 +17,7 @@ libs = rt util
 # util: pty stuff
 
 # arguments for pkg-config
-pkgs = x11 xrender freetype2 fontconfig #lua$(lua_version) #//harfbuzz
+pkgs = x11 xrender freetype2 fontconfig xcursor #lua$(lua_version) #//harfbuzz
 # fontconfig: (loading fonts)
 # freetype2: (font rendering)
 # X11: X window system (graphics, input, etc.)
