@@ -21,6 +21,24 @@
 //       centerline
 // (when drawing wide characters, the centerline will instead be on the boundary between the two cells.)
 
+       // wait can we just XRenderFillRectangle on the color source?
+
+static bool same_color(XRenderColor* a, XRenderColor* b) {
+	return memcmp(a, b, sizeof(XRenderColor))==0;
+}
+
+static Picture create_color(XRenderColor* col) {
+	static XRenderColor last;
+	static Picture lastp;
+	if (lastp && same_color(&last, col))
+		return lastp;
+	if (lastp)
+		XRenderFreePicture(W.d, lastp);
+	lastp = XRenderCreateSolidFill(W.d, col);
+	last = *col;
+	return lastp;
+}
+
 void render_glyph(
 	XRenderColor col, // color (only used for normal monochrome glyphs)
 	Picture dst, // destination picture
@@ -33,7 +51,7 @@ void render_glyph(
 	
 	// regular glyph
 	if (glyph->type==1) {
-		Picture src = XRenderCreateSolidFill(W.d, &col);
+		Picture src = create_color(&col);
 		XftFormat* format = &xft_formats[glyph->format];
 		XRenderCompositeString32(
 			W.d, PictOpOver,
@@ -44,7 +62,7 @@ void render_glyph(
 			bx, y, // dest pos
 			(unsigned int[]){glyph->id}, 1 // list of glyphs
 		);
-		XRenderFreePicture(W.d, src);
+		//XRenderFreePicture(W.d, src);
 	// color image glyph (i.e. emoji)
 	} else if (glyph->type==2) {
 		XRenderComposite(

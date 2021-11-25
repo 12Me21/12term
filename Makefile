@@ -25,7 +25,7 @@ pkgs = x11 xrender freetype2 fontconfig xcursor #lua$(lua_version) #//harfbuzz
 
 
 CFLAGS+= -g # include debug symbols
-#CFLAGS+= -O2
+CFLAGS+= -O2
 #CFLAGS+= -s -Os
 CFLAGS+= -Wall -Wextra -pedantic -std=c11 # turn on a bunch of warnings
 CFLAGS+= -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -Wno-parentheses -Wno-char-subscripts # disable these warnings
