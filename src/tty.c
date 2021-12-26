@@ -1,6 +1,18 @@
 // Interfacing with the pseudoterminal
 
 #define _POSIX_C_SOURCE 200112L
+
+#if defined(__linux)
+ #include <pty.h>
+#elif defined(__OpenBSD__) || defined(__NetBSD__) || defined(__APPLE__)
+ #include <util.h>
+#elif defined(__FreeBSD__) || defined(__DragonFly__)
+ #define _BSD_SOURCE 1
+ #include <libutil.h>
+#else
+ #error unsupported system
+#endif
+
 #include <sys/select.h>
 #include <signal.h>
 #include <sys/wait.h>
@@ -11,17 +23,8 @@
 #include <errno.h>
 #include <pwd.h>
 #include <stdarg.h>
+#include <sys/ioctl.h>
 // more headers might be required here, not sure...
-
-#if defined(__linux)
- #include <pty.h>
-#elif defined(__OpenBSD__) || defined(__NetBSD__) || defined(__APPLE__)
- #include <util.h>
-#elif defined(__FreeBSD__) || defined(__DragonFly__)
- #include <libutil.h>
-#else
- #error unsupported system
-#endif
 
 #include "common.h"
 #include "tty.h"
@@ -74,6 +77,7 @@ static void execsh(void) {
 	setenv("SHELL", sh, true);
 	setenv("HOME", pw->pw_dir, true);
 	setenv("TERM", settings.termName, true);
+	setenv("TERMCAP", "xterm-256color", true);
 	
 	signal(SIGCHLD, SIG_DFL);
 	signal(SIGHUP, SIG_DFL);

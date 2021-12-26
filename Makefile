@@ -12,7 +12,7 @@ srcs := $(srcs:=.c) #append .c to names
 #lua_version = 5.2
 
 # libs to include with -l<name>
-libs = rt util
+libs = util
 # rt: realtime extensions
 # util: pty stuff
 
