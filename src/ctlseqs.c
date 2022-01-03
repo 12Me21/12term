@@ -449,7 +449,7 @@ void process_chars(int len, const utf8 cs[len]) {
 				P.state = ST;
 			// end of string
 			// todo: maybe check other characters here just in case
-			else if (c==0x07 || c==0x18 || c==0x1A || (c>=0x80 && c<=0x9F)) {
+			else if (c==0x07 || c==0x18 || c==0x1A || (c>=0x80 && c<=0x9F) || c=='\n') {
 				end_string();
 			} else {
 				push_string_byte(c);

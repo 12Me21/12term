@@ -236,8 +236,10 @@ int main(int argc, char* argv[argc+1]) {
 	time_log(NULL);
 	
 	// hecking locale
-	setlocale(LC_CTYPE, "");
+	setlocale(LC_ALL, "");
 	XSetLocaleModifiers("");
+	
+	time_log("set locale");
 	
 	int w = settings.width;
 	int h = settings.height;
@@ -247,6 +249,9 @@ int main(int argc, char* argv[argc+1]) {
 	W.d = XOpenDisplay(NULL);
 	if (!W.d)
 		die("Could not connect to X server\n");
+	
+	time_log("open display");
+	
 	W.scr = XDefaultScreen(W.d);
 	W.vis = XDefaultVisual(W.d, W.scr);
 	
@@ -262,24 +267,31 @@ int main(int argc, char* argv[argc+1]) {
 		if (major<0 || (major==0 && minor<10))
 			die("Requires xrender >= 0.10");
 	}
+	
 	W.format = XRenderFindVisualFormat(W.d, W.vis);
 	if (!W.format)
 		die("cant find visual format ...\n");
 	
 	W.cmap = XDefaultColormap(W.d, W.scr);
 	
+	init_atoms();
+	
+	time_log("get various display info");
+	
 	// init db
 	XrmInitialize();
 	load_settings(&argc, argv);
 	print("subpixel : %d\n", settings.xft.rgba);
 	
-	init_atoms();
+	time_log("load settings");
 	
 	tty_init(); // todo: maybe try to pass the window size here if we can guess it?
 	
+	time_log("init tty");
+	
 	init_term(w, h); // todo: we are going to get a term_resize event quickly after this, mmm.. idk if this is the right place for this, also. I mostly just put it here to simplify the timing logs
 	
-	time_log("init stuff 1");
+	time_log("init term");
 	
 	font_init();
 	
@@ -313,6 +325,8 @@ int main(int argc, char* argv[argc+1]) {
 			.colormap = W.cmap,
 		}
 	);
+	
+	time_log("created window");
 	
 	W.gc = XCreateGC(W.d, W.win, GCGraphicsExposures, &(XGCValues){
 		.graphics_exposures = False,
@@ -352,7 +366,7 @@ int main(int argc, char* argv[argc+1]) {
 		});
 	}
 	
-	time_log("created window");
+	time_log("set window properties");
 	
 	init_input();
 	
