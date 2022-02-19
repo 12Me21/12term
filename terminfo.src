@@ -1,11 +1,13 @@
 #!/usr/bin/tic -x
-xterm-12term|xterm-12term|my terminal uwu,
+xterm-12term|my terminal uwu,
 ## 24-bit color
 	setf24=\E[38\:2\:%p1%{65536}%/%d\:%p1%{256}%/%{255}%&%d\:%p1%{255}%&%dm,
 	setb24=\E[48\:2\:%p1%{65536}%/%d\:%p1%{256}%/%{255}%&%d\:%p1%{255}%&%dm,
 # The "official" way to specify 24-bit color support is with the `RGB` capability, which signals that setaf/setab can accept 24-bit rgb values in addition to palette index numbers.
 # However, this means that the indexed colors collide with the first 8 or 256 rgb colors (corresponding to dark shades of blue).
 #  I think this is a bad solution, so I use emacs's setf24/setb24 instead.
+## another nonstandard way of announcing 24bit color support (declares support for CSI 38;2;<r>;<g>;<b>;m and 48)
+	Tc,
 
 ## background color erase
 	bce,
