@@ -35,7 +35,7 @@ typedef struct Bucket {
 } Bucket;
 
 // number !
-#define cache_length 7327
+#define cache_length 14327
 // cache is an array of buckets
 static Bucket cache[cache_length] = {0};
 
@@ -235,6 +235,10 @@ GlyphData* cache_lookup(Char chr, uint8_t style) {
 		i += 1;
 		i %= cache_length;
 		collisions++;
+		if (collisions >= cache_length) {
+			print("CACHE IS FULL!\n");
+			return NULL;
+		}
 	}
 	if (collisions)
 		print("cache collisions: %d\n", collisions);
