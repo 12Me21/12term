@@ -247,6 +247,9 @@ static void set_private_mode(int mode, bool state) {
 	}
 }
 
+// get the `n`th argument
+// if there aren't enough arguments, or the argument has a value of 0,
+// return `def` instead
 static int get_arg(int n, int def) {
 	if (n>=P.argc || P.argv[n]==0)
 		return def;
@@ -415,10 +418,7 @@ static void process_csi_command(Char c) {
 			delete_chars(arg01());
 			break;
 		case 'r': // set scroll region =csr=
-			set_scroll_region(
-				arg01()-1,
-				get_arg(1, T.height) // note that we don't subtract 1 here
-			);
+			set_scroll_region(arg01()-1, get_arg(1, T.height)); // no -1
 			break;
 		case 'S': // scroll text up =indn=
 			scroll_up(arg01());

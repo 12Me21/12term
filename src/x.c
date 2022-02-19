@@ -235,6 +235,10 @@ int main(int argc, char* argv[argc+1]) {
 #endif
 	time_log(NULL);
 	
+	for (int i=0; i<argc; i++) {
+		print("%s\n", argv[i]);
+	}
+	
 	// hecking locale
 	setlocale(LC_ALL, "");
 	XSetLocaleModifiers("");

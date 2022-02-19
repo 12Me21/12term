@@ -10,6 +10,7 @@ int cursor_up(int amount);
 int cursor_down(int amount);
 void cursor_right(int amount);
 void cursor_left(int amount);
+void carriage_return(void);
 void cursor_to(int x, int y);
 void forward_index(int amount);
 void reverse_index(int amount);

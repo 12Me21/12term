@@ -142,13 +142,16 @@ void term_resize(int width, int height) {
 			FOR (y, T.height) {
 				resize_row(&T.buffers[scr].rows[y], T.width, old_width);
 			}
+			// adjust last_written pos
+			// todo: remember to update this code when text re-wrapping is added
+			T.buffers[scr].last_x = limit(T.buffers[scr].last_x, 0, T.width);
 		}
 		// update tab stops
 		REALLOC(T.tabs, T.width+1);
 		FOR (x, T.width) {
 			T.tabs[x] = (x%8 == 0);
 		}
-		// update cursor position
+		// adjust cursor position
 		T.c.x = limit(T.c.x, 0, T.width); //note this is NOT width-1, since cursor is allowed to be in the right margin
 		T.saved_cursor.x = limit(T.saved_cursor.x, 0, T.width);
 		// resize history rows
@@ -171,10 +174,9 @@ void term_resize(int width, int height) {
 			free(T.buffers[1].rows[y]);
 		}
 		// lower rows: shift upwards
-		for (; y<T.height; y++) {
-			T.buffers[0].rows[y+diff] = T.buffers[0].rows[y];
-			T.buffers[1].rows[y+diff] = T.buffers[1].rows[y];
-		}
+		for (int scr=0; scr<=1; scr++)
+			for (; y<T.height; y++)
+				T.buffers[scr].rows[y+diff] = T.buffers[scr].rows[y];
 		// realloc lists of lines
 		T.height = height;
 		REALLOC(T.buffers[1].rows, height);
@@ -182,7 +184,9 @@ void term_resize(int width, int height) {
 		// adjust cursor position
 		T.c.y = limit(T.c.y+diff, 0, T.height-1);
 		T.saved_cursor.y = limit(T.saved_cursor.y+diff, 0, T.height-1);
-		
+		// adjust last written pos
+		for (int scr=0; scr<=1; scr++)
+			T.buffers[scr].last_y = limit(T.buffers[scr].last_y+diff, 0, T.height-1);
 	} else if (height > T.height) { // height INCREASE (diff > 0)
 		// realloc lists of lines
 		REALLOC(T.buffers[1].rows, height);
@@ -210,6 +214,9 @@ void term_resize(int width, int height) {
 		// adjust cursor down
 		T.c.y += diff;
 		T.saved_cursor.y += diff;
+		// adjust last written pos
+		for (int scr=0; scr<=1; scr++)
+			T.buffers[scr].last_y = T.buffers[scr].last_y+diff;
 	}
 	// todo: how do we handle the scrolling regions?
 	T.scroll_top = 0;
@@ -230,7 +237,15 @@ void set_cursor_style(int n) {
 	}
 }
 
+// reset the flag that tracks whether the last action was to print a character
+// call this when moving the cursor etc.
+static void reset_last(void) {
+	T.current->last = false;
+}
+
 void clear_region(int x1, int y1, int x2, int y2) {
+	reset_last(); // sometimes redundant, maybe not appropriate here. i think really, things (csi.c) should not be calling this function directly! TODO
+	
 	//print("clear region: [%d,%d]-(%d,%d)\n",x1,y1,x2,y2);
 	// todo: warn about this
 	if (x1<0)
@@ -267,6 +282,7 @@ void full_reset(void) {
 	for (int i=0; i<2; i++) {
 		T.current = &T.buffers[i];
 		clear_region(0, 0, T.width, T.height);
+		reset_last();
 	}
 	T.scroll_top = 0;
 	T.scroll_bottom = T.height;
@@ -395,6 +411,7 @@ void cursor_to(int x, int y) {
 	// todo: is it ok to move the cursor to the offscreen column?
 	T.c.x = limit(x, 0, T.width-1);
 	T.c.y = limit(y, 0, T.height-1);
+	reset_last();
 }
 
 // these scroll + move the cursor with the scrolled text
@@ -415,7 +432,15 @@ void scroll_down(int amount) {
 	}
 }
 
+// this is so ctlseqs.c doesn't manipulate T.c.x directly
+// maybe we should deny access to screen internals and only give it buffer2.h?
+void carriage_return(void) {
+	reset_last();
+	T.c.x = 0;
+}
+
 int cursor_up(int amount) {
+	reset_last();
 	if (amount<=0)
 		return 0;
 	int next = T.c.y - amount;
@@ -450,6 +475,7 @@ void reverse_index(int amount) {
 
 // are we sure this can't overflow T.c.y?
 int cursor_down(int amount) {
+	reset_last();
 	if (amount<=0)
 		return 0;
 	int next = T.c.y + amount;
@@ -470,13 +496,12 @@ int cursor_down(int amount) {
 	return 0;
 }
 
-static int add_combining_char(int x, int y, Char c) {
+static bool add_combining_char(int x, int y, Char c) {
 	Cell* dest = &T.current->rows[y]->cells[x];
-	if (x<0)
-		return 0; //if printing in the first column
+	// if this is the right half of a fullwidth char, move to the left
 	if (dest->wide==-1) {
 		if (x==0)
-			return 0; //should never happen
+			return false; //should never happen?
 		dest--;
 		x--;
 	}
@@ -485,11 +510,11 @@ static int add_combining_char(int x, int y, Char c) {
 			dest->combining[i] = c;
 			if (i+1<LEN(dest->combining))
 				dest->combining[i+1] = 0;
-			return 1;
+			return true;
 		}
 	}
 	print("too many combining chars in cell %d,%d!\n", x, y);
-	return 1; //we still return 1, because we don't want to put the combining char into the next cell
+	return false;
 }
 
 // utf-8 decoding macro lol
@@ -563,9 +588,13 @@ void put_char(Char c) {
 	int width = char_width(c);
 	
 	if (width==0) {
-		if (add_combining_char(T.c.x-1, T.c.y, c))
-			return;
-		width = 1;
+		// if the last action was the print a character,
+		// the combining char will be added to that cell
+		// otherwise it will be added to the current cell
+		int x = T.current->last ? T.current->last_x : T.c.x;
+		int y = T.current->last ? T.current->last_y : T.c.y;
+		add_combining_char(x, y, c);
+		return;
 	}
 	
 	// wrap
@@ -604,13 +633,19 @@ void put_char(Char c) {
 				erase_wc_left(T.c.x+2, T.c.y);
 			// (don't need erase_wc_right because we know the char to the left is new)
 			// insert dummy char
-			dest[1].chr = 0;
-			dest[1].combining[0] = 0;
-			dest[1].attrs = dest->attrs;
-			dest[1].wide = -1;
+			dest[1] = (Cell){
+				.chr = 0,
+				.attrs = dest->attrs,
+				.wide = -1,
+			};
 		}
 	} else
 		dest->wide = 0;
+	
+	// todo: figure out if there are any other places where we need to reset/adjust these
+	T.current->last = true;
+	T.current->last_x = T.c.x;
+	T.current->last_y = T.c.y;
 	
 	T.c.x += width;
 	//	if (T.current->rows[T.c.y]->length<T.c.x)
@@ -623,6 +658,7 @@ void backspace(void) {
 }
 
 void cursor_right(int amount) {
+	reset_last();
 	if (amount<=0) // should we do the <= check? calling this with amount=0 would potentially move the cursor out of the right margin column.(and should that even happen?)
 		return;
 	// todo: does this ever wrap?
@@ -632,6 +668,7 @@ void cursor_right(int amount) {
 }
 
 void cursor_left(int amount) {
+	reset_last();
 	if (amount<=0)
 		return;
 	// todo: does this ever wrap?
@@ -641,6 +678,10 @@ void cursor_left(int amount) {
 }
 
 void delete_chars(int n) {
+	// technically i think this is supposed to instantly return if the cursor is outside the horizontal margins (see: xterm/util.c/DeleteChar())
+	// which could happen if it's off the right side
+	// but idk i feel like that's a bug?
+	reset_last();
 	n = limit(n, 0, T.width-T.c.x);
 	if (!n)
 		return;
@@ -650,6 +691,7 @@ void delete_chars(int n) {
 }
 
 void insert_blank(int n) {
+	reset_last();
 	n = limit(n, 0, T.width-T.c.x);
 	if (!n)
 		return;
@@ -667,6 +709,7 @@ void insert_lines(int n) {
 		return;
 	if (T.c.y >= T.scroll_bottom)
 		return;
+	reset_last();
 	n = limit(n, 0, T.scroll_bottom - T.c.y);
 	if (!n)
 		return;
@@ -679,6 +722,7 @@ void delete_lines(int n) {
 		return;
 	if (T.c.y >= T.scroll_bottom)
 		return;
+	reset_last();
 	n = limit(n, 0, T.scroll_bottom - T.c.y);
 	if (!n)
 		return;
@@ -703,6 +747,7 @@ void forward_tab(int n) {
 }
 
 void erase_characters(int n) {
+	reset_last();
 	n = limit(n, 0, T.width-T.c.x);
 	clear_region(T.c.x, T.c.y, T.c.x+n, T.c.y+1);
 }
@@ -732,16 +777,20 @@ void restore_cursor(void) {
 	T.c.y = limit(T.c.y, 0, T.height-1);
 }
 
-void set_scroll_region(int y1, int y2) {
-	// behavior taken from xterm
-	if (y2 < y1)
+// set the top/bottom margins of the scrolling region
+// request is ignored if the region would have fewer than 2 rows
+void set_scroll_region(int top, int bottom) {
+	// behavior taken from xterm (see: xterm/charproc.c case CASE_DECSTBM and set_tb_margins) (but remember xterm uses inclusive bottom)
+	top = limit(top, 0, T.height-1);
+	bottom = limit(bottom, 0, T.height);
+	if (bottom-top < 2)
 		return;
-	y1 = limit(y1, 0, T.height-1);
-	y2 = limit(y2, 0, T.height);
-	T.scroll_top = y1;
-	T.scroll_bottom = y2;
-	cursor_to(0, 0); // todo: where is this supposed to move the cursor?
+	T.scroll_top = top;
+	T.scroll_bottom = bottom;
+	cursor_to(0, 0);
 }
+
+// 
 
 void set_scrollback(int pos) {
 	pos = limit(pos, 0, history.length);

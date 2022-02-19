@@ -53,12 +53,15 @@ typedef struct Cell {
 	Char combining[1]; //todo: (and make this like, 4 or something)
 	Attrs attrs;
 	int8_t wide: 2; //0 = normal, 1 = left half of wide char, -1 = right half (chr=0)
+// fullwidth chars consist of 2 cells:
+// - a cell with wide=1, and the character data stored in it
+// - a cell with wide=-1, and no data
 } Cell;
 
 // TODO: make a compressed version of this for storing history cells?
 
 typedef struct Row {
-	//int length; //todo
+	// TODO:
 	// when printing a char causes the cursor to wrap to the next line,
 	// the `wrap` flag is set on the old line, and `cont` is set on the new line
 	// (TODO) when the terminal is resized, lines are spliced together if:
@@ -80,11 +83,17 @@ typedef struct Cursor {
 // the main or alternate buffer.
 typedef struct Buffer {
 	Row** rows;
+	// (idk if this should be per-buffer)
+	// whether there was a character just printed, which combining chars can be added to:
+	bool last;
+	// position of that char
+	int last_x; // 0 … T.width-1 (never offscreen)
+	int last_y; // 0 … T.height-1
 } Buffer;
 
 // all terminal properties
 typedef struct Term {
-	int width, height;
+	int width, height; // must be > 0
 	
 	Buffer buffers[2]; // main, alt
 	Buffer* current; // always points to an item in .buffers

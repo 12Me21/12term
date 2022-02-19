@@ -31,7 +31,7 @@ bool process_control_char(utf8 c) {
 		backspace();
 		break;
 	case '\r':
-		T.c.x = 0;
+		carriage_return();
 		break;
 	case '\n':
 	case '\v':
@@ -51,6 +51,11 @@ static void begin_string(int type) {
 	P.string_command = type;
 	P.string_length = 0;
 }
+
+// xterm's VTPrsTbl.c is an interesting idea
+// ex: in the normal state, it looks up each char in `ansi_table`.
+// if it reads ESC, it would look up `ansi_table["\e"]` and switch to that state, which is CASE_ESC
+// then, in that state, it uses `esc_table` to decide how to handle the next char, etc
 
 static void process_escape_char(Char c) {
 	switch (c) {
@@ -99,7 +104,7 @@ static void process_escape_char(Char c) {
 		break;
 	case 'E': // Next Line
 		forward_index(1);
-		T.c.x = 0;
+		carriage_return();
 		break;
 	case 'M': // Reverse Index
 		reverse_index(1);
