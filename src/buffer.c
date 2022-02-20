@@ -523,7 +523,28 @@ static const Char DEC_GRAPHICS_CHARSET[128] = {
 	['`'] = L'◆', L'▒', L'␉', L'␌', L'␍', L'␊', L'°', L'±', L'␤', L'␋', L'┘', L'┐', L'┌', L'└', L'┼', L'⎺', L'⎻', L'─', L'⎼', L'⎽', L'├', L'┤', L'┴', L'┬', L'│', L'≤', L'≥', L'π', L'≠', L'£', L'·',
 };
 
-static int char_width(Char c) {
+typedef struct WidthRange {
+	int start, end;
+	uint8_t width;
+} WidthRange;
+
+WidthRange ranges[] = {
+	#include "width/widths.txt"
+};
+
+int char_width(int c) {
+	if (c<' ')
+		return 0;
+	for (int i=0; i<LEN(ranges); i++) {
+		if (c < ranges[i].start)
+			break;
+		if (c < ranges[i].end)
+			return ranges[i].width;
+	}
+	return 1;
+}
+
+/*static int char_width(Char c) {
 	int width;
 	if (c<128) { // assume ascii chars are never wide, to avoid calling wcwidth all the time // wait this includes control chars though? todo: dont print those unless we already filter them
 		width = 1;
@@ -533,7 +554,7 @@ static int char_width(Char c) {
 			width = 1;
 	}
 	return width;
-}
+	}*/
 
 // when printing a char at `dest`,
 // you may have overwritten a wide char spanning from `dest-1` to `dest`
@@ -588,6 +609,17 @@ static bool add_combining_char(Char c) {
 		x--;
 		// todo: what if there is glitched data, and it ends up on another dummy char?
 	}
+	//print("inserting combining char\n");
+	if (dest->wide==1) {
+		//print("unwidening\n");
+		dest->wide=0;
+		clean_wc_right(&dest[1], x+1);
+		// move the cursor backwards as the char is shrunk
+		if (T.current->last) {
+			T.c.x = T.current->last_x+1; // this is evil
+			T.c.y = T.current->last_y;
+		}
+	}
 	
 	// zero width joiner:
 	if (c == 0x200D) {
@@ -624,12 +656,11 @@ void put_char(Char c) {
 			c = DEC_GRAPHICS_CHARSET[c];
 	}
 	
-	int width;
+	int width = char_width(c);
 	if (T.current->joiner) { // if a zwj was printed previously, the next char is treated as combining
-		width = 0;
+		if (width==2)
+			width = 1;
 		T.current->joiner = false; // set to false here, in case someone prints like, <normal char> <zwj> <combining char> <normal char>, the second normal char wont be part of the sequence (this is correct right?)
-	} else {
-		width = char_width(c);
 	}
 	
 	if (width==0) {
