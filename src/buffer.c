@@ -241,7 +241,6 @@ void set_cursor_style(int n) {
 // call this when moving the cursor etc.
 static void reset_last(void) {
 	T.current->last = false;
-	T.current->joiner = false;
 }
 
 void clear_region(int x1, int y1, int x2, int y2) {
@@ -532,19 +531,7 @@ WidthRange ranges[] = {
 	#include "width/widths.txt"
 };
 
-int char_width(int c) {
-	if (c<' ')
-		return 0;
-	for (int i=0; i<LEN(ranges); i++) {
-		if (c < ranges[i].start)
-			break;
-		if (c < ranges[i].end)
-			return ranges[i].width;
-	}
-	return 1;
-}
-
-/*static int char_width(Char c) {
+static int char_width(Char c) {
 	int width;
 	if (c<128) { // assume ascii chars are never wide, to avoid calling wcwidth all the time // wait this includes control chars though? todo: dont print those unless we already filter them
 		width = 1;
@@ -554,7 +541,7 @@ int char_width(int c) {
 			width = 1;
 	}
 	return width;
-	}*/
+}
 
 // when printing a char at `dest`,
 // you may have overwritten a wide char spanning from `dest-1` to `dest`
@@ -609,32 +596,6 @@ static bool add_combining_char(Char c) {
 		x--;
 		// todo: what if there is glitched data, and it ends up on another dummy char?
 	}
-	//print("inserting combining char\n");
-	if (dest->wide==1) {
-		//print("unwidening\n");
-		dest->wide=0;
-		clean_wc_right(&dest[1], x+1);
-		// move the cursor backwards as the char is shrunk
-		if (T.current->last) {
-			T.c.x = T.current->last_x+1; // this is evil
-			T.c.y = T.current->last_y;
-		}
-	}
-	
-	// zero width joiner:
-	if (c == 0x200D) {
-		print("got joiner\n");
-		T.current->joiner = true;
-		// turn the base char into a wide char
-		/*if (x+1 < T.width) { // if there is room
-			if (dest->wide == 0) { // and not already wide
-				// make it wide
-				dest->wide = 1;
-				clean_wc_right(&dest[2], x+2);
-				add_dummy(dest);
-			}
-			}*/
-	}
 	
 	// insert into the list
 	for (int i=0; i<LEN(dest->combining); i++) {
@@ -658,12 +619,6 @@ void put_char(Char c) {
 	}
 	
 	int width = char_width(c);
-	if (T.current->joiner) { // if a zwj was printed previously, the next char is treated as combining
-		print("joined char '%lc'\n", c);
-		if (width==2)
-			width = 1;
-		T.current->joiner = false; // set to false here, in case someone prints like, <normal char> <zwj> <combining char> <normal char>, the second normal char wont be part of the sequence (this is correct right?)
-	}
 	
 	if (width==0) {
 		add_combining_char(c);
@@ -705,7 +660,6 @@ void put_char(Char c) {
 	
 	// todo: figure out if there are any other places where we need to reset/adjust these
 	T.current->last = true;
-	T.current->joiner = false;
 	T.current->last_x = T.c.x;
 	T.current->last_y = T.c.y;
 	
