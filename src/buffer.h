@@ -89,6 +89,8 @@ typedef struct Buffer {
 	// position of that char
 	int last_x; // 0 … T.width-1 (never offscreen)
 	int last_y; // 0 … T.height-1
+	// whether a zero width joiner was just printed
+	bool joiner;
 } Buffer;
 
 // all terminal properties
@@ -100,6 +102,8 @@ typedef struct Term {
 	
 	int scroll_top; // inclusive
 	int scroll_bottom; // exclusive
+	// scroll_bottom > scroll_top
+	// wait, is that true?
 	
 	Cursor c;
 	Cursor saved_cursor;

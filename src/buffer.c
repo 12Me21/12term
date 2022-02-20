@@ -241,6 +241,7 @@ void set_cursor_style(int n) {
 // call this when moving the cursor etc.
 static void reset_last(void) {
 	T.current->last = false;
+	T.current->joiner = false;
 }
 
 void clear_region(int x1, int y1, int x2, int y2) {
@@ -496,25 +497,18 @@ int cursor_down(int amount) {
 	return 0;
 }
 
-static bool add_combining_char(int x, int y, Char c) {
-	Cell* dest = &T.current->rows[y]->cells[x];
-	// if this is the right half of a fullwidth char, move to the left
-	if (dest->wide==-1) {
-		if (x==0)
-			return false; //should never happen?
-		dest--;
-		x--;
+void forward_index(int amount) {
+	if (amount<=0)
+		return;
+	// cursor is below scrolling region already, so we just move it down
+	if (T.c.y >= T.scroll_bottom) {
+		cursor_down(amount);
+	} else { //when the cursor starts out above the scrolling region
+		int push = cursor_down(amount);
+		// check if the cursor tried to pass through the margin
+		if (push > 0)
+			scroll_up_internal(push, T.current==&T.buffers[1]); // note: here, bce is only enabled on the alt screen
 	}
-	for (int i=0; i<LEN(dest->combining); i++) {
-		if (dest->combining[i]==0) {
-			dest->combining[i] = c;
-			if (i+1<LEN(dest->combining))
-				dest->combining[i+1] = 0;
-			return true;
-		}
-	}
-	print("too many combining chars in cell %d,%d!\n", x, y);
-	return false;
 }
 
 // utf-8 decoding macro lol
@@ -541,59 +535,105 @@ static int char_width(Char c) {
 	return width;
 }
 
-static void erase_wc_left(int x, int y) {
-	if (x+1 < T.width) {
-		Cell* dest = &T.current->rows[y]->cells[x+1];
-		if (dest->wide==-1) {
-			*dest = (Cell){
-				.attrs = dest->attrs,
-				// rest are 0
-			};
-		}
-	}
+// when printing a char at `dest`,
+// you may have overwritten a wide char spanning from `dest-1` to `dest`
+// so, this will remove the left half
+static void clean_wc_left(Cell* dest, int x) {
+	if (x-1 >= 0 && dest[-1].wide==1)
+		dest[-1] = (Cell){
+			.attrs = dest[-1].attrs,
+			// rest are 0
+		};
 }
 
-static void erase_wc_right(int x, int y) {
-	if (x-1 >= 0) {
-		Cell* dest = &T.current->rows[y]->cells[x-1];
-		if (dest->wide==1) {
-			*dest = (Cell){
-				.attrs = dest->attrs,
-				// rest are 0
-			};
-		}
-	}
+// likewise, you may have overwritten a wide char spanning from
+// `dest` to `dest+1`, (`dest+1` to `dest+2` when printing a wide char)
+// this will remove the right half (dest2 is dest+width)
+static void clean_wc_right(Cell* dest2, int x2) {
+	if (x2 < T.width && dest2->wide==-1)
+		*dest2 = (Cell){
+			.attrs = dest2->attrs,
+			// rest are 0
+		};
 }
 
-void forward_index(int amount) {
-	if (amount<=0)
-		return;
-	// cursor is below scrolling region already, so we just move it down
-	if (T.c.y >= T.scroll_bottom) {
-		cursor_down(amount);
-	} else { //when the cursor starts out above the scrolling region
-		int push = cursor_down(amount);
-		// check if the cursor tried to pass through the margin
-		if (push > 0)
-			scroll_up_internal(push, T.current==&T.buffers[1]); // note: here, bce is only enabled on the alt screen
+// add a dummy cell at `left+1`, to the wide char at `left`
+// ⚠ `left` MUST NOT be the last cell in a row
+static void add_dummy(Cell* left) {
+	left[1] = (Cell){
+		.chr = 0,
+		.attrs = left->attrs, // do we really need to copy these attrs or can we just handle that during rendering? I do realize that copying the background etc makes it easier to erase, though
+		.wide = -1,
+	};
+}
+// todo: for debugging: render unmatched wide char halfs somehow
+
+static bool add_combining_char(Char c) {
+	// if the last action was the print a character,
+	// the combining char will be added to that cell
+	// otherwise it will be added to the current cell
+	int x = T.current->last ? T.current->last_x : T.c.x;
+	int y = T.current->last ? T.current->last_y : T.c.y;
+	// note that we don't alter the `last` flag/position, or the cursor,
+	// so subsequent combining chars are printed to the same cell
+	
+	Cell* dest = &T.current->rows[y]->cells[x];
+	// if this is the right half of a fullwidth char, move to the left
+	if (dest->wide==-1) {
+		if (x==0) {
+			print("encountered malformed wide character in column 0 while adding combining character\n");
+			return false; //should never happen?
+		}
+		dest--;
+		x--;
+		// todo: what if there is glitched data, and it ends up on another dummy char?
 	}
+	
+	// zero width joiner:
+	if (c == 0x200D) {
+		T.current->joiner = true;
+		// turn the base char into a wide char
+		if (x+1 < T.width) { // if there is room
+			if (dest->wide == 0) { // and not already wide
+				// make it wide
+				dest->wide = 1;
+				clean_wc_right(&dest[2], x+2);
+				add_dummy(dest);
+			}
+		}
+	}
+	
+	// insert into the list
+	for (int i=0; i<LEN(dest->combining); i++) {
+		if (dest->combining[i]==0) {
+			dest->combining[i] = c;
+			if (i+1<LEN(dest->combining))
+				dest->combining[i+1] = 0; // nul terminate
+			return true;
+		}
+	}
+	// failed
+	print("too many combining chars in cell %d,%d!\n", x, y);
+	return false;
 }
 
 void put_char(Char c) {
+	// note: ref xterm/util.c/WriteText, xterm/screen.c/ScrnWriteText
 	if (T.charsets[0] == '0') {
 		if (c<128 && c>=0 && DEC_GRAPHICS_CHARSET[c])
 			c = DEC_GRAPHICS_CHARSET[c];
 	}
 	
-	int width = char_width(c);
+	int width;
+	if (T.current->joiner) { // if a zwj was printed previously, the next char is treated as combining
+		width = 0;
+		T.current->joiner = false; // set to false here, in case someone prints like, <normal char> <zwj> <combining char> <normal char>, the second normal char wont be part of the sequence (this is correct right?)
+	} else {
+		width = char_width(c);
+	}
 	
 	if (width==0) {
-		// if the last action was the print a character,
-		// the combining char will be added to that cell
-		// otherwise it will be added to the current cell
-		int x = T.current->last ? T.current->last_x : T.c.x;
-		int y = T.current->last ? T.current->last_y : T.c.y;
-		add_combining_char(x, y, c);
+		add_combining_char(c);
 		return;
 	}
 	
@@ -606,14 +646,15 @@ void put_char(Char c) {
 	}
 	
 	Cell* dest = &T.current->rows[T.c.y]->cells[T.c.x];
-	if (dest->wide==1)
-		erase_wc_left(T.c.x, T.c.y);
-	else if (dest->wide==-1)
-		erase_wc_right(T.c.x, T.c.y);
+	// technically we'll only ever have to do one of these, but it's easier to check both rather than keeping track... (though, we could save on bounds checks too...)
+	clean_wc_left(dest, T.c.x);
+	clean_wc_right(&dest[width], T.c.x+width);
 	
-	dest->chr = c;
-	dest->combining[0] = 0;
-	dest->attrs = T.c.attrs;
+	*dest = (Cell){
+		.chr = c,
+		.wide = width==2,
+		.attrs = T.c.attrs,
+	};
 	if (T.c.attrs.reverse) {
 		dest->attrs.color = T.c.attrs.background;
 		dest->attrs.background = T.c.attrs.color;
@@ -625,25 +666,13 @@ void put_char(Char c) {
 				dest->attrs.color.i += 8;
 		}
 	}
-	// inserting a wide character
-	if (width==2) {
-		dest->wide = 1;
-		if (T.c.x+1 < T.width) { //should always be true
-			if (dest[1].wide==1)
-				erase_wc_left(T.c.x+2, T.c.y);
-			// (don't need erase_wc_right because we know the char to the left is new)
-			// insert dummy char
-			dest[1] = (Cell){
-				.chr = 0,
-				.attrs = dest->attrs,
-				.wide = -1,
-			};
-		}
-	} else
-		dest->wide = 0;
+	
+	if (width==2)
+		add_dummy(dest);
 	
 	// todo: figure out if there are any other places where we need to reset/adjust these
 	T.current->last = true;
+	T.current->joiner = false;
 	T.current->last_x = T.c.x;
 	T.current->last_y = T.c.y;
 	
