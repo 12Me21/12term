@@ -623,6 +623,7 @@ static bool add_combining_char(Char c) {
 	
 	// zero width joiner:
 	if (c == 0x200D) {
+		print("got joiner\n");
 		T.current->joiner = true;
 		// turn the base char into a wide char
 		/*if (x+1 < T.width) { // if there is room
@@ -658,6 +659,7 @@ void put_char(Char c) {
 	
 	int width = char_width(c);
 	if (T.current->joiner) { // if a zwj was printed previously, the next char is treated as combining
+		print("joined char '%lc'\n", c);
 		if (width==2)
 			width = 1;
 		T.current->joiner = false; // set to false here, in case someone prints like, <normal char> <zwj> <combining char> <normal char>, the second normal char wont be part of the sequence (this is correct right?)
