@@ -625,14 +625,14 @@ static bool add_combining_char(Char c) {
 	if (c == 0x200D) {
 		T.current->joiner = true;
 		// turn the base char into a wide char
-		if (x+1 < T.width) { // if there is room
+		/*if (x+1 < T.width) { // if there is room
 			if (dest->wide == 0) { // and not already wide
 				// make it wide
 				dest->wide = 1;
 				clean_wc_right(&dest[2], x+2);
 				add_dummy(dest);
 			}
-		}
+			}*/
 	}
 	
 	// insert into the list
