@@ -66,9 +66,10 @@ static void clear_row(Row* row, int start, bool bce) {
 }
 
 void term_free(void) {
-	for (int i=0; i<2; i++) {
-		for (int y=0; y<T.height; y++)
-			free(T.buffers[i].rows[y]);
+	FOR (scr, 2) {
+		FOR (y, T.height) {
+			free(T.buffers[scr].rows[y]);
+		}
 	}
 	free(T.tabs);
 	free_history();
@@ -133,24 +134,24 @@ Row* resize_row(Row** row, int size, int old_size) {
 // this sets T.width and T.height
 // please do NOT change those variables manually
 void term_resize(int width, int height) {
+	print("resizing screen from %dx%d to %dx%d\n", T.width, T.height, width, height);
+	
 	if (width != T.width) {
 		int old_width = T.width;
 		T.width = width;
 		// resize existing rows
 		// todo: option to re-wrap text?
-		for (int scr=0; scr <= 1; scr++) {
-			FOR (y, T.height) {
+		FOR (scr, 2) {
+			FOR (y, T.height)
 				resize_row(&T.buffers[scr].rows[y], T.width, old_width);
-			}
 			// adjust last_written pos
 			// todo: remember to update this code when text re-wrapping is added
 			T.buffers[scr].last_x = limit(T.buffers[scr].last_x, 0, T.width);
 		}
 		// update tab stops
 		REALLOC(T.tabs, T.width+1);
-		FOR (x, T.width) {
+		FOR (x, T.width)
 			T.tabs[x] = (x%8 == 0);
-		}
 		// adjust cursor position
 		T.c.x = limit(T.c.x, 0, T.width); //note this is NOT width-1, since cursor is allowed to be in the right margin
 		T.saved_cursor.x = limit(T.saved_cursor.x, 0, T.width);
@@ -164,9 +165,8 @@ void term_resize(int width, int height) {
 	int diff = height-T.height;
 	//// height decrease ////
 	if (height < T.height) { // diff < 0
-		// iterate from top to bottom
-		int y = 0;
 		// upper rows
+		int y = 0;
 		for (; y < -diff; y++) {
 			// main buffer: put lines into history
 			push_history(y);
@@ -174,31 +174,30 @@ void term_resize(int width, int height) {
 			free(T.buffers[1].rows[y]);
 		}
 		// lower rows: shift upwards
-		for (int scr=0; scr<=1; scr++)
-			for (; y<T.height; y++)
+		for (; y<T.height; y++)
+			FOR (scr, 2)
 				T.buffers[scr].rows[y+diff] = T.buffers[scr].rows[y];
 		// realloc lists of lines
+		FOR (scr, 2)
+			REALLOC(T.buffers[scr].rows, height);
 		T.height = height;
-		REALLOC(T.buffers[1].rows, height);
-		REALLOC(T.buffers[0].rows, height);
 		// adjust cursor position
 		T.c.y = limit(T.c.y+diff, 0, T.height-1);
 		T.saved_cursor.y = limit(T.saved_cursor.y+diff, 0, T.height-1);
 		// adjust last written pos
-		for (int scr=0; scr<=1; scr++)
+		FOR (scr, 2)
 			T.buffers[scr].last_y = limit(T.buffers[scr].last_y+diff, 0, T.height-1);
 	} else if (height > T.height) { // height INCREASE (diff > 0)
 		// realloc lists of lines
-		REALLOC(T.buffers[1].rows, height);
-		REALLOC(T.buffers[0].rows, height);
+		FOR (scr, 2)
+			REALLOC(T.buffers[scr].rows, height);
 		T.height = height;
 		// iterate from bottom to top
 		int y = T.height-1;
 		// lower rows: shift downwards
-		for (; y >= diff; y--) {
-			T.buffers[0].rows[y] = T.buffers[0].rows[y-diff];
-			T.buffers[1].rows[y] = T.buffers[1].rows[y-diff];
-		}
+		for (; y >= diff; y--)
+			FOR (scr, 2)
+				T.buffers[scr].rows[y] = T.buffers[scr].rows[y-diff];
 		/// upper rows:
 		for (; y>=0; y--) {
 			// main buffer: move rows out of history
@@ -215,7 +214,7 @@ void term_resize(int width, int height) {
 		T.c.y += diff;
 		T.saved_cursor.y += diff;
 		// adjust last written pos
-		for (int scr=0; scr<=1; scr++)
+		FOR (scr, 2)
 			T.buffers[scr].last_y = T.buffers[scr].last_y+diff;
 	}
 	// todo: how do we handle the scrolling regions?
@@ -279,8 +278,8 @@ void clear_region(int x1, int y1, int x2, int y2) {
 
 // todo: confirm which things are supposed to be reset by this
 void full_reset(void) {
-	for (int i=0; i<2; i++) {
-		T.current = &T.buffers[i];
+	FOR (scr, 2) {
+		T.current = &T.buffers[scr];
 		clear_region(0, 0, T.width, T.height);
 		reset_last();
 	}
@@ -301,7 +300,7 @@ void full_reset(void) {
 	
 	init_palette();
 	
-	for (int i=0; i<T.width+1; i++)
+	FOR (i, T.width+1)
 		T.tabs[i] = i%8==0;
 	
 	T.charsets[0] = 0; // like, whatever, man
@@ -312,7 +311,7 @@ void full_reset(void) {
 	T.mouse_mode = 0;
 	T.mouse_encoding = 0;
 	
-	for (int i=0; i<T.links.length; i++)
+	FOR (i, T.links.length)
 		free(T.links.items[i]);
 	T.links.length = 0;
 	
@@ -360,7 +359,7 @@ static void rotate(int count, int itemsize, uint8_t data[count][itemsize], int a
 	int a=0;
 	int b=0;
 	
-	for (int i=0; i<count; i++) {
+	FOR (i, count) {
 		b = (b+amount) % count;
 		if (b==a)
 			b = ++a;
@@ -522,15 +521,6 @@ static const Char DEC_GRAPHICS_CHARSET[128] = {
 	['`'] = L'◆', L'▒', L'␉', L'␌', L'␍', L'␊', L'°', L'±', L'␤', L'␋', L'┘', L'┐', L'┌', L'└', L'┼', L'⎺', L'⎻', L'─', L'⎼', L'⎽', L'├', L'┤', L'┴', L'┬', L'│', L'≤', L'≥', L'π', L'≠', L'£', L'·',
 };
 
-typedef struct WidthRange {
-	int start, end;
-	uint8_t width;
-} WidthRange;
-
-WidthRange ranges[] = {
-	#include "width/widths.txt"
-};
-
 static int char_width(Char c) {
 	int width;
 	if (c<128) { // assume ascii chars are never wide, to avoid calling wcwidth all the time // wait this includes control chars though? todo: dont print those unless we already filter them
@@ -598,7 +588,7 @@ static bool add_combining_char(Char c) {
 	}
 	
 	// insert into the list
-	for (int i=0; i<LEN(dest->combining); i++) {
+	FOR (i, LEN(dest->combining)) {
 		if (dest->combining[i]==0) {
 			dest->combining[i] = c;
 			if (i+1<LEN(dest->combining))
