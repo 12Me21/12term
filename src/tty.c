@@ -124,7 +124,7 @@ size_t tty_read(void) {
 		process_chars(len, buf);
 		return len;
 	} else if (len<0 && errno!=EAGAIN) {
-		print("couldn't read from shell: %s\n", strerror(errno));
+		print("couldn't read from shell. status: \"%s\"\n", strerror(errno));
 		// this is the normal exit condition.
 		sleep_forever(true);
 	}
