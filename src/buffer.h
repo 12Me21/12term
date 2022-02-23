@@ -83,12 +83,6 @@ typedef struct Cursor {
 // the main or alternate buffer.
 typedef struct Buffer {
 	Row** rows;
-	// (idk if this should be per-buffer)
-	// whether there was a character just printed, which combining chars can be added to:
-	bool last;
-	// position of that char
-	int last_x; // 0 … T.width-1 (never offscreen)
-	int last_y; // 0 … T.height-1
 } Buffer;
 
 // all terminal properties
@@ -108,6 +102,12 @@ typedef struct Term {
 	bool show_cursor;
 	int cursor_shape;
 	bool cursor_blink; // unused, probably will never implement this because it sucks lol
+	
+	// whether there was a character just printed, which combining chars can be added to:
+	bool last;
+	// position of that char
+	int last_x; // 0 … T.width-1 (never offscreen)
+	int last_y; // 0 … T.height-1
 	
 	RGBColor cursor_color;
 	RGBColor background, foreground; // these can maybe be accessed as palette[-1] and [-2] but don't try it lol
