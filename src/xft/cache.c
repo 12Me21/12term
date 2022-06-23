@@ -217,31 +217,40 @@ XftFont* find_char_font(Char chr, int style) {
 	return NULL; // couln't find :(
 }
 
+#define cache_ascii 95
+#define cache_other (cache_length-cache_ascii)
+
 // todo: make sure we actually fill in the cache
 // even if loading fails
 // so we don't try to load invalid glyphs every time
 GlyphData* cache_lookup(Char chr, uint8_t style) {
-	int i = chr % cache_length;
-	
-	int collisions = 0;
-	// loop while slot `i` doesn't match
-	while (chr != cache[i].key) {
-		// found empty slot
-		if (cache[i].key == 0) {
-			cache[i].key = chr;
-			break;
+	int i;
+	if (chr>=' ' && chr<='~') {
+		i = chr - ' ';
+	} else {
+		i = cache_ascii + chr % cache_other;
+		
+		int collisions = 0;
+		// loop while slot `i` doesn't match
+		while (chr != cache[i].key) {
+			// found empty slot
+			if (cache[i].key == 0) {
+				cache[i].key = chr;
+				break;
+			}
+			// todo: choose better offset
+			i += 1;
+			if (i >= cache_length)
+				i -= cache_other;
+			collisions++;
+			if (collisions >= cache_length) {
+				print("CACHE IS FULL!\n");
+				return NULL;
+			}
 		}
-		// todo: choose better offset
-		i += 1;
-		i %= cache_length;
-		collisions++;
-		if (collisions >= cache_length) {
-			print("CACHE IS FULL!\n");
-			return NULL;
-		}
+		if (collisions)
+			print("cache collisions: %d\n", collisions);
 	}
-	if (collisions)
-		print("cache collisions: %d\n", collisions);
 	
 	GlyphData* g = &cache[i].value[style];
 	if (!g->type) {
