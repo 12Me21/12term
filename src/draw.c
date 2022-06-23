@@ -47,6 +47,9 @@ static XftDraw cursor_draw = {0, 0};
 static int cursor_width; // in cells
 static int cursor_y; // cells
 
+//Drawable frame_buffer = None;
+//GC fb_gc = None;
+
 // convert a Color (indexed or rgb) into XRenderColor (rgb)
 XRenderColor make_color(Color c) {
 	RGBColor rgb;
@@ -112,6 +115,15 @@ static void cells_to_glyphs(int len, Cell cells[len], Glyph glyphs[len], bool ca
 // these are only used to track the old size in this function
 static int drawn_width = -1, drawn_height = -1;
 void draw_resize(int width, int height, bool charsize) {
+	/* if (frame_buffer) */
+	/* 	XFreePixmap(W.d, frame_buffer); */
+	/* frame_buffer = XCreatePixmap(W.d, W.win, W.w, W.h, DefaultDepth(W.d, W.scr)); */
+	/* if (fb_gc) */
+	/* 	XFreeGC(W.d, fb_gc); */
+	/* fb_gc = XCreateGC(W.d, frame_buffer, GCGraphicsExposures, &(XGCValues){ */
+	/* 		.graphics_exposures = False, */
+	/* 	}); */
+	
 	if (rows) {
 		FOR (i, drawn_height) {
 			FREE(rows[i].glyphs);
@@ -309,10 +321,12 @@ static int row_displayed_at(int y) {
 static void draw_put(XftDraw draw, Px x, Px y, Px w, Px h, Px dx, Px dy) {
 	XCopyArea(W.d, draw.drawable, W.win, W.gc, x, y, w, h, dx, dy);
 }
-
 static void copy_cursor_part(Px x, Px y, Px w, Px h, int cx, int cy) {
 	draw_put(cursor_draw, x, y, w, h, W.border+cx*W.cw+x, W.border+W.ch*cy+y);
 }
+//void composite(void) {
+  //	XCopyArea(W.d, frame_buffer, W.win, W.gc, 0, 0, W.w, W.h, 0, 0);
+//}
 
 // todo: vary thickness of cursors and lines based on font size
 
@@ -374,6 +388,8 @@ void draw(bool repaint_all) {
 	}
 	print("] ");
 	time_log("redraw");
+	//composite();
+	//time_log("comp");
 }
 
 void draw_free(void) {
