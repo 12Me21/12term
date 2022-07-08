@@ -40,7 +40,7 @@ static FontFile* get_file(const utf8* filename, int id) {
 	for (f=xft_files; f; f=f->next) {
 		if (!strcmp(f->filename, filename) && f->id == id) {
 			++f->ref;
-			if (XftDebug() & XFT_DBG_REF)
+			if (DEBUG.ref)
 				print("FontFile %s/%d matches existing (%d)\n", filename, id, f->ref);
 			goto found;
 		}
@@ -50,7 +50,7 @@ static FontFile* get_file(const utf8* filename, int id) {
 	if (!f)
 		return NULL;
 	
-	if (XftDebug() & XFT_DBG_REF)
+	if (DEBUG.ref)
 		print("FontFile %s/%d matches new\n", filename, id);
 	f->next = xft_files;
 	xft_files = f;
@@ -102,7 +102,7 @@ static bool set_face(FontFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix*
 	FT_Face face = f->face;
 	
 	if (f->xsize != xsize || f->ysize != ysize) {
-		if (XftDebug() & XFT_DBG_GLYPH)
+		if (DEBUG.glyph)
 			print("Set face size to %dx%d (%dx%d)\n",
 			       (int) (xsize >> 6), (int) (ysize >> 6), (int) xsize, (int) ysize);
 		// Bitmap only faces must match exactly, so find the closest
@@ -134,7 +134,7 @@ static bool set_face(FontFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix*
 		f->ysize = ysize;
 	}
 	if (!matrix_equal(&f->matrix, matrix)) {
-		if (XftDebug() & XFT_DBG_GLYPH)
+		if (DEBUG.glyph)
 			print("Set face matrix to (%g,%g,%g,%g)\n",
 			      (double)matrix->xx / 0x10000,
 			      (double)matrix->xy / 0x10000,
@@ -249,7 +249,7 @@ static bool font_info_fill(const FcPattern* pattern, XftFontInfo* fi) {
 	fi->ysize = (FT_F26Dot6)(dsize * 64.0);
 	fi->xsize = (FT_F26Dot6)(dsize * aspect * 64.0);
 	
-	if (XftDebug() & XFT_DBG_OPEN)
+	if (DEBUG.open)
 		print("font_info_fill: %s: %d (%g pixels)\n",
 		      (filename ? (utf8*)filename : "<none>"), id, dsize);
 	
@@ -310,7 +310,7 @@ static bool font_info_fill(const FcPattern* pattern, XftFontInfo* fi) {
 
 static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	// No existing font, create another.
-	if (XftDebug() & XFT_DBG_CACHE)
+	if (DEBUG.cache)
 		print("New font %s/%d size %dx%d\n",
 		      fi->file->filename, fi->file->id,
 		      (int) fi->xsize >> 6, (int) fi->ysize >> 6);
@@ -318,7 +318,7 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	FontFile* f = fi->file;
 	
 	if (!f->face) {
-		if (XftDebug() & XFT_DBG_REF)
+		if (DEBUG.ref)
 			print("Loading file %s/%d\n", f->filename, f->id);
 		FT_New_Face(ft_library, f->filename, f->id, &f->face);
 		

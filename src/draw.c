@@ -360,8 +360,10 @@ static void paint_row(int y) {
 }
 
 void draw(bool repaint_all) {
-	time_log(NULL);
-	print("dirty rows: [");
+	if (DEBUG.redraw)
+		time_log(NULL);
+	if (DEBUG.dirty)
+		print("dirty rows: [");
 	// wait how does this work with scrolling?
 	// and yeah we don't need this every time
 	draw_cursor(T.c.x, T.c.y); // todo: do we need this every time?
@@ -379,15 +381,19 @@ void draw(bool repaint_all) {
 		bool paint = false;
 		if (draw_row(y, row)) {
 			paint = true;
-			print(row==blank_row ? "~" : "#");
+			if (DEBUG.dirty)
+				print(row==blank_row ? "~" : "#");
 		} else {
-			print(".");
+			if (DEBUG.dirty)
+				print(".");
 		}
 		if (repaint_all || paint || T.c.y == y || rows[y].redraw)
 			paint_row(y);
 	}
-	print("] ");
-	time_log("redraw");
+	if (DEBUG.dirty)
+		print("] ");
+	if (DEBUG.redraw)
+		time_log("redraw");
 	//composite();
 	//time_log("comp");
 }

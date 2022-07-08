@@ -4,11 +4,13 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
 
 #include "common.h"
 #include "debug.h"
 
 bool debug_enabled = true;
+Debug_options DEBUG;
 
 __attribute__((noreturn)) void die(const utf8 *errstr, ...) {
 	va_list ap;
@@ -59,4 +61,30 @@ void time_log(const utf8* str) {
 	} else
 		first_time = now;
 	prev_time = now;
+}
+
+const char* debug_groups[] = {
+	"open", "openv", "render", "draw", "ref", "glyph", "glyphv", "cache", "cachev", "memory",
+	"redraw", "dirty",
+};
+
+void debug_init(void) {
+	utf8* e = getenv("DEBUG_12TERM");
+	if (e) {
+		print("DEBUG_12TERM is %s\n", e);
+		// add leading and trailing spaces
+		for (
+			utf8 *word=e, *token;
+			token = strtok(word, " ,\t\n\f");
+			word=NULL
+		) {
+			for (int i=0; i<LEN(debug_groups); i++) {
+				if (!strcmp(token, debug_groups[i])) {
+					(&DEBUG.item_0)[i] = true;
+					print("set: %s\n", debug_groups[i]);
+					break;
+				}
+			}
+		}
+	}
 }

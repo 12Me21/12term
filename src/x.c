@@ -233,6 +233,8 @@ int main(int argc, char* argv[argc+1]) {
 #ifdef CATCH_SEGFAULT
 	signal(SIGSEGV, (__sighandler_t)hecko);
 #endif
+	debug_init();
+	
 	time_log(NULL);
 	
 	for (int i=0; i<argc; i++) {
