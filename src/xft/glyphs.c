@@ -36,23 +36,27 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 		return false;
 	
 	// determine render mode
-	FT_Render_Mode mode = FT_RENDER_MODE_MONO;
-	if (font->info.color)
+	FT_Render_Mode mode = FT_LOAD_TARGET_MODE(font->info.load_flags);
+	
+	/*FT_Render_Mode mode = FT_RENDER_MODE_MONO;
+	if (font->info.color) {
 		mode = FT_RENDER_MODE_NORMAL;
-	if (font->info.antialias) {
-		switch (font->info.rgba) {
-		case FC_RGBA_RGB:
-		case FC_RGBA_BGR:
-			mode = FT_RENDER_MODE_LCD;
-			break;
-		case FC_RGBA_VRGB:
-		case FC_RGBA_VBGR:
-			mode = FT_RENDER_MODE_LCD_V;
-			break;
-		default:
-			mode = FT_RENDER_MODE_NORMAL;
+	} else {
+		if (font->info.antialias) {
+			switch (font->info.rgba) {
+			case FC_RGBA_RGB:
+			case FC_RGBA_BGR:
+				mode = FT_RENDER_MODE_LCD;
+				break;
+			case FC_RGBA_VRGB:
+			case FC_RGBA_VBGR:
+				mode = FT_RENDER_MODE_LCD_V;
+				break;
+			default:
+				mode = FT_RENDER_MODE_LIGHT;
+			}
 		}
-	}
+		}*/
 	
 	bool transform = font->info.transform && mode != FT_RENDER_MODE_MONO;
 	

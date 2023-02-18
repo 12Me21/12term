@@ -13,7 +13,7 @@ typedef union {
 	char item_0;
 	struct {
 		char open, openv, render, draw, ref, glyph, glyphv, cache, cachev, memory; // not all are used anymore...
-		char redraw, dirty; //mine
+		char redraw, dirty, utf8; //mine
 	};
 } Debug_options;
 

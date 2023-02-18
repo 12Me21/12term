@@ -472,13 +472,16 @@ void process_chars(int len, const utf8 cs[len]) {
 					if (utf8_remaining==0)
 						process_char(utf8_buffer);
 				} else {
-					print("Invalid utf8! unexpected continuation byte\n");
+					if (DEBUG.utf8)
+						print("Invalid utf8! unexpected continuation byte\n");
 				}
 			} else if (type==-1) { // invalid
-				print("Invalid utf8! invalid byte\n");
+				if (DEBUG.utf8)
+					print("Invalid utf8! invalid byte\n");
 			} else { // start byte
 				if (utf8_remaining!=0) {
-					print("Invalid utf8! interrupted sequence\n");
+					if (DEBUG.utf8)
+						print("Invalid utf8! interrupted sequence\n");
 					process_char(0xFFFD);
 				}
 				if (type==0) {

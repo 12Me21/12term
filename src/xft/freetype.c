@@ -26,9 +26,12 @@ typedef struct FontFile {
 // List of all open files (each face in a file is managed separately)
 static FontFile* xft_files = NULL;
 
+FcConfig* defc;
+
 void font_init(void) {
 	if (!FcInit())
 		die("fontconfig init failed");
+	//defc = FcInitLoadConfig();
 	if (FT_Init_FreeType(&ft_library))
 		die("freetype init failed");
 }
@@ -165,13 +168,17 @@ FT_Face xft_lock_face(XftFont* font) {
 }
 
 static FT_Int get_load_flags(const FcPattern* pattern, const XftFontInfo* fi) {
+	print("Setting fc load flags:\n");
+	
 	FT_Int flags = FT_LOAD_DEFAULT | FT_LOAD_COLOR;
 	
 	// disable bitmaps when anti-aliasing or transforming glyphs
 	FcBool bitmap = false;
 	FcPatternGetBool(pattern, FC_EMBEDDED_BITMAP, 0, &bitmap);
-	if ((!bitmap && fi->antialias) || fi->transform)
+	if ((!bitmap && fi->antialias) || fi->transform) {
 		flags |= FT_LOAD_NO_BITMAP;
+		print("\t+ NO BITMAP\n");
+	}
 	
 	FcBool hinting = true;
 	FcPatternGetBool(pattern, FC_HINTING, 0, &hinting);
@@ -179,42 +186,40 @@ static FT_Int get_load_flags(const FcPattern* pattern, const XftFontInfo* fi) {
 	FcPatternGetInteger(pattern, FC_HINT_STYLE, 0, &hint_style);
 	
 	// disable hinting if requested
-	if (!hinting || hint_style == FC_HINT_NONE)
+	if (!hinting || hint_style == FC_HINT_NONE) {
 		flags |= FT_LOAD_NO_HINTING;
+		print("+ NO HINTING\n");
+	}
 	
-	// Figure out the load target, which modifies the hinting
-	// behavior of FreeType based on the intended use of the glyphs.
-	if (fi->antialias) {
-		if (FC_HINT_NONE < hint_style && hint_style < FC_HINT_FULL) {
-			flags |= FT_LOAD_TARGET_LIGHT;
-		} else {
-			// autohinter will snap stems to integer widths, when
-			// the LCD targets are used.
-			switch (fi->rgba) {
-			case FC_RGBA_RGB:
-			case FC_RGBA_BGR:
-				flags |= FT_LOAD_TARGET_LCD;
-				break;
-			case FC_RGBA_VRGB:
-			case FC_RGBA_VBGR:
-				flags |= FT_LOAD_TARGET_LCD_V;
-				break;
-			}
+	// this only applies to the autohinter
+	FT_Int target = FT_LOAD_TARGET_LIGHT;
+	if (!fi->antialias) {
+		target = FT_LOAD_TARGET_MONO;
+		print("+ TARGET MONO\n");
+	} else {
+		/// if (hint_style <= FC_HINT_NONE || hint_style >= FC_HINT_FULL) 
+		switch (fi->rgba) {
+		case FC_RGBA_RGB:
+		case FC_RGBA_BGR:
+			target = FT_LOAD_TARGET_LCD;
+			print("+ TARGET LCD\n");
+			break;
+		case FC_RGBA_VRGB:
+		case FC_RGBA_VBGR:
+			target = FT_LOAD_TARGET_LCD_V;
+			print("+ TARGET LCD V\n");
+			break;
 		}
-	} else
-		flags |= FT_LOAD_TARGET_MONO;
+	}
+	flags |= target;
 	
 	// force autohinting if requested
 	FcBool autohint = false;
 	FcPatternGetBool(pattern, FC_AUTOHINT, 0, &autohint);
-	if (autohint)
+	if (autohint) {
 		flags |= FT_LOAD_FORCE_AUTOHINT;
-	
-	// disable global advance width (for broken DynaLab TT CJK fonts)
-	FcBool global_advance = true;
-	FcPatternGetBool(pattern, FC_GLOBAL_ADVANCE, 0, &global_advance);
-	if (!global_advance)
-		flags |= FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH;
+		print("+ FORCE AUTOHINT\n");
+	}
 	
 	return flags;
 }

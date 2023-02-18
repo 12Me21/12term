@@ -211,7 +211,7 @@ void load_settings(int* argc, utf8** argv) {
 	get_boolean("Xft." FC_HINTING, &settings.xft.hinting);
 	settings.xft.hint_style = FC_HINT_FULL;
 	get_integer("Xft." FC_HINT_STYLE, &settings.xft.hint_style);
-	settings.xft.autohint = FC_AUTOHINT;
+	settings.xft.autohint = false;
 	get_boolean("Xft." FC_AUTOHINT, &settings.xft.autohint);
 	
 	if (!get_integer("Xft." FC_RGBA, &settings.xft.rgba)) {

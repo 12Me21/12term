@@ -308,8 +308,15 @@ static void process_csi_command(Char c) {
 		}
 		break;
 	case '>':
-		//whatever;
-		dump(c);
+		switch (c) {
+		default:
+			print("UNKNOWN: ");
+			dump(c);
+			break;
+		case 'c':
+			// CSI > ... c ??? TODO
+			break;
+		}
 		break;
 	case 0:
 		switch (c) {
@@ -426,9 +433,11 @@ static void process_csi_command(Char c) {
 		case 'T': // scroll text down
 			scroll_down(arg01());
 			break;
-			//case 't': //window ops
+		case 't': //window ops
+			//UNKNOWN: CSI 23 ; 0 ; 0 't'
+			//UNKNOWN: CSI 22 ; 0 ; 0 't'
 			// TODO
-			//break;
+			break;
 		case 'X': // erase characters =ech=
 			erase_characters(arg01());
 			break;

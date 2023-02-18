@@ -189,7 +189,8 @@ XftFont* find_char_font(Char chr, int style) {
 		}
 	}
 	// use fontconfig to find one
-	print("searching for char\n");
+	if (DEBUG.cache)
+		print("searching for char\n");
 	FcCharSet* charset = FcCharSetCreate();
 	FcPattern* pattern = FcPatternDuplicate(f->pattern);
 	FcCharSetAddChar(charset, chr);
@@ -202,7 +203,8 @@ XftFont* find_char_font(Char chr, int style) {
 	if (match) {
 		int i = fontset_search(set, match);
 		if (i>=0) {
-			print("match success. loading font %d\n", i);
+			if (DEBUG.cache)
+				print("match success. loading font %d\n", i);
 			//pattern_default_substitute(match);
 			//FcConfigSubstitute(NULL, match, FcMatchFont); // changed this from FcMatchPattern to FcMatchFont and that helped with some memory leaks????
 			//pattern_default_substitute(match);
@@ -249,7 +251,8 @@ GlyphData* cache_lookup(Char chr, uint8_t style) {
 			}
 		}
 		if (collisions)
-			print("cache collisions: %d\n", collisions);
+			if (DEBUG.cache)
+				print("cache collisions: %d\n", collisions);
 	}
 	
 	GlyphData* g = &cache[i].value[style];

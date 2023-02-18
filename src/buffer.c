@@ -799,7 +799,7 @@ void set_scroll_region(int top, int bottom) {
 
 void set_scrollback(int pos) {
 	pos = limit(pos, 0, history.length);
-	print("scrolling %d\n", pos);
+	//print("scrolling %d\n", pos);
 	int dist = pos-T.scroll;
 	if (abs(dist)<T.height)
 		draw_rotate_rows(0, T.height, dist, true);

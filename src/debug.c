@@ -65,7 +65,7 @@ void time_log(const utf8* str) {
 
 const char* debug_groups[] = {
 	"open", "openv", "render", "draw", "ref", "glyph", "glyphv", "cache", "cachev", "memory",
-	"redraw", "dirty",
+	"redraw", "dirty", "utf8",
 };
 
 void debug_init(void) {
