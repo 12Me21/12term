@@ -359,9 +359,11 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	bool color = FT_HAS_COLOR(face);
 	// Find the appropriate picture format
 	// we should probably cache the format list
-	if (color)
+	if (color) {
 		font->format = PictStandardARGB32;
-	else if (antialias) {
+	} else if (antialias) {
+		/* wait, for normal glyphs why isn't this just A8? */
+		/* OH or is it actually being used as  storing alpha in the rgb channels?..  i dont understand.. */
 		switch (fi->rgba) {
 		case FC_RGBA_RGB:
 		case FC_RGBA_BGR:

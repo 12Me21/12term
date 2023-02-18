@@ -36,11 +36,14 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 		return false;
 	
 	// determine render mode
-	FT_Render_Mode mode = FT_LOAD_TARGET_MODE(font->info.load_flags);
+	//FT_Render_Mode mode = FT_LOAD_TARGET_MODE(font->info.load_flags);
 	
-	/*FT_Render_Mode mode = FT_RENDER_MODE_MONO;
+	FT_Render_Mode mode = FT_RENDER_MODE_MONO;
+	FT_Int load_flags = font->info.load_flags;
 	if (font->info.color) {
+		// set render mode to NORMAL when loading color fonts, otherwise the width will be stretched 3× for subpixel rendering (if in LCD mode), which we can't handle (yet) TODO: support this? it's difficult to composite though..
 		mode = FT_RENDER_MODE_NORMAL;
+		load_flags = load_flags & ~FT_LOAD_TARGET_(-1) | mode;
 	} else {
 		if (font->info.antialias) {
 			switch (font->info.rgba) {
@@ -56,7 +59,7 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 				mode = FT_RENDER_MODE_LIGHT;
 			}
 		}
-		}*/
+	}
 	
 	bool transform = font->info.transform && mode != FT_RENDER_MODE_MONO;
 	
@@ -65,14 +68,16 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 	
 	FT_Library_SetLcdFilter(ft_library, font->info.lcd_filter);
 	
-	FT_Error	error = FT_Load_Glyph(face, glyphindex, font->info.load_flags);
+	FT_Error	error = FT_Load_Glyph(face, glyphindex, load_flags);
 	if (error) {
 		// If anti-aliasing or transforming glyphs and
 		// no outline version exists, fallback to the
 		// bitmap and let things look bad instead of
 		// missing the glyph
-		if (font->info.load_flags & FT_LOAD_NO_BITMAP)
-			error = FT_Load_Glyph(face, glyphindex, font->info.load_flags & ~FT_LOAD_NO_BITMAP);
+		if (load_flags & FT_LOAD_NO_BITMAP) {
+			load_flags ^= FT_LOAD_NO_BITMAP;
+			error = FT_Load_Glyph(face, glyphindex, load_flags);
+		}
 		if (error)
 			return false;
 	}
@@ -115,6 +120,7 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 	}
 	out->metrics.xOff = x_off;
 	out->metrics.yOff = y_off;
+	// TODO: remember that sub-pixel positioning exists?
 	
 	FT_Bitmap local;
 	if (glyphslot->format != FT_GLYPH_FORMAT_BITMAP)
@@ -174,6 +180,7 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 	XftFormat* format = &xft_formats[font->format];
 	
 	if (glyphslot->bitmap.pixel_mode == FT_PIXEL_MODE_BGRA) {
+		//print("rendering image, %d×%d\n", );
 		// all of this is just to take data and turn it into a Picture
 		Pixmap pixmap = XCreatePixmap(W.d, DefaultRootWindow(W.d), local.width, local.rows, 32);
 		// do we need to create a gc each time here
