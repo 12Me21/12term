@@ -83,6 +83,7 @@ typedef struct Cursor {
 // the main or alternate buffer.
 typedef struct Buffer {
 	Row** rows;
+	Cursor saved_cursor; // it seems that each buffer has a separate *saved* cursor (while the *current* cursor position itself is shared)
 } Buffer;
 
 // all terminal properties
@@ -98,7 +99,6 @@ typedef struct Term {
 	// wait, is that true?
 	
 	Cursor c;
-	Cursor saved_cursor;
 	bool show_cursor;
 	int cursor_shape;
 	bool cursor_blink; // unused, probably will never implement this because it sucks lol

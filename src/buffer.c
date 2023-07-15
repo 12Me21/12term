@@ -154,7 +154,7 @@ void term_resize(int width, int height) {
 			T.tabs[x] = (x%8 == 0);
 		// adjust cursor position
 		T.c.x = limit(T.c.x, 0, T.width); //note this is NOT width-1, since cursor is allowed to be in the right margin
-		T.saved_cursor.x = limit(T.saved_cursor.x, 0, T.width);
+		// T.saved_cursor.x = limit(T.saved_cursor.x, 0, T.width); // I used to limit the saved cursor pos here, but i think that's wrong, since it's limited when restored anyway? honsestly i'm not sure. it only makes a difference if the window is resized smaller, then larger again.
 		// resize history rows
 		for (int i=1; i<=history.length; i++) {
 			Row** row = &history.rows[(history.head-i+history.size) % history.size];
@@ -183,7 +183,7 @@ void term_resize(int width, int height) {
 		T.height = height;
 		// adjust cursor position
 		T.c.y = limit(T.c.y+diff, 0, T.height-1);
-		T.saved_cursor.y = limit(T.saved_cursor.y+diff, 0, T.height-1);
+		//T.saved_cursor.y = limit(T.saved_cursor.y+diff, 0, T.height-1); // see note above
 		// adjust last written pos
 		T.last_y = limit(T.last_y+diff, 0, T.height-1);
 	} else if (height > T.height) { // height INCREASE (diff > 0)
@@ -211,7 +211,8 @@ void term_resize(int width, int height) {
 		}
 		// adjust cursor down
 		T.c.y += diff;
-		T.saved_cursor.y += diff;
+		FOR (scr, 2)
+			T.buffers[scr].saved_cursor.y += diff;
 		// adjust last written pos
 		T.last_y += diff;
 	}
@@ -292,7 +293,8 @@ void full_reset(void) {
 			.background = {.i = -2},
 		},
 	};
-	T.saved_cursor = T.c;
+	FOR (scr, 2)
+		T.buffers[scr].saved_cursor = T.c;
 	T.show_cursor = true;
 	set_cursor_style(0);
 	
@@ -772,11 +774,12 @@ void switch_buffer(bool alt) {
 }
 
 void save_cursor(void) {
-	T.saved_cursor = T.c;
+	T.current->saved_cursor = T.c;
 }
 
 void restore_cursor(void) {
-	T.c = T.saved_cursor;
+	reset_last(); // newly added. is this needed?
+	T.c = T.current->saved_cursor;
 	// we limit here in case the window was resized between when the cursor was saved and now
 	T.c.x = limit(T.c.x, 0, T.width); //note: not width-1!
 	T.c.y = limit(T.c.y, 0, T.height-1);
