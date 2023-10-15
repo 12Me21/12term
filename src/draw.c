@@ -292,7 +292,7 @@ static bool draw_row(int y, Row* row) {
 	draw_rect(rows[y].draw, prev_color, W.border+W.cw*prev_start, 0, W.cw*(x-prev_start/*+1*/), W.ch);
 	
 	// draw right border background
-	draw_rect(rows[y].draw, (Color){.i = /*row->wrap?-3:*/-2}, W.border+W.cw*T.width, 0, W.border+W.cw, W.ch);
+	draw_rect(rows[y].draw, (Color){.i = /*row->wrap?-3:*/-2}, W.border+W.cw*T.width, 0, W.border+W.cw, W.ch); // we add W.cw to the border width incase the window is slightly larger than it should be (i.e. in fullscreen)
 	//draw_rect(rows[y].draw, (Color){.i = -3}, W.border+W.cw*row->length, 0, W.border, W.ch);
 	
 	// draw text
