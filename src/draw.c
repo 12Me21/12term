@@ -283,15 +283,16 @@ static bool draw_row(int y, Row* row) {
 	for (x=1; x<T.width; x++) {
 		Color bg = row->cells[x].attrs.background;
 		if (!same_color(bg, prev_color)) {
-			draw_rect(rows[y].draw, prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x-1), W.ch);
+			draw_rect(rows[y].draw, prev_color, W.border+W.cw*prev_start, 0, W.cw*(x-prev_start), W.ch);
 			prev_start = x;
 			prev_color = bg;
 		}
 	}
-	draw_rect(rows[y].draw, prev_color, W.border+W.cw*prev_start, 0, W.cw*(prev_start-x-1), W.ch);
-	// todo: why does the bg color extend too far in fullscreen?
+	
+	draw_rect(rows[y].draw, prev_color, W.border+W.cw*prev_start, 0, W.cw*(x-prev_start/*+1*/), W.ch);
+	
 	// draw right border background
-	draw_rect(rows[y].draw, (Color){.i = /*row->wrap?-3:*/-2}, W.border+W.cw*T.width, 0, W.border, W.ch);
+	draw_rect(rows[y].draw, (Color){.i = /*row->wrap?-3:*/-2}, W.border+W.cw*T.width, 0, W.border+W.cw, W.ch);
 	//draw_rect(rows[y].draw, (Color){.i = -3}, W.border+W.cw*row->length, 0, W.border, W.ch);
 	
 	// draw text
