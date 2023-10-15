@@ -23,11 +23,8 @@ static void swap_card32(uint32_t* data, int u) {
 	}
 }
 
-static int dot6_to_int(FT_F26Dot6 x) {
-	return x>>6;
-}
 static int dot6_round(FT_F26Dot6 x) {
-	return x+32 & ~63;
+	return (x+32)>>6;
 }
 
 bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
@@ -100,6 +97,7 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 	
 	FT_Library_SetLcdFilter(ft_library, FT_LCD_FILTER_NONE);
 	
+	// calculate x and y advance
 	int x_off, y_off;
 	if (font->info.spacing >= FC_MONO) {
 		if (transform) {
@@ -109,17 +107,17 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 			};
 			FT_Vector_Transform(&vector, &font->info.matrix);
 			x_off = vector.x >> 6;
-			y_off = -(vector.y >> 6);
+			y_off = vector.y >> 6;
 		} else {
 			x_off = font->max_advance_width;
 			y_off = 0;
 		}
 	} else {
-		x_off = dot6_to_int(dot6_round(glyphslot->advance.x));
-		y_off = -dot6_to_int(dot6_round(glyphslot->advance.y));
+		x_off = dot6_round(glyphslot->advance.x);
+		y_off = dot6_round(glyphslot->advance.y);
 	}
 	out->metrics.xOff = x_off;
-	out->metrics.yOff = y_off;
+	out->metrics.yOff = -y_off;
 	// TODO: remember that sub-pixel positioning exists?
 	
 	FT_Bitmap local;
@@ -149,9 +147,9 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 	
 	uint8_t bufBitmap[size]; // I hope there's enough stack space owo
 	//memset(bufBitmap, 0, size);
-		
+	
 	local.buffer = bufBitmap;
-		
+	
 	if (mode==FT_RENDER_MODE_NORMAL && glyph_transform)
 		fill_xrender_bitmap(&local, &glyphslot->bitmap, mode, false, &font->info.matrix);
 	else

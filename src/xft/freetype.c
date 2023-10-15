@@ -23,7 +23,7 @@ typedef struct FontFile {
 	FT_Face face; // pointer to face; only valid when lock
 } FontFile;
 
-// List of all open files (each face in a file is managed separately)
+// Linked list of all open files (each face in a file is managed separately)
 static FontFile* xft_files = NULL;
 
 FcConfig* defc;
@@ -42,32 +42,28 @@ static FontFile* get_file(const utf8* filename, int id) {
 	// search all files for one with a matching name/id
 	for (f=xft_files; f; f=f->next) {
 		if (!strcmp(f->filename, filename) && f->id == id) {
-			++f->ref;
 			if (DEBUG.ref)
 				print("FontFile %s/%d matches existing (%d)\n", filename, id, f->ref);
+			++f->ref;
 			goto found;
 		}
 	}
-	// otherwise, create a new one
-	f = malloc(sizeof(FontFile)+strlen(filename)+1);
-	if (!f)
-		return NULL;
-	
 	if (DEBUG.ref)
 		print("FontFile %s/%d matches new\n", filename, id);
-	f->next = xft_files;
-	xft_files = f;
 	
-	f->ref = 1;
+	// otherwise, create a new one
+	f = malloc(sizeof(FontFile)+strlen(filename)+1);
 	
-	f->filename = (utf8*)&f[1];
+	*f = (FontFile){
+		.next = xft_files,
+		.ref = 1,
+		.filename = (utf8*)&f[1], // points to the extra memory we allocated after the struct
+		.id = id,
+		.face = NULL,
+		// rest of fields are 0
+	};
 	strcpy(f->filename, filename);
-	f->id = id;
-	
-	f->face = NULL;
-	f->xsize = 0;
-	f->ysize = 0;
-	f->matrix.xx = f->matrix.xy = f->matrix.yx = f->matrix.yy = 0;
+	xft_files = f;
  found:
 	return f;
 }
@@ -83,9 +79,7 @@ static FontFile* make_face_file(FT_Face face) {
 		.filename = NULL,
 		.id = 0,
 		.face = face,
-		.xsize = 0,
-		.ysize = 0,
-		.matrix = {0,0,0,0},
+		// rest are 0
 	};
 	return f;
 }
@@ -100,14 +94,24 @@ static FT_F26Dot6 dist(FT_F26Dot6 a, FT_F26Dot6 b) {
 	return b-a;
 }
 
+// for debug only
+static double f26dot6_to_float(FT_F26Dot6 n) {
+	return (double)n / (1<<6);
+}
+// for debug only
+static double fixed_to_float(FT_Fixed n) {
+	return (double)n / (1<<16);
+}
+
 // set the current size and matrix for a font
 static bool set_face(FontFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix* matrix) {
 	FT_Face face = f->face;
 	
 	if (f->xsize != xsize || f->ysize != ysize) {
 		if (DEBUG.glyph)
-			print("Set face size to %dx%d (%dx%d)\n",
-			       (int) (xsize >> 6), (int) (ysize >> 6), (int) xsize, (int) ysize);
+			print("Set face size to %g×%g\n", f26dot6_to_float(xsize), f26dot6_to_float(ysize));
+		
+		FT_F26Dot6 rx = xsize, ry = ysize;
 		// Bitmap only faces must match exactly, so find the closest
 		// one (height dominant search)
 		if (!(face->face_flags & FT_FACE_FLAG_SCALABLE)) {
@@ -115,34 +119,27 @@ static bool set_face(FontFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix*
 			
 			for (int i=1; i<face->num_fixed_sizes; i++) {
 				FT_Bitmap_Size* si = &face->available_sizes[i];
-				if (dist(ysize, si->y_ppem) < dist(ysize, best->y_ppem) ||
-				    (dist(ysize, si->y_ppem) == dist(ysize, best->y_ppem) &&
-				     dist(xsize, si->x_ppem) < dist(xsize, best->x_ppem))) {
+				if (dist(ysize, si->y_ppem) < dist(ysize, best->y_ppem) || (dist(ysize, si->y_ppem) == dist(ysize, best->y_ppem) && dist(xsize, si->x_ppem) < dist(xsize, best->x_ppem)))
 					best = si;
-				}
 			}
-			// Freetype 2.1.7 and earlier used width/height
-			// for matching sizes in the BDF and PCF loaders.
-			// This has been fixed for 2.1.8.  Because BDF and PCF
-			// files have but a single strike per file, we can
-			// simply try both sizes.
-			if (FT_Set_Char_Size(face, best->x_ppem, best->y_ppem, 0, 0) != 0 &&
-			    FT_Set_Char_Size(face, best->width<<6, best->height<<6, 0, 0) != 0)
-				return false;
-		} else {
-			if (FT_Set_Char_Size(face, xsize, ysize, 0, 0))
-				return false;
+			rx = best->x_ppem;
+			ry = best->y_ppem;
 		}
+		
+		if (FT_Set_Char_Size(face, rx, ry, 0, 0))
+			return false;
 		f->xsize = xsize;
 		f->ysize = ysize;
 	}
+	
 	if (!matrix_equal(&f->matrix, matrix)) {
 		if (DEBUG.glyph)
 			print("Set face matrix to (%g,%g,%g,%g)\n",
-			      (double)matrix->xx / 0x10000,
-			      (double)matrix->xy / 0x10000,
-			      (double)matrix->yx / 0x10000,
-			      (double)matrix->yy / 0x10000);
+				fixed_to_float(matrix->xx),
+				fixed_to_float(matrix->xy),
+				fixed_to_float(matrix->yx),
+				fixed_to_float(matrix->yy)
+			);
 		FT_Set_Transform(face, matrix, NULL);
 		f->matrix = *matrix;
 	}
@@ -151,9 +148,8 @@ static bool set_face(FontFile* f, FT_F26Dot6 xsize, FT_F26Dot6 ysize, FT_Matrix*
 
 static void release_file(FontFile* f) {
 	if (f->filename) {
-		if (f->face) {
+		if (f->face)
 			FT_Done_Face(f->face);
-		}
 	}
 	free(f);
 }
@@ -251,8 +247,8 @@ static bool font_info_fill(const FcPattern* pattern, XftFontInfo* fi) {
 	double aspect = 1.0;
 	FcPatternGetDouble(pattern, FC_ASPECT, 0, &aspect);
 	
-	fi->ysize = (FT_F26Dot6)(dsize * 64.0);
-	fi->xsize = (FT_F26Dot6)(dsize * aspect * 64.0);
+	fi->ysize = dsize * (1<<6);
+	fi->xsize = dsize * aspect * (1<<6);
 	
 	if (DEBUG.open)
 		print("font_info_fill: %s: %d (%g pixels)\n",
@@ -271,6 +267,7 @@ static bool font_info_fill(const FcPattern* pattern, XftFontInfo* fi) {
 	FcPatternGetInteger(pattern, FC_LCD_FILTER, 0, &fi->lcd_filter);
 	
 	// Get matrix and transform values
+	// - why are we multiplying all this?
 	FcMatrix* font_matrix;
 	if (FcPatternGetMatrix(pattern, FC_MATRIX, 0, &font_matrix) == FcResultMatch) {
 		fi->matrix.xx = 0x10000L * font_matrix->xx;
@@ -316,9 +313,10 @@ static bool font_info_fill(const FcPattern* pattern, XftFontInfo* fi) {
 static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	// No existing font, create another.
 	if (DEBUG.cache)
-		print("New font %s/%d size %dx%d\n",
-		      fi->file->filename, fi->file->id,
-		      (int) fi->xsize >> 6, (int) fi->ysize >> 6);
+		print("New font %s/%d size %g×%g\n",
+			fi->file->filename, fi->file->id,
+			f26dot6_to_float(fi->xsize), f26dot6_to_float(fi->ysize)
+		);
 	
 	FontFile* f = fi->file;
 	
@@ -378,54 +376,28 @@ static XftFont* XftFontOpenInfo(FcPattern* pattern, XftFontInfo* fi) {
 	} else
 		font->format = PictStandardA1;
 	
-	int ascent, descent, height;
 	// Public fields
-	if (fi->transform) {
-		FT_Vector vector;
-		
-		vector.x = 0;
-		vector.y = face->size->metrics.descender;
-		FT_Vector_Transform(&vector, &fi->matrix);
-		descent = -(vector.y >> 6);
-		
-		vector.x = 0;
-		vector.y = face->size->metrics.ascender;
-		FT_Vector_Transform(&vector, &fi->matrix);
-		
-		ascent = vector.y >> 6;
-		
-		if (fi->minspace)
-			height = ascent + descent;
-		else {
-			vector.x = 0;
-			vector.y = face->size->metrics.height;
-			FT_Vector_Transform(&vector, &fi->matrix);
-			height = vector.y >> 6;
-		}
-	} else {
-		descent = -(face->size->metrics.descender >> 6);
-		ascent = face->size->metrics.ascender >> 6;
-		if (fi->minspace)
-			height = ascent + descent;
-		else
-			height = face->size->metrics.height >> 6;
-	}
-	font->ascent = ascent;
-	font->descent = descent;
-	font->height = height;
 	
-	if (fi->char_width)
-		font->max_advance_width = fi->char_width;
-	else {
-		if (fi->transform) {
-			FT_Vector vector;
-			vector.x = face->size->metrics.max_advance;
-			vector.y = 0;
-			FT_Vector_Transform(&vector, &fi->matrix);
-			font->max_advance_width = vector.x >> 6;
-		} else
-			font->max_advance_width = face->size->metrics.max_advance >> 6;
+	FT_F26Dot6 descent = -face->size->metrics.descender;
+	FT_F26Dot6 ascent = face->size->metrics.ascender;
+	FT_F26Dot6 height = face->size->metrics.height;
+	FT_F26Dot6 char_width = face->size->metrics.max_advance;
+	if (fi->minspace)
+		height = ascent + descent;
+	if (fi->transform) {
+		descent = FT_MulFix(descent, fi->matrix.yy);
+		ascent = FT_MulFix(descent, fi->matrix.yy);
+		height = FT_MulFix(height, fi->matrix.yy);
+		char_width = FT_MulFix(char_width, fi->matrix.xx);
 	}
+	if (fi->char_width)
+		char_width = fi->char_width<<6;
+	// todo: why dont we just keep these as fixed, hm?
+	font->ascent = ascent>>6;
+	font->descent = descent>>6;
+	font->height = height>>6;
+	font->max_advance_width = char_width>>6;
+	
 	font->charset = charset;
 	font->pattern = pattern;
 	

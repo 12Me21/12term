@@ -138,7 +138,7 @@ void fill_xrender_bitmap(
 				FT_Vector_Transform(&vector, &inverse);
 				vector.x = limit(FT_RoundFix(vector.x)/0x10000, 0, source->width - 1);
 				vector.y = limit(FT_RoundFix(vector.y)/0x10000, 0, source->rows  - 1);
-			
+				
 				uint8_t* src;
 				switch (source->pixel_mode) {
 					// convert mono to 8-bit gray, scale using nearest pixel
