@@ -233,6 +233,8 @@ static bool font_info_fill(const FcPattern* pattern, XftFontInfo* fi) {
 		fi->file = get_file((utf8*)filename, id);
 	} else if (FcPatternGetFTFace(pattern, FC_FT_FACE, 0, &face) == FcResultMatch && face) {
 		fi->file = make_face_file(face);
+	} else {
+		fi->file = NULL;
 	}
 	
 	if (!fi->file)
