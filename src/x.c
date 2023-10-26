@@ -58,6 +58,10 @@ static unsigned long alloc_color(Color c) {
 // this is called when changing the window size
 // set `charsize` if W.cw or W.ch have changed.
 void change_size(Px w, Px h, bool charsize, bool resize) {
+	if (charsize) {
+		if (W.cw<2) W.cw=2;
+		if (W.ch<2) W.ch=2;
+	}
 	Px base = W.border*2;
 	int width = (w-base) / W.cw;
 	int height = (h-base) / W.ch;
