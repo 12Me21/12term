@@ -283,7 +283,7 @@ static void process_osc(void) {
 	case 10: // set foreground, background, cursor colors
 	case 11:
 	case 12:
-		// what ??
+		// what ??  i dont think this was written correctly..
 		/*while (s && *s==';') {
 			s++;
 			parse_x_color(s, (RGBColor*[]){
