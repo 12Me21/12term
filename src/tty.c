@@ -79,7 +79,6 @@ static void execsh(void) {
 	setenv("LOGNAME", pw->pw_name, true);
 	setenv("USER", pw->pw_name, true);
 	setenv("SHELL", sh, true);
-	setenv("EDITOR", "emacs", true);
 	setenv("HOME", pw->pw_dir, true);
 	setenv("TERM", settings.termName, true);
 	setenv("TERMCAP", "xterm-256color", true);
