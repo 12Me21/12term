@@ -66,7 +66,7 @@ int compute_xrender_bitmap_size(
 			// each pixel is replicated into a 32-bit ARGB value
 			pitch = width * 4;
 		} else {
-			pitch = round_up(width, 4);
+			pitch = width * 4; // why is this *4? but this is the only value that doesn't crash
 		}
 		break;
 	case FT_PIXEL_MODE_BGRA:
@@ -94,7 +94,6 @@ int compute_xrender_bitmap_size(
 	target->rows = height;
 	target->pitch = pitch;
 	target->buffer = NULL;
-	
 	return pitch * height;
 }
 
@@ -206,7 +205,12 @@ void fill_xrender_bitmap(
 					}
 					// copy gray into gray
 				} else {
-					memcpy(dst_line, src_line, width);
+					//print("gray gray\n");
+					// WHAT WHY????
+					FOR (x, width) {
+						dst[x] = pack(src_line[x], src_line[x], src_line[x], src_line[x]);
+					}
+					//					memcpy(dst_line, src_line, width*4);
 				}
 				break;
 			case FT_PIXEL_MODE_BGRA: 
