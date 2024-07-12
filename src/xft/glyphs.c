@@ -99,7 +99,8 @@ bool load_glyph(XftFont* font, Char chr, GlyphData* out) {
 	
 	// calculate x and y advance
 	int x_off, y_off;
-	if (font->info.spacing >= FC_MONO) {
+	if (0 && font->info.spacing >= FC_MONO) {
+	// is there any like reason to do this i mean
 		if (transform) {
 			FT_Vector vector = {
 				.x = face->size->metrics.max_advance,
