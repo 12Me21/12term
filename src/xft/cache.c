@@ -229,6 +229,7 @@ GlyphData* cache_lookup(Char chr, uint8_t style) {
 	int i;
 	if (chr>=' ' && chr<='~') {
 		i = chr - ' ';
+		cache[i].key = chr; // hack! we have to set .key on any filled cache entry, so clearing the cache works (we need to un-cache even ascii glyphs, when changing the font)
 	} else {
 		i = cache_ascii + chr % cache_other;
 		
