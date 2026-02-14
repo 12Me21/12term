@@ -397,7 +397,7 @@ static void process_char(Char c) {
 		break;
 	case CSI_START:
 		P.state = CSI;
-		if (c=='?' || c=='>' || c=='!')
+		if (c=='?' || c=='>' || c=='!' || c=='<')
 			P.csi_private = c;
 		else {
 			P.csi_private = 0;
