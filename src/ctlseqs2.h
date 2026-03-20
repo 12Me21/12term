@@ -9,9 +9,10 @@ enum parse_state {
 	CSI_START,
 	CSI,
 	CSI_2,
-	ESC_TEST,
-	UTF8,
-	ALTCHARSET,
+	// ESC_TEST,
+	//	UTF8,
+	G_D4, // G[0-4] Designate 94-character set
+	DOCS, // Designate Other Coding System
 	STRING,
 	ST,
 };

@@ -60,11 +60,14 @@ static void begin_string(int type) {
 static void process_escape_char(Char c) {
 	switch (c) {
 		// multi-char sequences
+	case '%': // "Designate other coding system" (select encoding)
+		P.state = DOCS;
+		return;
 	case '(': // designate G0-G3 char sets
 	case ')':
 	case '*':
 	case '+':
-		P.state = ALTCHARSET;
+		P.state = G_D4;
 		P.charset = c-'(';
 		return;
 	case '[': // CSI
@@ -410,12 +413,21 @@ static void process_char(Char c) {
 	case CSI_2:
 		process_csi_command_2(c);
 		break;
-	case ALTCHARSET:
+	case G_D4:
+		// note we only ever use working set G0, and only support character sets 'B' (ASCII but actually unicode) and '0' (DEC line drawing)
+		// i can't remember if i've seen '0' used before, but definitely haven't seen any others.
 		if (c=='0' || c=='B')
 			select_charset(P.charset, c);
 		else
 			print("unknown charset: %s\n", char_name(c));
 		P.state = NORMAL;
+		break;
+	case DOCS:
+		// i've only seen this used by xclip, when outputting target=TEXT it puts these around non-ascii chars
+		// we are always going to operate in UTF-8 mode, however
+		// i think the only place this differs from ISO 2022 is that the single-byte C1 control characters are not supported?? but i don't think even xterm supports that normally? idk. todo: check xterm code.
+		if (c!='/') // note this allows multiple `/`, but so does xterm.
+			P.state = NORMAL;
 		break;
 		// ???
 	case ST:
@@ -504,3 +516,6 @@ void reset_parser(void) {
 	P.state = NORMAL;
 	P.last_printed = -1;
 }
+
+// note:  there are some standards which describe terminal control sequences, but in general we support things that people actually use (and thus, only if other terminals support them, or there is significant push to add them as new features, and we defer to commonly incorrectly implemented features as well)
+// also, certain things are only parsed insofaras skipping the right number of characters to prevent printing garbage.
