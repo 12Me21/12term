@@ -25,10 +25,14 @@ typedef union Color {
 		RGBColor rgb;
 		bool truecolor;
 	};
-	int16_t i;
+	struct {
+		int16_t i;
+		int16_t _padding;
+		// new behavior in gcc 15.2: this field must exist, otherwise compound literal (Color){.i=-1} will not zero the second 2 bytes !
+	};
 } Color;
-// RRRRRRRR GGGGGGGG BBBBBBBB 1.......
-// iiiiiiii iiiiiiii ........ 0.......
+// RRRRRRRR GGGGGGGG BBBBBBBB 1....... union branch 1
+// iiiiiiii iiiiiiii ........(0)...... union branch 2 - .truecolor is accessible here too, we pretend
 
 // display attributes for characters
 typedef struct Attrs {
