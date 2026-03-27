@@ -30,6 +30,10 @@
 #include "tty.h"
 #include "ctlseqs.h"
 #include "settings.h"
+
+// this is probably most likely always going to be "-c" but just in case..
+#define SHELL_EVAL_FLAG "-c"
+
 void sleep_forever(bool hangup); // nnn where do these decs go...
 
 static Fd master_fd;
@@ -85,8 +89,14 @@ static void execsh(void) {
 	signal(SIGQUIT, SIG_DFL);
 	signal(SIGTERM, SIG_DFL);
 	signal(SIGALRM, SIG_DFL);
-	
-	execvp(sh, (char*[]){sh, NULL});
+
+	char* eval = getenv("LAUNCH_12TERM");
+
+	if (eval == NULL) {
+		execvp(sh, (char*[]){sh, NULL});
+	} else {
+		execvp(sh, (char*[]){sh, SHELL_EVAL_FLAG, eval, NULL});
+	}
 }
 
 // I don't use openbsd so I can't confirm whether these pledge calls are correct.
